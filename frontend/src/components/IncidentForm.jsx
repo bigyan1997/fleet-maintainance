@@ -1,0 +1,109 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { fetchVehicles } from '../api/vehicles'
+import { createIncident, updateIncident } from '../api/incidents'
+import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
+
+const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
+const SEVERITIES = ['Minor', 'Moderate', 'Major']
+const STATUSES = ['Open', 'In progress', 'Resolved']
+
+function today() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function blankForm() {
+  return { vehicle: '', incident_type: TYPES[0], date: today(), severity: SEVERITIES[0], location: '', status: STATUSES[0], cost: '', description: '', notes: '' }
+}
+
+function fromIncident(x) {
+  return {
+    vehicle: x.vehicle, incident_type: x.incident_type, date: x.date, severity: x.severity,
+    location: x.location || '', status: x.status, cost: x.cost ?? '', description: x.description || '', notes: x.notes || '',
+  }
+}
+
+export function IncidentForm({ incident, onDone, onSaved, onError }) {
+  const isEdit = Boolean(incident && incident.id)
+  const [form, setForm] = useState(() => (isEdit ? fromIncident(incident) : blankForm()))
+  const queryClient = useQueryClient()
+  const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const payload = { ...form, cost: form.cost || null }
+      return isEdit ? updateIncident(incident.id, payload) : createIncident(payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['incidents'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      onSaved(isEdit ? 'Incident updated.' : 'Incident logged.')
+      onDone(true)
+    },
+    onError: (err) => onError(err?.response?.data?.detail ?? 'Could not save incident.'),
+  })
+
+  const vehicleOptions = vehiclesQuery.data ?? []
+
+  return (
+    <div className="rounded-lg border border-line bg-white p-5">
+      <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit incident' : 'Log an incident'}</h2>
+      <FormRow>
+        <Field label="Vehicle">
+          <select value={form.vehicle} onChange={(e) => set('vehicle')(e.target.value ? Number(e.target.value) : '')} className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm">
+            <option value="">Select vehicle…</option>
+            {vehicleOptions.map((v) => <option key={v.id} value={v.id}>{v.label} ({v.rego})</option>)}
+          </select>
+        </Field>
+        <Field label="Type">
+          <SelectInput value={form.incident_type} onChange={set('incident_type')} options={TYPES} />
+        </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Date">
+          <DateInput value={form.date} onChange={set('date')} />
+        </Field>
+        <Field label="Severity">
+          <SelectInput value={form.severity} onChange={set('severity')} options={SEVERITIES} />
+        </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Location">
+          <TextInput value={form.location} onChange={set('location')} placeholder="e.g. Highway 1, near Depot" />
+        </Field>
+        <Field label="Status">
+          <SelectInput value={form.status} onChange={set('status')} options={STATUSES} />
+        </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Cost ($)">
+          <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 850" />
+        </Field>
+        <div />
+      </FormRow>
+      <div className="mb-3">
+        <Field label="Description">
+          <TextInput value={form.description} onChange={set('description')} placeholder="What happened" />
+        </Field>
+      </div>
+      <div className="mb-4">
+        <Field label="Notes / follow-up">
+          <TextInput value={form.notes} onChange={set('notes')} />
+        </Field>
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !form.vehicle}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
+        >
+          {mutation.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Save incident'}
+        </button>
+        <button onClick={() => onDone(isEdit)} className="rounded-md border border-line bg-white px-4 py-2 text-sm font-medium hover:bg-[#f5f5f5]">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
