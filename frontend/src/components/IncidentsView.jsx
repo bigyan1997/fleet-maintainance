@@ -4,6 +4,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { deleteIncident, fetchIncidents } from '../api/incidents'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
+import { IncidentLog } from './IncidentLog'
 
 const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const STATUSES = ['Open', 'In progress', 'Resolved']
@@ -114,7 +115,11 @@ export function IncidentsView({ onEdit, onAdd }) {
           rows={[
             ['Type', detail.incident_type], ['Date', detail.date], ['Severity', detail.severity],
             ['Status', detail.status], ['Location', detail.location || '—'], ['Cost', detail.cost ? `$${detail.cost}` : '—'],
-            ['Description', detail.description || '—'], ['Notes', detail.notes || '—'],
+            ['Description', detail.description || '—'],
+            ['Updates', <div className="text-left font-normal"><IncidentLog updates={detail.updates} /></div>],
+            ...(detail.status === 'Resolved'
+              ? [['Resolution', detail.resolution || '—'], ['Resolved date', detail.resolved_date || '—']]
+              : []),
           ]}
           onClose={() => setDetail(null)}
           onEdit={() => { onEdit(detail); setDetail(null) }}

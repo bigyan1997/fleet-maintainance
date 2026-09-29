@@ -16,6 +16,12 @@ The mirror (`fleet/sheets_sync.py`, wired via `fleet/signals.py`) writes to a ne
 
 Also fixed: the Incidents list 500'd on every load (`list_incidents()` didn't accept the `date_from`/`date_to` the shared filter helper passes).
 
+**Service status workflow** (later the same day): every ServiceRecord has a `status` — Booked → In service → Completed, awaiting invoice → Invoiced (originally five stages; "Service completed" and "Waiting for invoice" were merged at the business's request). The dashboard leads with per-status counts (click through to a filtered Service History) and a "Jobs in progress" list (everything not Invoiced) with inline status dropdowns; the service form and Service History also edit it, Recent services only displays it. Migration 0002 marked pre-existing past records Invoiced and future-dated ones Booked. The service PATCH endpoint is truly partial (the others still require every field) so the dropdown can send just `{status}`.
+
+**Incident follow-up log**: an incident's single notes field became `IncidentUpdate` — a dated, author-stamped log, append-only by design (no edit/delete). Resolving requires a `resolution` ("what was done", enforced server-side) and stamps `resolved_date`, cleared again if reopened. The API still exposes the joined log as read-only `notes` so Export/CSV didn't need restructuring.
+
+**Also fixed**: Service History / Incidents / Fuel Log all rendered empty — their plain `ViewSet`s ignored `DEFAULT_PAGINATION_CLASS`, while the pages read `{count, results}`. `views._paginated()` now paginates them explicitly.
+
 ### Earlier (2026-09-28)
 
 **Backend and frontend fully built and verified end-to-end** against a real local Postgres database — all 4 entities' CRUD, the odometer-bump business rule, vehicle delete protection, dashboard, alerts, and analytics aggregation were all tested live via real HTTP requests, not just unit-level. Not yet deployed anywhere; not yet connected to any Google Sheet (neither the one-time import from the legacy sheet, nor the outgoing mirror).

@@ -1,10 +1,10 @@
 from datetime import date
 
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from .models import FuelLog, Incident, ServiceRecord, Vehicle
+from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, Vehicle
 
 
 class ValidationError(Exception):
@@ -118,10 +118,12 @@ def _bump_odometer_if_higher(vehicle, odometer):
 # ── Service record CRUD ──────────────────────────────────────────────────
 
 
-def list_services(vehicle=None, service_type="", date_from=None, date_to=None, search=""):
+def list_services(vehicle=None, service_type="", status="", date_from=None, date_to=None, search=""):
     qs = ServiceRecord.objects.select_related("vehicle").all()
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
+    if status:
+        qs = qs.filter(status=status)
     if service_type:
         qs = qs.filter(service_type=service_type)
     if date_from:
@@ -168,7 +170,7 @@ def delete_service(pk):
 
 
 def list_incidents(vehicle=None, incident_type="", status="", date_from=None, date_to=None, search=""):
-    qs = Incident.objects.select_related("vehicle").all()
+    qs = Incident.objects.select_related("vehicle").prefetch_related("updates__author")
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
     if date_from:
@@ -185,8 +187,9 @@ def list_incidents(vehicle=None, incident_type="", status="", date_from=None, da
             | Q(vehicle__model__icontains=search)
             | Q(vehicle__rego__icontains=search)
             | Q(description__icontains=search)
-            | Q(notes__icontains=search)
-        )
+            | Q(updates__text__icontains=search)
+            | Q(resolution__icontains=search)
+        ).distinct()
     return qs
 
 
@@ -264,6 +267,12 @@ def dashboard_summary():
             due_count += 1
     total_spend = ServiceRecord.objects.aggregate(total=Sum("cost"))["total"] or 0
     recent = ServiceRecord.objects.select_related("vehicle").order_by("-date", "-id")[:5]
+    counts = dict(ServiceRecord.objects.order_by().values_list("status").annotate(n=Count("id")))
+    in_progress = (
+        ServiceRecord.objects.select_related("vehicle")
+        .exclude(status=SERVICE_STATUS_DONE)
+        .order_by("date", "id")
+    )
     return {
         "vehicle_count": len(vehicles),
         "service_count": ServiceRecord.objects.count(),
@@ -271,6 +280,8 @@ def dashboard_summary():
         "open_incident_count": Incident.objects.exclude(status="Resolved").count(),
         "total_spend": total_spend,
         "recent_services": recent,
+        "status_counts": [{"status": key, "count": counts.get(key, 0)} for key, _ in SERVICE_STATUS_CHOICES],
+        "in_progress_services": in_progress,
     }
 
 

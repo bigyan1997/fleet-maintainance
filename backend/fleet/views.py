@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
+from .pagination import FleetPagination
 from .serializers import (
     FuelLogSerializer,
     IncidentSerializer,
@@ -55,6 +56,14 @@ class VehicleViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _paginated(request, rows, serializer_class):
+    # Plain ViewSets ignore DEFAULT_PAGINATION_CLASS, but the History /
+    # Incidents / Fuel pages (and Export) read {count, results}.
+    paginator = FleetPagination()
+    page = paginator.paginate_queryset(rows, request)
+    return paginator.get_paginated_response(serializer_class(page, many=True).data)
+
+
 def _filtered_list(request, list_fn, extra_filters=None):
     filters = {
         "vehicle": request.query_params.get("vehicle") or None,
@@ -72,9 +81,12 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         rows = _filtered_list(
             request,
             services.list_services,
-            lambda r: {"service_type": r.query_params.get("service_type", "")},
+            lambda r: {
+                "service_type": r.query_params.get("service_type", ""),
+                "status": r.query_params.get("status", ""),
+            },
         )
-        return Response(ServiceRecordSerializer(rows, many=True).data)
+        return _paginated(request, rows, ServiceRecordSerializer)
 
     def create(self, request):
         serializer = ServiceRecordSerializer(data=request.data)
@@ -82,8 +94,8 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         record = services.create_service(serializer.validated_data)
         return Response(ServiceRecordSerializer(record).data, status=status.HTTP_201_CREATED)
 
-    def update(self, request, pk=None):
-        serializer = ServiceRecordSerializer(data=request.data)
+    def update(self, request, pk=None, partial=False):
+        serializer = ServiceRecordSerializer(data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         try:
             record = services.update_service(pk, serializer.validated_data)
@@ -92,7 +104,9 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         return Response(ServiceRecordSerializer(record).data)
 
     def partial_update(self, request, pk=None):
-        return self.update(request, pk=pk)
+        # Truly partial (unlike the other viewsets) so the dashboard's status
+        # dropdown can send just {"status": ...}.
+        return self.update(request, pk=pk, partial=True)
 
     def destroy(self, request, pk=None):
         try:
@@ -112,10 +126,10 @@ class IncidentViewSet(viewsets.ViewSet):
                 "status": r.query_params.get("status", ""),
             },
         )
-        return Response(IncidentSerializer(rows, many=True).data)
+        return _paginated(request, rows, IncidentSerializer)
 
     def create(self, request):
-        serializer = IncidentSerializer(data=request.data)
+        serializer = IncidentSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -125,7 +139,7 @@ class IncidentViewSet(viewsets.ViewSet):
             incident = services.get_incident(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
-        serializer = IncidentSerializer(incident, data=request.data)
+        serializer = IncidentSerializer(incident, data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -144,7 +158,7 @@ class IncidentViewSet(viewsets.ViewSet):
 class FuelLogViewSet(viewsets.ViewSet):
     def list(self, request):
         rows = _filtered_list(request, services.list_fuel_logs)
-        return Response(FuelLogSerializer(rows, many=True).data)
+        return _paginated(request, rows, FuelLogSerializer)
 
     def create(self, request):
         serializer = FuelLogSerializer(data=request.data)
@@ -183,6 +197,8 @@ class DashboardView(APIView):
                 "openIncidentCount": summary["open_incident_count"],
                 "totalSpend": summary["total_spend"],
                 "recentServices": ServiceRecordSerializer(summary["recent_services"], many=True).data,
+                "statusCounts": summary["status_counts"],
+                "inProgressServices": ServiceRecordSerializer(summary["in_progress_services"], many=True).data,
             }
         )
 

@@ -66,7 +66,8 @@ export function ExportView() {
       XLSX.utils.json_to_sheet(
         incidents.map((x) => ({
           Vehicle: x.vehicleLabel, Date: x.date, Type: x.incident_type, Severity: x.severity,
-          Location: x.location, Description: x.description, 'Cost ($)': x.cost, Status: x.status, Notes: x.notes,
+          Location: x.location, Description: x.description, 'Cost ($)': x.cost, Status: x.status, Updates: x.notes,
+          Resolution: x.resolution, 'Resolved Date': x.resolved_date,
         })),
       ),
       'Incidents',
@@ -97,7 +98,7 @@ export function ExportView() {
       download(toCSV(rows, ['vehicleLabel', 'service_type', 'date', 'odometer', 'cost', 'next_due', 'notes']), 'fleet-services.csv', 'text/csv')
     } else if (which === 'incidents') {
       const rows = await fetchAll(fetchIncidents)
-      download(toCSV(rows, ['vehicleLabel', 'date', 'incident_type', 'severity', 'location', 'description', 'cost', 'status', 'notes']), 'fleet-incidents.csv', 'text/csv')
+      download(toCSV(rows, ['vehicleLabel', 'date', 'incident_type', 'severity', 'location', 'description', 'cost', 'status', 'notes', 'resolution', 'resolved_date']), 'fleet-incidents.csv', 'text/csv')
     } else if (which === 'fuel') {
       const rows = await fetchAll(fetchFuelLogs)
       download(toCSV(rows, ['vehicleLabel', 'date', 'litres', 'cost', 'pricePerLitre', 'odometer', 'invoice_number', 'notes']), 'fleet-fuel.csv', 'text/csv')

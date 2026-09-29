@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createService, updateService } from '../api/services'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
+import { SERVICE_STATUSES } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
@@ -14,12 +15,12 @@ function today() {
 }
 
 function blankForm() {
-  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), odometer: '', cost: '', next_due: '', notes: '' }
+  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', odometer: '', cost: '', next_due: '', notes: '' }
 }
 
 function fromService(s) {
   return {
-    vehicle: s.vehicle, service_type: s.service_type, date: s.date,
+    vehicle: s.vehicle, service_type: s.service_type, date: s.date, status: s.status,
     odometer: s.odometer ?? '', cost: s.cost ?? '', next_due: s.next_due || '', notes: s.notes || '',
   }
 }
@@ -74,23 +75,26 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
         <Field label="Date">
           <DateInput value={form.date} onChange={set('date')} />
         </Field>
-        <Field label="Odometer (km)">
-          <NumberInput value={form.odometer} onChange={set('odometer')} placeholder="e.g. 85000" />
+        <Field label="Status">
+          <SelectInput value={form.status} onChange={set('status')} options={SERVICE_STATUSES} />
         </Field>
       </FormRow>
       <FormRow>
+        <Field label="Odometer (km)">
+          <NumberInput value={form.odometer} onChange={set('odometer')} placeholder="e.g. 85000" />
+        </Field>
         <Field label="Cost ($)">
           <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 250" />
         </Field>
+      </FormRow>
+      <FormRow>
         <Field label="Next due (km or date)">
           <TextInput value={form.next_due} onChange={set('next_due')} placeholder="e.g. 95000 or 2026-06-01" />
         </Field>
-      </FormRow>
-      <div className="mb-4">
         <Field label="Notes / parts replaced">
           <TextInput value={form.notes} onChange={set('notes')} />
         </Field>
-      </div>
+      </FormRow>
       <div className="flex items-center gap-3">
         <button
           onClick={() => mutation.mutate()}

@@ -20,7 +20,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from fleet import sheets_sync, signals
-from fleet.models import FuelLog, Incident, ServiceRecord, Vehicle
+from fleet.models import FuelLog, Incident, IncidentUpdate, ServiceRecord, Vehicle
 
 
 class DryRun(Exception):
@@ -168,6 +168,8 @@ class Command(BaseCommand):
                 cost=_decimal(get("Cost")),
                 next_due="" if next_due == "0" else next_due,
                 notes=get("Notes"),
+                # The legacy sheet had no status: past jobs are done, future ones are bookings.
+                status="Booked" if date > self.today else "Invoiced",
             )
             counts["Service History"] += 1
 
@@ -178,7 +180,7 @@ class Command(BaseCommand):
             date = self._date(get("Date"), f"Incidents row {n} ({get('Vehicle')})")
             if not vehicle or not date:
                 continue
-            Incident.objects.create(
+            incident = Incident.objects.create(
                 vehicle=vehicle,
                 incident_type=get("Type") or "Other",
                 date=date,
@@ -187,8 +189,9 @@ class Command(BaseCommand):
                 description=get("Description"),
                 cost=_decimal(get("Cost")),
                 status=get("Status") or "Open",
-                notes=get("Notes"),
             )
+            if get("Notes"):
+                IncidentUpdate.objects.create(incident=incident, text=get("Notes"))
             counts["Incidents"] += 1
 
         header, rows = tabs["Fuel Log"]

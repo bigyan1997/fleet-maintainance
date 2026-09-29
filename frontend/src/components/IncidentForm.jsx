@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createIncident, updateIncident } from '../api/incidents'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
+import { IncidentLog } from './IncidentLog'
 
 const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const SEVERITIES = ['Minor', 'Moderate', 'Major']
@@ -13,13 +14,17 @@ function today() {
 }
 
 function blankForm() {
-  return { vehicle: '', incident_type: TYPES[0], date: today(), severity: SEVERITIES[0], location: '', status: STATUSES[0], cost: '', description: '', notes: '' }
+  return {
+    vehicle: '', incident_type: TYPES[0], date: today(), severity: SEVERITIES[0], location: '', status: STATUSES[0],
+    cost: '', description: '', new_update: '', resolution: '', resolved_date: '',
+  }
 }
 
 function fromIncident(x) {
   return {
     vehicle: x.vehicle, incident_type: x.incident_type, date: x.date, severity: x.severity,
-    location: x.location || '', status: x.status, cost: x.cost ?? '', description: x.description || '', notes: x.notes || '',
+    location: x.location || '', status: x.status, cost: x.cost ?? '', description: x.description || '',
+    new_update: '', resolution: x.resolution || '', resolved_date: x.resolved_date || '',
   }
 }
 
@@ -32,7 +37,7 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { ...form, cost: form.cost || null }
+      const payload = { ...form, cost: form.cost || null, resolved_date: form.resolved_date || null }
       return isEdit ? updateIncident(incident.id, payload) : createIncident(payload)
     },
     onSuccess: () => {
@@ -41,10 +46,16 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
       onSaved(isEdit ? 'Incident updated.' : 'Incident logged.')
       onDone(true)
     },
-    onError: (err) => onError(err?.response?.data?.detail ?? 'Could not save incident.'),
+    onError: (err) => {
+      const data = err?.response?.data
+      onError(data?.detail ?? data?.resolution?.[0] ?? 'Could not save incident.')
+    },
   })
 
   const vehicleOptions = vehiclesQuery.data ?? []
+  const resolved = form.status === 'Resolved'
+  const setStatus = (status) =>
+    setForm((f) => ({ ...f, status, resolved_date: status === 'Resolved' ? f.resolved_date || today() : '' }))
 
   return (
     <div className="rounded-lg border border-line bg-white p-5">
@@ -73,7 +84,7 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
           <TextInput value={form.location} onChange={set('location')} placeholder="e.g. Highway 1, near Depot" />
         </Field>
         <Field label="Status">
-          <SelectInput value={form.status} onChange={set('status')} options={STATUSES} />
+          <SelectInput value={form.status} onChange={setStatus} options={STATUSES} />
         </Field>
       </FormRow>
       <FormRow>
@@ -87,15 +98,45 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
           <TextInput value={form.description} onChange={set('description')} placeholder="What happened" />
         </Field>
       </div>
-      <div className="mb-4">
-        <Field label="Notes / follow-up">
-          <TextInput value={form.notes} onChange={set('notes')} />
+      <div className="mb-4 border-t border-line pt-4">
+        <div className="mb-2 text-[13px] font-semibold text-ink">Updates</div>
+        {isEdit && (
+          <div className="mb-3">
+            <IncidentLog updates={incident.updates} />
+          </div>
+        )}
+        <Field label={isEdit ? 'Add an update (saved with the date and your name)' : 'First update (optional)'}>
+          <textarea
+            value={form.new_update}
+            onChange={(e) => set('new_update')(e.target.value)}
+            rows={2}
+            placeholder="e.g. Quote received $420, booked for Thursday"
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          />
         </Field>
       </div>
+      {resolved && (
+        <div className="mb-4 rounded-md border border-[#a7e3bc] bg-ok-bg/40 p-3">
+          <FormRow>
+            <Field label="Resolution: what was done *">
+              <textarea
+                value={form.resolution}
+                onChange={(e) => set('resolution')(e.target.value)}
+                rows={2}
+                placeholder="e.g. Rear window replaced by SAM Mobile Glass, $420, paid"
+                className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+              />
+            </Field>
+            <Field label="Resolved date">
+              <DateInput value={form.resolved_date} onChange={set('resolved_date')} />
+            </Field>
+          </FormRow>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button
           onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || !form.vehicle}
+          disabled={mutation.isPending || !form.vehicle || (resolved && !form.resolution.trim())}
           className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
         >
           {mutation.isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Save incident'}

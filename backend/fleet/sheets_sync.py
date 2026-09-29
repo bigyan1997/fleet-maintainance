@@ -59,10 +59,13 @@ def _vehicle_rows():
 def _service_rows():
     from .models import ServiceRecord
 
-    header = ["ID", "Vehicle ID", "Vehicle", "Rego", "Service type", "Date", "Odometer (km)", "Cost", "Next due", "Notes"]
+    header = [
+        "ID", "Vehicle ID", "Vehicle", "Rego", "Service type", "Date", "Status", "Odometer (km)", "Cost",
+        "Next due", "Notes",
+    ]
     rows = [
         [
-            s.pk, s.vehicle_id, str(s.vehicle), s.vehicle.rego, s.service_type, _date(s.date),
+            s.pk, s.vehicle_id, str(s.vehicle), s.vehicle.rego, s.service_type, _date(s.date), s.status,
             _num(s.odometer), _num(s.cost), s.next_due, s.notes,
         ]
         for s in ServiceRecord.objects.select_related("vehicle").order_by("date", "pk")
@@ -75,14 +78,16 @@ def _incident_rows():
 
     header = [
         "ID", "Vehicle ID", "Vehicle", "Rego", "Type", "Date", "Severity", "Location",
-        "Description", "Cost", "Status", "Notes",
+        "Description", "Cost", "Status", "Updates", "Resolution", "Resolved date",
     ]
     rows = [
         [
             i.pk, i.vehicle_id, str(i.vehicle), i.vehicle.rego, i.incident_type, _date(i.date),
-            i.severity, i.location, i.description, _num(i.cost), i.status, i.notes,
+            i.severity, i.location, i.description, _num(i.cost), i.status,
+            "\n".join(str(u) for u in i.updates.all()),
+            i.resolution, _date(i.resolved_date),
         ]
-        for i in Incident.objects.select_related("vehicle").order_by("date", "pk")
+        for i in Incident.objects.select_related("vehicle").prefetch_related("updates__author").order_by("date", "pk")
     ]
     return header, rows
 
@@ -116,6 +121,7 @@ MODEL_TABS = {
     "Vehicle": list(TABS),
     "ServiceRecord": ["Service History"],
     "Incident": ["Incidents"],
+    "IncidentUpdate": ["Incidents"],
     "FuelLog": ["Fuel Log"],
 }
 

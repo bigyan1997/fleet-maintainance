@@ -67,7 +67,15 @@ function MainApp({ username }) {
     },
   })
 
-  const goToTab = (tab) => setActiveTab(tab)
+  const [historyStatus, setHistoryStatus] = useState('')
+  const goToTab = (tab) => {
+    setHistoryStatus('')
+    setActiveTab(tab)
+  }
+  const showServicesWithStatus = (status) => {
+    setHistoryStatus(status)
+    setActiveTab('history')
+  }
 
   const openAddVehicle = () => {
     setEditingVehicle(undefined) // undefined = "add new" (distinct from null = "not on this view")
@@ -142,7 +150,7 @@ function MainApp({ username }) {
           ))}
         </div>
 
-        {activeTab === 'dashboard' && <DashboardView onOpenService={openEditService} onGoTo={goToTab} />}
+        {activeTab === 'dashboard' && <DashboardView onOpenService={openEditService} onGoTo={goToTab} onShowStatus={showServicesWithStatus} onError={(msg) => show(msg, true)} />}
 
         {activeTab === 'fleet' && <FleetView onEdit={openEditVehicle} onAdd={openAddVehicle} />}
         {activeTab === 'add-vehicle' && (
@@ -157,7 +165,7 @@ function MainApp({ username }) {
           />
         )}
 
-        {activeTab === 'history' && <HistoryView onEdit={openEditService} />}
+        {activeTab === 'history' && <HistoryView onEdit={openEditService} initialStatus={historyStatus} onError={(msg) => show(msg, true)} />}
         {activeTab === 'log-service' && (
           <ServiceForm
             service={editingService}

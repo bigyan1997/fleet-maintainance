@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 FUEL_TYPE_CHOICES = [
@@ -23,6 +25,16 @@ SERVICE_TYPE_CHOICES = [
     ("Insurance", "Insurance"),
     ("Fuel log", "Fuel log"),
 ]
+
+# A service job's progress, booking through to paid-up. Everything but
+# "Invoiced" counts as in progress on the dashboard.
+SERVICE_STATUS_CHOICES = [
+    ("Booked", "Booked"),
+    ("In service", "In service"),
+    ("Completed, awaiting invoice", "Completed, awaiting invoice"),
+    ("Invoiced", "Invoiced"),
+]
+SERVICE_STATUS_DONE = "Invoiced"
 
 INCIDENT_TYPE_CHOICES = [
     ("Accident", "Accident"),
@@ -83,6 +95,7 @@ class ServiceRecord(models.Model):
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     next_due = models.CharField(max_length=100, blank=True)  # free text — a km figure or a date
     notes = models.TextField(blank=True)
+    status = models.CharField(max_length=32, choices=SERVICE_STATUS_CHOICES, default="Booked", db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -101,7 +114,9 @@ class Incident(models.Model):
     description = models.TextField(blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=16, choices=INCIDENT_STATUS_CHOICES, default="Open")
-    notes = models.TextField(blank=True)
+    # Running notes while Open / In progress live in IncidentUpdate (a dated log).
+    resolution = models.TextField(blank=True)  # what was done — required once Resolved
+    resolved_date = models.DateField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -109,6 +124,23 @@ class Incident(models.Model):
     class Meta:
         ordering = ["-date", "-id"]
         indexes = [models.Index(fields=["vehicle", "date"])]
+
+
+class IncidentUpdate(models.Model):
+    """One dated entry in an incident's follow-up log."""
+
+    incident = models.ForeignKey(Incident, on_delete=models.CASCADE, related_name="updates")
+    text = models.TextField()
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)  # not auto_now_add, so migrated notes keep their date
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        stamp = timezone.localtime(self.created_at).strftime("%d/%m/%Y %H:%M")
+        who = self.author.get_username() if self.author else ""
+        return f"{stamp} {who}: {self.text}" if who else f"{stamp}: {self.text}"
 
 
 class FuelLog(models.Model):

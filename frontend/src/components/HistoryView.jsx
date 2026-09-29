@@ -4,15 +4,18 @@ import { fetchVehicles } from '../api/vehicles'
 import { deleteService, fetchServices } from '../api/services'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
+import { StatusSelect } from './StatusSelect'
+import { SERVICE_STATUSES } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
   'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
 ]
 
-export function HistoryView({ onEdit }) {
+export function HistoryView({ onEdit, initialStatus = '', onError }) {
   const [vehicle, setVehicle] = useState('')
   const [serviceType, setServiceType] = useState('')
+  const [statusFilter, setStatusFilter] = useState(initialStatus)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
@@ -22,7 +25,7 @@ export function HistoryView({ onEdit }) {
   const queryClient = useQueryClient()
 
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
-  const filters = { vehicle: vehicle || undefined, service_type: serviceType || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined, search: search || undefined, page }
+  const filters = { vehicle: vehicle || undefined, service_type: serviceType || undefined, status: statusFilter || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined, search: search || undefined, page }
   const servicesQuery = useQuery({ queryKey: ['services', filters], queryFn: () => fetchServices(filters) })
 
   const deleteMutation = useMutation({
@@ -35,7 +38,7 @@ export function HistoryView({ onEdit }) {
   })
 
   const clearFilters = () => {
-    setVehicle(''); setServiceType(''); setDateFrom(''); setDateTo(''); setSearch(''); setPage(1)
+    setVehicle(''); setServiceType(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); setSearch(''); setPage(1)
   }
 
   const data = servicesQuery.data
@@ -43,7 +46,7 @@ export function HistoryView({ onEdit }) {
   const count = data?.count ?? 0
   const pageSize = 25
   const totalPages = Math.max(1, Math.ceil(count / pageSize))
-  const hasFilters = Boolean(vehicle || serviceType || dateFrom || dateTo || search)
+  const hasFilters = Boolean(vehicle || serviceType || statusFilter || dateFrom || dateTo || search)
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white">
@@ -65,6 +68,13 @@ export function HistoryView({ onEdit }) {
           </select>
         </div>
         <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium tracking-wide text-off uppercase">Status</label>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className="h-[34px] rounded-md border border-line px-2.5 text-[13px]">
+            <option value="">All statuses</option>
+            {SERVICE_STATUSES.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium tracking-wide text-off uppercase">Date from</label>
           <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1) }} className="h-[34px] rounded-md border border-line px-2.5 text-[13px]" />
         </div>
@@ -81,12 +91,13 @@ export function HistoryView({ onEdit }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-[13px]">
+        <table className="w-full min-w-[760px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-line bg-[#fafafa] text-xs text-off">
               <th className="px-3 py-2.5 text-left font-medium">Vehicle</th>
               <th className="px-3 py-2.5 text-left font-medium">Type</th>
               <th className="px-3 py-2.5 text-left font-medium">Date</th>
+              <th className="px-3 py-2.5 text-left font-medium">Status</th>
               <th className="px-3 py-2.5 text-left font-medium">Odometer</th>
               <th className="px-3 py-2.5 text-left font-medium">Cost</th>
               <th className="px-3 py-2.5 text-left font-medium">Notes</th>
@@ -95,13 +106,14 @@ export function HistoryView({ onEdit }) {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-10 text-center text-off">{hasFilters ? 'No records match the current filters.' : 'No records yet.'}</td></tr>
+              <tr><td colSpan={8} className="px-3 py-10 text-center text-off">{hasFilters ? 'No records match the current filters.' : 'No records yet.'}</td></tr>
             ) : (
               rows.map((s) => (
                 <tr key={s.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(s)}>
                   <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{s.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{s.service_type}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.date}</td>
+                  <td className="px-3 py-2.5"><StatusSelect service={s} onError={onError} /></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.odometer ? `${s.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.cost ? `$${s.cost}` : '—'}</td>
                   <td className="max-w-[180px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{s.notes || '—'}</td>
@@ -130,6 +142,7 @@ export function HistoryView({ onEdit }) {
           rows={[
             ['Type', detail.service_type],
             ['Date', detail.date],
+            ['Status', detail.status],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],
             ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Next due', detail.next_due || '—'],
