@@ -136,6 +136,7 @@ def list_services(vehicle=None, service_type="", status="", date_from=None, date
             | Q(vehicle__model__icontains=search)
             | Q(vehicle__rego__icontains=search)
             | Q(vehicle__vin__icontains=search)
+            | Q(issues__icontains=search)
             | Q(notes__icontains=search)
         )
     return qs
@@ -305,11 +306,11 @@ def alerts():
         if v.rego_expiry:
             diff = (v.rego_expiry - today).days
             if diff < 60:
-                add("Registration expires", v.rego_expiry.isoformat(), diff)
+                add("Registration expires", v.rego_expiry.strftime("%d-%m-%Y"), diff)
         if v.insurance_expiry:
             diff = (v.insurance_expiry - today).days
             if diff < 60:
-                add("Insurance expires", v.insurance_expiry.isoformat(), diff)
+                add("Insurance expires", v.insurance_expiry.strftime("%d-%m-%Y"), diff)
         svc = next_service_due(v)
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
             add("Scheduled service due", f"{svc['due_at']} km", svc["km_left"])

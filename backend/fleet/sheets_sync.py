@@ -30,7 +30,7 @@ _lock = threading.Lock()
 
 
 def _date(value):
-    return value.strftime("%d/%m/%Y") if value else ""
+    return value.strftime("%d-%m-%Y") if value else ""
 
 
 def _num(value):
@@ -61,12 +61,12 @@ def _service_rows():
 
     header = [
         "ID", "Vehicle ID", "Vehicle", "Rego", "Service type", "Date", "Status", "Odometer (km)", "Cost",
-        "Next due", "Notes",
+        "Next due", "Issues for mechanic", "Notes",
     ]
     rows = [
         [
             s.pk, s.vehicle_id, str(s.vehicle), s.vehicle.rego, s.service_type, _date(s.date), s.status,
-            _num(s.odometer), _num(s.cost), s.next_due, s.notes,
+            _num(s.odometer), _num(s.cost), s.next_due, s.issues, s.notes,
         ]
         for s in ServiceRecord.objects.select_related("vehicle").order_by("date", "pk")
     ]
@@ -156,7 +156,7 @@ def push_tabs_sync(names):
     with _lock:
         sheets = _service()
         _ensure_tabs(sheets, names)
-        synced_at = timezone.localtime().strftime("%d/%m/%Y %H:%M")  # Sydney time
+        synced_at = timezone.localtime().strftime("%d-%m-%Y %H:%M")  # Sydney time
         for name in names:
             header, rows = TABS[name]()
             values = [header, *rows, [], [f"Mirrored from Fleet Maintenance at {synced_at} — edits here are overwritten."]]

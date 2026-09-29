@@ -40,7 +40,7 @@ class ServiceRecordSerializer(serializers.ModelSerializer):
         model = ServiceRecord
         fields = [
             "id", "vehicle", "vehicleLabel", "service_type", "date",
-            "odometer", "cost", "next_due", "notes", "status",
+            "odometer", "cost", "next_due", "issues", "notes", "status",
         ]
 
 

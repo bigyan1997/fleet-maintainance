@@ -2,6 +2,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { fetchServices } from '../api/services'
 import { fetchIncidents } from '../api/incidents'
 import { fetchFuelLogs } from '../api/fuelLogs'
+import { fmtDate } from '../lib/formatDate'
 
 function download(content, filename, type) {
   const blob = new Blob([content], { type })
@@ -18,8 +19,11 @@ function esc(v) {
   return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+const DATE_COLS = new Set(['date', 'rego_expiry', 'insurance_expiry', 'resolved_date'])
+
 function toCSV(rows, cols) {
-  return [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n')
+  const cell = (r, c) => esc(DATE_COLS.has(c) ? fmtDate(r[c]) : r[c])
+  return [cols.join(','), ...rows.map((r) => cols.map((c) => cell(r, c)).join(','))].join('\n')
 }
 
 async function fetchAll(fetchFn) {
@@ -45,7 +49,7 @@ export function ExportView() {
         vehicles.map((v) => ({
           Make: v.make, Model: v.model, Year: v.year, Rego: v.rego, VIN: v.vin,
           'Vehicle Number': v.vehicle_number, 'Fuel Card': v.fuel_card_number, 'Fuel Type': v.fuel_type,
-          'Odometer (km)': v.odometer, 'Rego Expiry': v.rego_expiry, 'Insurance Expiry': v.insurance_expiry,
+          'Odometer (km)': v.odometer, 'Rego Expiry': fmtDate(v.rego_expiry), 'Insurance Expiry': fmtDate(v.insurance_expiry),
           'Service Interval (km)': v.service_interval_km, 'Tyre Interval (km)': v.tyre_interval_km,
         })),
       ),
@@ -55,8 +59,8 @@ export function ExportView() {
       wb,
       XLSX.utils.json_to_sheet(
         services.map((s) => ({
-          Vehicle: s.vehicleLabel, 'Service Type': s.service_type, Date: s.date,
-          'Odometer (km)': s.odometer, 'Cost ($)': s.cost, 'Next Due': s.next_due, Notes: s.notes,
+          Vehicle: s.vehicleLabel, 'Service Type': s.service_type, Date: fmtDate(s.date),
+          'Odometer (km)': s.odometer, 'Cost ($)': s.cost, 'Next Due': s.next_due, Status: s.status, 'Issues for Mechanic': s.issues, 'Work Done / Parts': s.notes,
         })),
       ),
       'Service History',
@@ -65,9 +69,9 @@ export function ExportView() {
       wb,
       XLSX.utils.json_to_sheet(
         incidents.map((x) => ({
-          Vehicle: x.vehicleLabel, Date: x.date, Type: x.incident_type, Severity: x.severity,
+          Vehicle: x.vehicleLabel, Date: fmtDate(x.date), Type: x.incident_type, Severity: x.severity,
           Location: x.location, Description: x.description, 'Cost ($)': x.cost, Status: x.status, Updates: x.notes,
-          Resolution: x.resolution, 'Resolved Date': x.resolved_date,
+          Resolution: x.resolution, 'Resolved Date': fmtDate(x.resolved_date),
         })),
       ),
       'Incidents',
@@ -76,7 +80,7 @@ export function ExportView() {
       wb,
       XLSX.utils.json_to_sheet(
         fuel.map((f) => ({
-          Vehicle: f.vehicleLabel, Date: f.date, Litres: f.litres, 'Cost ($)': f.cost,
+          Vehicle: f.vehicleLabel, Date: fmtDate(f.date), Litres: f.litres, 'Cost ($)': f.cost,
           'Price Per Litre ($)': f.pricePerLitre, 'Odometer (km)': f.odometer, 'Invoice Number': f.invoice_number, Notes: f.notes,
         })),
       ),
@@ -95,7 +99,7 @@ export function ExportView() {
       )
     } else if (which === 'services') {
       const rows = await fetchAll(fetchServices)
-      download(toCSV(rows, ['vehicleLabel', 'service_type', 'date', 'odometer', 'cost', 'next_due', 'notes']), 'fleet-services.csv', 'text/csv')
+      download(toCSV(rows, ['vehicleLabel', 'service_type', 'date', 'odometer', 'cost', 'next_due', 'status', 'issues', 'notes']), 'fleet-services.csv', 'text/csv')
     } else if (which === 'incidents') {
       const rows = await fetchAll(fetchIncidents)
       download(toCSV(rows, ['vehicleLabel', 'date', 'incident_type', 'severity', 'location', 'description', 'cost', 'status', 'notes', 'resolution', 'resolved_date']), 'fleet-incidents.csv', 'text/csv')

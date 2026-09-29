@@ -4,6 +4,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { deleteFuelLog, fetchFuelLogs } from '../api/fuelLogs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
+import { fmtDate } from '../lib/formatDate'
 
 export function FuelView({ onEdit, onAdd }) {
   const [vehicle, setVehicle] = useState('')
@@ -85,7 +86,7 @@ export function FuelView({ onEdit, onAdd }) {
               rows.map((f) => (
                 <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(f)}>
                   <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{f.date}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(f.date)}</td>
                   <td className="px-3 py-2.5">{f.litres} L</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">${f.cost}</td>
                   <td className="px-3 py-2.5">{f.pricePerLitre ? `$${f.pricePerLitre}` : '—'}</td>
@@ -112,7 +113,7 @@ export function FuelView({ onEdit, onAdd }) {
         <DetailModal
           title={detail.vehicleLabel}
           rows={[
-            ['Date', detail.date], ['Litres', `${detail.litres} L`], ['Cost', `$${detail.cost}`],
+            ['Date', fmtDate(detail.date)], ['Litres', `${detail.litres} L`], ['Cost', `$${detail.cost}`],
             ['Price per litre', detail.pricePerLitre ? `$${detail.pricePerLitre}` : '—'],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],
             ['Invoice #', detail.invoice_number || '—'], ['Notes', detail.notes || '—'],

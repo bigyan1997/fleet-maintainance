@@ -5,6 +5,7 @@ import { deleteIncident, fetchIncidents } from '../api/incidents'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { IncidentLog } from './IncidentLog'
+import { fmtDate } from '../lib/formatDate'
 
 const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const STATUSES = ['Open', 'In progress', 'Resolved']
@@ -94,7 +95,7 @@ export function IncidentsView({ onEdit, onAdd }) {
                 <tr key={x.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(x)}>
                   <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{x.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{x.incident_type}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{x.date}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(x.date)}</td>
                   <td className="px-3 py-2.5">{x.severity}</td>
                   <td className="px-3 py-2.5"><span className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + (STATUS_BADGE[x.status] ?? '')}>{x.status}</span></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{x.cost ? `$${x.cost}` : '—'}</td>
@@ -113,12 +114,12 @@ export function IncidentsView({ onEdit, onAdd }) {
         <DetailModal
           title={detail.vehicleLabel}
           rows={[
-            ['Type', detail.incident_type], ['Date', detail.date], ['Severity', detail.severity],
+            ['Type', detail.incident_type], ['Date', fmtDate(detail.date)], ['Severity', detail.severity],
             ['Status', detail.status], ['Location', detail.location || '—'], ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Description', detail.description || '—'],
             ['Updates', <div className="text-left font-normal"><IncidentLog updates={detail.updates} /></div>],
             ...(detail.status === 'Resolved'
-              ? [['Resolution', detail.resolution || '—'], ['Resolved date', detail.resolved_date || '—']]
+              ? [['Resolution', detail.resolution || '—'], ['Resolved date', fmtDate(detail.resolved_date) || '—']]
               : []),
           ]}
           onClose={() => setDetail(null)}

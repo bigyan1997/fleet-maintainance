@@ -94,6 +94,9 @@ class ServiceRecord(models.Model):
     odometer = models.PositiveIntegerField(null=True, blank=True)
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     next_due = models.CharField(max_length=100, blank=True)  # free text — a km figure or a date
+    # What's wrong / needs checking, written when booking so it can be passed
+    # on to the mechanic. `notes` is what was actually done.
+    issues = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=32, choices=SERVICE_STATUS_CHOICES, default="Booked", db_index=True)
 
@@ -138,7 +141,7 @@ class IncidentUpdate(models.Model):
         ordering = ["created_at", "id"]
 
     def __str__(self):
-        stamp = timezone.localtime(self.created_at).strftime("%d/%m/%Y %H:%M")
+        stamp = timezone.localtime(self.created_at).strftime("%d-%m-%Y %H:%M")
         who = self.author.get_username() if self.author else ""
         return f"{stamp} {who}: {self.text}" if who else f"{stamp}: {self.text}"
 

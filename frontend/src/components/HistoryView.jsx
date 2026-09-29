@@ -6,6 +6,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { StatusSelect } from './StatusSelect'
 import { SERVICE_STATUSES } from '../lib/serviceStatus'
+import { fmtDate } from '../lib/formatDate'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
@@ -112,7 +113,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
                 <tr key={s.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(s)}>
                   <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{s.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{s.service_type}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{s.date}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(s.date)}</td>
                   <td className="px-3 py-2.5"><StatusSelect service={s} onError={onError} /></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.odometer ? `${s.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.cost ? `$${s.cost}` : '—'}</td>
@@ -141,12 +142,13 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
           title={detail.vehicleLabel}
           rows={[
             ['Type', detail.service_type],
-            ['Date', detail.date],
+            ['Date', fmtDate(detail.date)],
             ['Status', detail.status],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],
             ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Next due', detail.next_due || '—'],
-            ['Notes', detail.notes || '—'],
+            ['Issues for mechanic', detail.issues || '—'],
+            ['Work done / parts', detail.notes || '—'],
           ]}
           onClose={() => setDetail(null)}
           onEdit={() => { onEdit(detail); setDetail(null) }}

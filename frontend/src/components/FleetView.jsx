@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { deleteVehicle, fetchVehicles } from '../api/vehicles'
 import { ConfirmDialog } from './ConfirmDialog'
+import { fmtDate } from '../lib/formatDate'
 
 const BADGE = {
   ok: { label: 'OK', className: 'bg-ok-bg text-ok' },
@@ -45,8 +46,8 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
         </div>
       )}
       <div className="mt-2 text-[11px] text-[#aaa]">
-        {vehicle.rego_expiry && <div>Rego: {vehicle.rego_expiry}</div>}
-        {vehicle.insurance_expiry && <div>Insurance: {vehicle.insurance_expiry}</div>}
+        {vehicle.rego_expiry && <div>Rego: {fmtDate(vehicle.rego_expiry)}</div>}
+        {vehicle.insurance_expiry && <div>Insurance: {fmtDate(vehicle.insurance_expiry)}</div>}
       </div>
     </div>
   )

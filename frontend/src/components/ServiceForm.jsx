@@ -15,12 +15,12 @@ function today() {
 }
 
 function blankForm() {
-  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', odometer: '', cost: '', next_due: '', notes: '' }
+  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', issues: '', odometer: '', cost: '', next_due: '', notes: '' }
 }
 
 function fromService(s) {
   return {
-    vehicle: s.vehicle, service_type: s.service_type, date: s.date, status: s.status,
+    vehicle: s.vehicle, service_type: s.service_type, date: s.date, status: s.status, issues: s.issues || '',
     odometer: s.odometer ?? '', cost: s.cost ?? '', next_due: s.next_due || '', notes: s.notes || '',
   }
 }
@@ -79,6 +79,17 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
           <SelectInput value={form.status} onChange={set('status')} options={SERVICE_STATUSES} />
         </Field>
       </FormRow>
+      <div className="mb-3">
+        <Field label="Issues for the mechanic (what's wrong / needs checking)">
+          <textarea
+            value={form.issues}
+            onChange={(e) => set('issues')(e.target.value)}
+            rows={3}
+            placeholder="e.g. Front left headlight out, brakes squealing, tyre pressure warning on"
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          />
+        </Field>
+      </div>
       <FormRow>
         <Field label="Odometer (km)">
           <NumberInput value={form.odometer} onChange={set('odometer')} placeholder="e.g. 85000" />
@@ -89,9 +100,9 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
       </FormRow>
       <FormRow>
         <Field label="Next due (km or date)">
-          <TextInput value={form.next_due} onChange={set('next_due')} placeholder="e.g. 95000 or 2026-06-01" />
+          <TextInput value={form.next_due} onChange={set('next_due')} placeholder="e.g. 95000 or 01-06-2026" />
         </Field>
-        <Field label="Notes / parts replaced">
+        <Field label="Work done / parts replaced">
           <TextInput value={form.notes} onChange={set('notes')} />
         </Field>
       </FormRow>
