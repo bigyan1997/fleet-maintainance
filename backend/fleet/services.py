@@ -167,10 +167,14 @@ def delete_service(pk):
 # ── Incident CRUD ──────────────────────────────────────────────────────────
 
 
-def list_incidents(vehicle=None, incident_type="", status="", search=""):
+def list_incidents(vehicle=None, incident_type="", status="", date_from=None, date_to=None, search=""):
     qs = Incident.objects.select_related("vehicle").all()
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
+    if date_from:
+        qs = qs.filter(date__gte=date_from)
+    if date_to:
+        qs = qs.filter(date__lte=date_to)
     if incident_type:
         qs = qs.filter(incident_type=incident_type)
     if status:

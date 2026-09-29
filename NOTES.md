@@ -8,7 +8,15 @@ Achieve Cafe Provisions tracked its vehicle fleet through a single static HTML/J
 
 This project gives it the same upgrade NPD Tracker v2 got: Postgres as the real source of truth, a shared Django login, and a one-way Postgres → Sheets mirror so people can still glance at a spreadsheet.
 
-## Status (2026-09-28)
+## Status (2026-09-29)
+
+**Legacy data imported and Sheets mirror live.** `python manage.py import_from_sheet` (run once, with `--dry-run` reviewed first) brought in 11 vehicles, 58 service records, 1 incident and 0 fuel logs from the legacy sheet, resolving each row's text label to a real Vehicle FK. It reads slash dates as DD/MM/YYYY like the legacy app did (its `parseDateToTs()` MM/DD branch was dead code), and flags only the genuinely ambiguous ones — day and month both <= 12 *and* the swapped reading isn't in the future. Two service dates were in the future at import time (Van 9 `07/10/2026`, possibly a US-style 10 Jul; Van 1 `30/09/2026`) and several vans share copy-pasted VINs — imported as-is, left for staff to correct in the app.
+
+The mirror (`fleet/sheets_sync.py`, wired via `fleet/signals.py`) writes to a new sheet ("Fleet Management v2", `FLEET_SHEET_ID`), never the legacy one. Unlike NPD's row-by-row find/update, each push rewrites a whole tab (Vehicles / Service History / Incidents / Fuel Log) — fleet data is small, and a full rewrite can't drift from Postgres. Pushes run on a background thread after commit, same as NPD. `python manage.py sync_sheet` forces a full rewrite. Service account: `fleet-management@fleet-maintenance-500122.iam.gserviceaccount.com` (key in `backend/secrets/`, gitignored) — Editor on the mirror, Viewer on the legacy sheet.
+
+Also fixed: the Incidents list 500'd on every load (`list_incidents()` didn't accept the `date_from`/`date_to` the shared filter helper passes).
+
+### Earlier (2026-09-28)
 
 **Backend and frontend fully built and verified end-to-end** against a real local Postgres database — all 4 entities' CRUD, the odometer-bump business rule, vehicle delete protection, dashboard, alerts, and analytics aggregation were all tested live via real HTTP requests, not just unit-level. Not yet deployed anywhere; not yet connected to any Google Sheet (neither the one-time import from the legacy sheet, nor the outgoing mirror).
 
@@ -28,8 +36,6 @@ This project gives it the same upgrade NPD Tracker v2 got: Postgres as the real 
 
 ## Not yet done
 
-- **One-time import from the legacy Google Sheet** into Postgres. Needs: the legacy sheet (`1WBJqRuYX06NG6l7SUeXkBL3JsGPFfqjrKp6zjHNsr0k`) shared with the service account as Viewer first. The legacy app's date-parsing has a real bug worth knowing about before importing: its `parseDateToTs()` "MM/DD/YYYY" branch has a regex identical to the DD/MM/YYYY branch above it, so it's dead code — every ambiguous date has only ever been read as DD/MM/YYYY, even if it was truly entered as MM/DD/YYYY. The import script will need a `--dry-run` mode to flag ambiguous dates for manual review, since this can't be recovered algorithmically.
-- **Outgoing one-way Sheets mirror** — needs a brand-new, separate Google Sheet (never the legacy one, to avoid write collisions), shared with the service account as Editor. Should reuse the exact background-thread pattern from NPD's `sheets_sync.py` (a real bug — a Sheets push blocking the HTTP response — was found and fixed there; don't reintroduce it here).
 - Not deployed anywhere yet — no `DEPLOYMENT_NOTES.md`, no live server, no auto-deploy.
 - No automated tests written yet (`backend/fleet/tests.py` and `backend/accounts/tests.py` are still the empty stubs from `startapp`/copied from NPD).
 
