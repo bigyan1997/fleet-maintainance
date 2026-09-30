@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createService, updateService } from '../api/services'
+import { Documents } from './Documents'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { SERVICE_STATUSES } from '../lib/serviceStatus'
 
@@ -27,7 +28,7 @@ function fromService(s) {
 
 export function ServiceForm({ service, onDone, onSaved, onError }) {
   const isEdit = Boolean(service && service.id)
-  const [form, setForm] = useState(() => (isEdit ? fromService(service) : blankForm()))
+  const [form, setForm] = useState(() => (isEdit ? fromService(service) : { ...blankForm(), ...(service ?? {}) }))
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
@@ -67,7 +68,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   })
 
   return (
-    <div className="rounded-lg border border-line bg-white p-5">
+    <div className="p-6">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit service record' : 'Log a service'}</h2>
       <FormRow>
         <Field label="Vehicle">
@@ -135,6 +136,13 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
           Cancel
         </button>
       </div>
+      {isEdit && (
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-1 text-[14px] font-semibold text-ink">Files</h3>
+          <p className="mb-3 text-xs text-off">Invoice, quote or photos for this job.</p>
+          <Documents service={service.id} vehicle={service.vehicle} compact />
+        </div>
+      )}
     </div>
   )
 }

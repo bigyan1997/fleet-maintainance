@@ -5,7 +5,7 @@ from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, Vehicle
+from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, Vehicle, fuel_only_q
 
 
 class ValidationError(Exception):
@@ -405,6 +405,7 @@ def alerts():
             rows.append(
                 {
                     "vehicle": label,
+                    "vehicleId": v.pk,
                     "title": title,
                     "sub": sub,
                     "days_or_km_left": diff,
@@ -428,10 +429,10 @@ def alerts():
 
         svc = next_service_due(v)
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Scheduled service due", f"{svc['due_at']} km{booked_note(svc)}", svc["km_left"])
+            add("Scheduled service due", f"{svc['due_at']:,} km{booked_note(svc)}", svc["km_left"])
         tyre = next_tyre_due(v)
         if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Tyre replacement due", f"{tyre['due_at']} km{booked_note(tyre)}", tyre["km_left"])
+            add("Tyre replacement due", f"{tyre['due_at']:,} km{booked_note(tyre)}", tyre["km_left"])
     return rows
 
 
@@ -491,9 +492,12 @@ def analytics(vehicle=None, date_from=None, date_to=None):
     costed_count = costed_services.count()
     avg_service = (avg_service / costed_count) if costed_count else 0
     open_incident_cost = incidents_qs.exclude(status="Resolved").aggregate(t=Sum("cost"))["t"] or 0
-    fuel_month_qs = fuel_qs.filter(date__gte=month_start)
-    fuel_month_cost = fuel_month_qs.aggregate(t=Sum("cost"))["t"] or 0
-    fuel_month_litres = fuel_month_qs.aggregate(t=Sum("litres"))["t"] or 0
+    # Over the whole selected range (not the calendar month), so it lines up
+    # with the fuel card statement. Cost includes the card's fees/charges;
+    # litres are fuel only (not AdBlue).
+    fuel_cost = fuel_qs.aggregate(t=Sum("cost"))["t"] or 0
+    fuel_only_cost = fuel_qs.filter(fuel_only_q()).aggregate(t=Sum("cost"))["t"] or 0
+    fuel_litres = fuel_qs.filter(fuel_only_q()).aggregate(t=Sum("litres"))["t"] or 0
 
     months = _month_range(date_from, date_to)
     month_keys = [m.strftime("%Y-%m") for m in months]
@@ -514,7 +518,7 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         for label, k in zip(month_labels, month_keys)
     ]
     fuel_cost_by_month = bucket_by_month(fuel_qs, "cost")
-    fuel_litres_by_month = bucket_by_month(fuel_qs, "litres")
+    fuel_litres_by_month = bucket_by_month(fuel_qs.filter(fuel_only_q()), "litres")
     monthly_fuel = [
         {"label": label, "value": fuel_cost_by_month[k], "litres": fuel_litres_by_month[k]}
         for label, k in zip(month_labels, month_keys)
@@ -564,11 +568,96 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         "monthSpend": month_spend,
         "avgService": avg_service,
         "openIncidentCost": open_incident_cost,
-        "fuelMonthCost": fuel_month_cost,
-        "fuelMonthLitres": fuel_month_litres,
+        "fuelCost": fuel_cost,  # fuel + card fees/charges
+        "fuelOnlyCost": fuel_only_cost,
+        "fuelFees": fuel_cost - fuel_only_cost,
+        "fuelLitres": fuel_litres,
         "monthlySpend": monthly_spend,
         "monthlyFuel": monthly_fuel,
         "costByVehicle": cost_by_vehicle,
         "fuelByVehicle": fuel_by_vehicle,
         "costByType": cost_by_type,
+        **fuel_insights(fuel_qs),
     }
+
+
+# A van using this much more fuel per 100 km than the fleet average is
+# worth a look (tyres, brakes, injectors, or how it's being driven).
+FUEL_HIGH_USE_RATIO = 1.15
+# More litres than any of the vans' tanks hold in one go.
+FUEL_MAX_SINGLE_FILL = 80
+
+
+def _litres_per_100km(fills):
+    """km between a van's lowest and highest odometer reading, against the
+    fuel put in after that first reading (the first fill's litres were
+    burnt before the period started). Same rule as the Fuel tab."""
+    with_odo = sorted((f for f in fills if f.odometer), key=lambda f: f.odometer)
+    if len(with_odo) < 2:
+        return None, None
+    first, last = with_odo[0], with_odo[-1]
+    km = last.odometer - first.odometer
+    if km <= 0:
+        return None, None
+    litres = sum(f.litres for f in fills if f is not first and first.date <= f.date <= last.date)
+    return float(litres) / km * 100, km
+
+
+def fuel_insights(fuel_qs):
+    """Per-van fuel efficiency, plus fill-ups that look odd enough to ask
+    the driver about."""
+    by_van, cost_by_van = {}, {}
+    for f in fuel_qs.select_related("vehicle").order_by("date", "id"):
+        cost_by_van[f.vehicle] = cost_by_van.get(f.vehicle, 0) + f.cost
+        if f.is_fuel:
+            by_van.setdefault(f.vehicle, []).append(f)
+
+    vans = []
+    for v, fills in by_van.items():
+        litres = sum(f.litres for f in fills)
+        cost = cost_by_van[v]  # fuel + the card's charges, as on the statement
+        per100, km = _litres_per_100km(fills)
+        vans.append({
+            "id": v.pk,
+            "label": str(v),
+            "rego": v.rego,
+            "fills": len(fills),
+            "litres": float(litres),
+            "cost": float(cost),
+            "fuelCost": float(sum(f.cost for f in fills)),
+            "fees": float(cost - sum(f.cost for f in fills)),
+            "km": km,
+            "per100": round(per100, 1) if per100 else None,
+            "costPerKm": round(float(cost) / km, 2) if km else None,
+        })
+    rated = [r["per100"] for r in vans if r["per100"]]
+    fleet_avg = round(sum(rated) / len(rated), 1) if rated else None
+    for r in vans:
+        r["highUse"] = bool(fleet_avg and r["per100"] and r["per100"] > fleet_avg * FUEL_HIGH_USE_RATIO)
+    vans.sort(key=lambda r: -(r["per100"] or 0))
+
+    flags = []
+
+    def flag(v, when, kind, text):
+        flags.append({"vehicle": v.pk, "vehicleLabel": str(v), "date": when.isoformat(), "kind": kind, "text": text})
+
+    for v, fills in by_van.items():
+        per_day = {}
+        for f in fills:
+            per_day.setdefault(f.date, []).append(f)
+            if f.litres > FUEL_MAX_SINGLE_FILL:
+                flag(v, f.date, "Big fill-up", f"{f.litres} L in one go — more than the tank holds")
+            if "premium" in (f.product or f.notes).lower():
+                flag(v, f.date, "Premium diesel", f"{f.litres} L at ${f.price_per_litre}/L — regular diesel is cheaper")
+            if "looked wrong" in f.notes:
+                flag(v, f.date, "Odometer typo", "Odometer entered at the pump doesn't fit the van's other readings")
+        for day, same in per_day.items():
+            if len(same) > 1:
+                total = sum(f.litres for f in same)
+                flag(v, day, "Filled twice in a day", f"{len(same)} fill-ups, {total} L in total")
+        missing = [f for f in fills if not f.odometer and "looked wrong" not in f.notes]
+        if missing:
+            flag(v, missing[-1].date, "No odometer", f"{len(missing)} fill-up{'s' if len(missing) > 1 else ''} with no odometer entered at the pump")
+    flags.sort(key=lambda r: r["date"], reverse=True)
+
+    return {"fuelVans": vans, "fuelFleetPer100": fleet_avg, "fuelFlags": flags}

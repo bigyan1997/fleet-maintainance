@@ -1,5 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { fetchDrivers } from '../api/extra'
 import { createVehicle, updateVehicle } from '../api/vehicles'
 import { Field, FormRow, NumberInput, SectionLabel, SelectInput, DateInput, TextInput } from './FormFields'
 
@@ -11,7 +12,7 @@ function blankForm() {
   return {
     make: '', model: '', year: '', rego: '', vin: '', vehicle_number: '',
     fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '', insurance_expiry: '',
-    service_interval_km: '', tyre_interval_km: '', wash_needed: true,
+    service_interval_km: '', tyre_interval_km: '', wash_needed: true, driver: '',
   }
 }
 
@@ -21,7 +22,7 @@ function fromVehicle(v) {
     vin: v.vin || '', vehicle_number: v.vehicle_number || '', fuel_card_number: v.fuel_card_number || '',
     fuel_type: v.fuel_type || '', odometer: v.odometer ?? '', rego_expiry: v.rego_expiry || '',
     insurance_expiry: v.insurance_expiry || '', service_interval_km: v.service_interval_km ?? '',
-    tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true,
+    tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true, driver: v.driver ?? '',
   }
 }
 
@@ -30,6 +31,7 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
   const [form, setForm] = useState(() => (isEdit ? fromVehicle(vehicle) : blankForm()))
   const queryClient = useQueryClient()
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+  const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -41,6 +43,7 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         tyre_interval_km: form.tyre_interval_km || null,
         rego_expiry: form.rego_expiry || null,
         insurance_expiry: form.insurance_expiry || null,
+        driver: form.driver || null,
       }
       return isEdit ? updateVehicle(vehicle.id, payload) : createVehicle(payload)
     },
@@ -55,7 +58,7 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
   })
 
   return (
-    <div className="rounded-lg border border-line bg-white p-5">
+    <div className="p-6">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit vehicle' : 'Add a vehicle'}</h2>
 
       <SectionLabel>Vehicle details</SectionLabel>
@@ -82,6 +85,21 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         <Field label="Vehicle number">
           <TextInput value={form.vehicle_number} onChange={set('vehicle_number')} placeholder="e.g. FLEET-007" />
         </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Usual driver">
+          <select
+            value={form.driver}
+            onChange={(e) => set('driver')(e.target.value ? Number(e.target.value) : '')}
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="">No regular driver</option>
+            {(drivers.data ?? []).filter((d) => d.active || d.id === form.driver).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </Field>
+        <div className="self-end pb-2 text-xs text-off">Add drivers on Vans → Drivers.</div>
       </FormRow>
 
       <SectionLabel>Fuel</SectionLabel>

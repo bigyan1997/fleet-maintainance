@@ -117,7 +117,7 @@ export function IncidentsView({ onEdit, onAdd }) {
             ['Type', detail.incident_type], ['Date', fmtDate(detail.date)], ['Severity', detail.severity],
             ['Status', detail.status], ['Location', detail.location || '—'], ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Description', detail.description || '—'],
-            ['Updates', <div className="text-left font-normal"><IncidentLog updates={detail.updates} /></div>],
+            ['Updates', <div key="updates" className="text-left font-normal"><IncidentLog updates={detail.updates} /></div>],
             ...(detail.status === 'Resolved'
               ? [['Resolution', detail.resolution || '—'], ['Resolved date', fmtDate(detail.resolved_date) || '—']]
               : []),

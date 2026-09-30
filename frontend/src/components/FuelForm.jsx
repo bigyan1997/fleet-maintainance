@@ -21,7 +21,7 @@ function fromFuel(f) {
 
 export function FuelForm({ fuel, onDone, onSaved, onError }) {
   const isEdit = Boolean(fuel && fuel.id)
-  const [form, setForm] = useState(() => (isEdit ? fromFuel(fuel) : blankForm()))
+  const [form, setForm] = useState(() => (isEdit ? fromFuel(fuel) : { ...blankForm(), ...(fuel ?? {}) }))
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
@@ -46,7 +46,7 @@ export function FuelForm({ fuel, onDone, onSaved, onError }) {
   const vehicleOptions = vehiclesQuery.data ?? []
 
   return (
-    <div className="rounded-lg border border-line bg-white p-5">
+    <div className="p-6">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit fuel record' : 'Log a fuel fill-up'}</h2>
       <FormRow>
         <Field label="Vehicle">

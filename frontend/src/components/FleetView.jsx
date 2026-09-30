@@ -1,11 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { deleteVehicle, fetchVehicles } from '../api/vehicles'
-import { fetchServices } from '../api/services'
-import { ConfirmDialog } from './ConfirmDialog'
+import { fetchVehicles } from '../api/vehicles'
 import { SortTh } from './SortTh'
 import { fmtAgo, fmtDate } from '../lib/formatDate'
-import { STATUS_STYLES } from '../lib/serviceStatus'
+import { expiryCell, kmColour, serviceText, washText } from '../lib/fleet'
+import { navigate } from '../lib/router'
 import { useSort } from '../lib/useSort'
 
 const BADGE = {
@@ -31,19 +30,14 @@ function readView() {
   }
 }
 
-function StatusBadge({ status }) {
+export function StatusBadge({ status }) {
   const b = BADGE[status] ?? BADGE.ok
   return <span className={'inline-block rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ' + b.className}>{b.label}</span>
 }
 
-function kmColour(kmLeft) {
-  if (kmLeft < 0) return 'text-due'
-  if (kmLeft < 2000) return 'text-warn'
-  return ''
-}
 
 // "· Booked 30-09-2026 (tomorrow)" — shown when a due service already has a job open.
-function BookedNote({ job }) {
+export function BookedNote({ job }) {
   const verb = job.status === 'Booked' ? 'Booked' : job.status
   return (
     <span className="font-medium text-primary">
@@ -52,22 +46,8 @@ function BookedNote({ job }) {
   )
 }
 
-function serviceText(svc) {
-  if (!svc) return 'No service logged'
-  return svc.km_left < 0 ? `${Math.abs(svc.km_left).toLocaleString()} km overdue` : `${svc.km_left.toLocaleString()} km left`
-}
 
-function washText(v) {
-  if (!v.wash_needed) return 'No need'
-  return v.lastWashed ? fmtAgo(v.lastWashed) : 'Never logged'
-}
 
-function expiryCell(date) {
-  if (!date) return <span className="text-off">—</span>
-  const days = Math.round((new Date(date) - new Date(new Date().toDateString())) / 86400000)
-  const colour = days < 0 ? 'text-due font-medium' : days < 60 ? 'text-warn font-medium' : ''
-  return <span className={colour}>{fmtDate(date)}</span>
-}
 
 // ── Table view ────────────────────────────────────────────────────────────
 
@@ -80,6 +60,7 @@ function FleetTable({ rows, onOpen }) {
           <tr className="border-b border-line bg-[#fafafa] text-xs text-off">
             <SortTh label="Van" col="label" sort={sort} />
             <SortTh label="Rego" col="rego" sort={sort} />
+            <SortTh label="Driver" col="driverName" sort={sort} />
             <SortTh label="Odometer" col="odometer" sort={sort} />
             <SortTh label="Next service" col="serviceKm" sort={sort} />
             <SortTh label="Rego expiry" col="rego_expiry" sort={sort} />
@@ -95,6 +76,7 @@ function FleetTable({ rows, onOpen }) {
               <tr key={v.id} onClick={() => onOpen(v)} className="cursor-pointer border-b border-[#f0f0f0] last:border-0 hover:bg-[#fafafa]">
                 <td className="px-2 py-2.5 font-medium text-ink">{v.label}</td>
                 <td className="px-2 py-2.5 whitespace-nowrap">{v.rego || '—'}</td>
+                <td className="px-2 py-2.5 whitespace-nowrap">{v.driverName || <span className="text-off">—</span>}</td>
                 <td className="px-2 py-2.5 whitespace-nowrap">{v.odometer ? `${v.odometer.toLocaleString()} km` : '—'}</td>
                 <td className="px-2 py-2.5">
                   <span className={svc ? kmColour(svc.km_left) + (svc.km_left < 2000 ? ' font-medium' : '') : 'text-off'}>{serviceText(svc)}</span>
@@ -145,104 +127,13 @@ function VehicleCard({ vehicle, onOpen }) {
   )
 }
 
-// ── Details panel (click a row / card) ────────────────────────────────────
-
-function Detail({ label, children }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-[#f0f0f0] py-1.5 last:border-0">
-      <span className="text-off">{label}</span>
-      <span className="text-right font-medium">{children}</span>
-    </div>
-  )
-}
-
-function VehicleDetail({ vehicle: v, onClose, onEdit, onDelete }) {
-  const svc = v.nextServiceDue
-  const tyre = v.nextTyreDue
-  const history = useQuery({
-    queryKey: ['services', { vehicle: v.id, page_size: 5 }],
-    queryFn: () => fetchServices({ vehicle: v.id, page_size: 5 }),
-  })
-  const recent = history.data?.results ?? []
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,.45)] px-5" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-[640px] overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-ink">{v.label}</h3>
-            <div className="text-xs text-off">{v.rego || 'No rego'}{v.vehicle_number ? ` · #${v.vehicle_number}` : ''}</div>
-          </div>
-          <StatusBadge status={v.statusBadge} />
-        </div>
-
-        <div className="mb-4 text-[13px] text-[#333]">
-          <Detail label="Odometer">{v.odometer ? `${v.odometer.toLocaleString()} km` : '—'}</Detail>
-          <Detail label="Next service">
-            {svc ? `${svc.due_at.toLocaleString()} km (${serviceText(svc)})` : 'No service logged'}
-            {svc?.booked && <BookedNote job={svc.booked} />}
-          </Detail>
-          <Detail label="Next tyre change">{tyre ? `${tyre.due_at.toLocaleString()} km (${serviceText(tyre)})` : '—'}</Detail>
-          <Detail label="Rego expiry">{expiryCell(v.rego_expiry)}</Detail>
-          <Detail label="Insurance expiry">{expiryCell(v.insurance_expiry)}</Detail>
-          <Detail label="Last washed">{v.wash_needed ? (v.lastWashed ? `${fmtDate(v.lastWashed)} (${fmtAgo(v.lastWashed)})` : 'Never logged') : 'No need (driver takes it home)'}</Detail>
-          <Detail label="VIN"><span className="font-mono text-xs">{v.vin || '—'}</span></Detail>
-          <Detail label="Fuel">{[v.fuel_type, v.fuel_card_number && `card ${v.fuel_card_number}`].filter(Boolean).join(' · ') || '—'}</Detail>
-          <Detail label="Intervals">
-            service every {v.service_interval_km?.toLocaleString()} km{v.tyre_interval_km ? ` · tyres every ${v.tyre_interval_km.toLocaleString()} km` : ''}
-          </Detail>
-        </div>
-
-        <div className="mb-4">
-          <div className="mb-2 text-[13px] font-semibold text-ink">Recent services</div>
-          {recent.length === 0 ? (
-            <div className="text-[13px] text-off">{history.isLoading ? 'Loading…' : 'No services logged.'}</div>
-          ) : (
-            <table className="w-full border-collapse text-[12px]">
-              <tbody>
-                {recent.map((s) => (
-                  <tr key={s.id} className="border-b border-[#f0f0f0] last:border-0">
-                    <td className="py-1.5 pr-2 whitespace-nowrap">{fmtDate(s.date)}</td>
-                    <td className="py-1.5 pr-2">{s.service_type}</td>
-                    <td className="py-1.5 pr-2 whitespace-nowrap">{s.odometer ? `${s.odometer.toLocaleString()} km` : ''}</td>
-                    <td className="py-1.5 text-right">
-                      <span className={'inline-block rounded-full border px-2 py-0.5 text-[11px] whitespace-nowrap ' + (STATUS_STYLES[s.status] ?? '')}>{s.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="flex justify-between gap-2">
-          <button onClick={() => onDelete(v)} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium text-off hover:bg-due-bg hover:text-due">
-            Delete vehicle
-          </button>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
-              Close
-            </button>
-            <button onClick={() => onEdit(v)} className="rounded-md bg-primary px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-primary-dark">
-              Edit
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────
 
-export function FleetView({ onEdit, onAdd }) {
+export function FleetView({ onAdd }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [view, setViewState] = useState(readView)
-  const [openVehicle, setOpenVehicle] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [deleteError, setDeleteError] = useState(null)
-  const queryClient = useQueryClient()
+  const openVehicle = (v) => navigate('vans', v.id)
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', search], queryFn: () => fetchVehicles(search) })
 
   const setView = (v) => {
@@ -253,16 +144,6 @@ export function FleetView({ onEdit, onAdd }) {
       /* private window etc. — the choice just won't be remembered */
     }
   }
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteVehicle,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
-      setDeleteTarget(null)
-      setOpenVehicle(null)
-    },
-    onError: (err) => setDeleteError(err?.response?.data?.detail ?? 'Could not delete vehicle.'),
-  })
 
   // Sort keys for the table; the default order puts vans needing attention
   // first, then whichever is closest to its next service.
@@ -284,7 +165,6 @@ export function FleetView({ onEdit, onAdd }) {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-[15px] font-semibold text-ink">All vehicles</h2>
           <div className="flex gap-1 rounded-md border border-line bg-white p-0.5">
             {FILTERS.map((f) => (
               <button
@@ -333,31 +213,13 @@ export function FleetView({ onEdit, onAdd }) {
       ) : view === 'cards' ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {shown.map((v) => (
-            <VehicleCard key={v.id} vehicle={v} onOpen={setOpenVehicle} />
+            <VehicleCard key={v.id} vehicle={v} onOpen={openVehicle} />
           ))}
         </div>
       ) : (
-        <FleetTable rows={shown} onOpen={setOpenVehicle} />
+        <FleetTable rows={shown} onOpen={openVehicle} />
       )}
 
-      {openVehicle && (
-        <VehicleDetail
-          vehicle={openVehicle}
-          onClose={() => setOpenVehicle(null)}
-          onEdit={(v) => { setOpenVehicle(null); onEdit(v) }}
-          onDelete={(v) => { setDeleteTarget(v); setDeleteError(null) }}
-        />
-      )}
-      {deleteTarget && (
-        <ConfirmDialog
-          title="Delete vehicle?"
-          message={`Delete ${deleteTarget.label} (${deleteTarget.rego || 'no rego'})? This can't be undone.`}
-          errorMessage={deleteError}
-          confirming={deleteMutation.isPending}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
-        />
-      )}
     </div>
   )
 }

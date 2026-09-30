@@ -16,9 +16,12 @@ export function TopBar({ username, links, onLogout }) {
             Google Sheet ↗
           </a>
         )}
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f1fb] px-2.5 py-1.5 text-[11px] text-primary">
-          <span className="h-1.5 w-1.5 rounded-full bg-ok" />
-          {username}
+        <a href="#/team" className={linkClass}>
+          Team
+        </a>
+        <span title={username} className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full bg-[#e6f1fb] px-2.5 py-1.5 text-[11px] text-primary">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
+          <span className="truncate">{username}</span>
         </span>
         <button
           onClick={onLogout}

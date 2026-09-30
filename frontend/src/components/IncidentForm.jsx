@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createIncident, updateIncident } from '../api/incidents'
+import { Documents } from './Documents'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { IncidentLog } from './IncidentLog'
 
@@ -30,7 +31,7 @@ function fromIncident(x) {
 
 export function IncidentForm({ incident, onDone, onSaved, onError }) {
   const isEdit = Boolean(incident && incident.id)
-  const [form, setForm] = useState(() => (isEdit ? fromIncident(incident) : blankForm()))
+  const [form, setForm] = useState(() => (isEdit ? fromIncident(incident) : { ...blankForm(), ...(incident ?? {}) }))
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
@@ -58,7 +59,7 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
     setForm((f) => ({ ...f, status, resolved_date: status === 'Resolved' ? f.resolved_date || today() : '' }))
 
   return (
-    <div className="rounded-lg border border-line bg-white p-5">
+    <div className="p-6">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit incident' : 'Log an incident'}</h2>
       <FormRow>
         <Field label="Vehicle">
@@ -145,6 +146,13 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
           Cancel
         </button>
       </div>
+      {isEdit && (
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-1 text-[14px] font-semibold text-ink">Files</h3>
+          <p className="mb-3 text-xs text-off">Photos, quotes and paperwork for this incident.</p>
+          <Documents incident={incident.id} vehicle={incident.vehicle} compact />
+        </div>
+      )}
     </div>
   )
 }

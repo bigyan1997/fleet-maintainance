@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -59,6 +61,26 @@ INCIDENT_STATUS_CHOICES = [
 DEFAULT_SERVICE_INTERVAL_KM = 10000
 
 
+def new_report_token():
+    return secrets.token_urlsafe(16)
+
+
+class Driver(models.Model):
+    name = models.CharField(max_length=100)
+    phone = models.CharField(max_length=30, blank=True)
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Vehicle(models.Model):
     make = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
@@ -76,6 +98,10 @@ class Vehicle(models.Model):
     # False for vans a driver takes home after each run — they're not washed
     # by us, so the dashboard doesn't nag about them.
     wash_needed = models.BooleanField(default=True)
+    driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True, related_name="vehicles")
+    # Secret part of the van's QR-sticker link, so drivers can report a
+    # problem or a wash without logging in (and without seeing anything else).
+    report_token = models.CharField(max_length=32, unique=True, default=new_report_token)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -150,11 +176,29 @@ class IncidentUpdate(models.Model):
         return f"{stamp} {who}: {self.text}" if who else f"{stamp}: {self.text}"
 
 
+# Words that make a fuel-card line fuel for the tank. Anything else on the
+# statement (AdBlue, roadside assist, card/management fees) is a charge: it
+# counts towards cost, but not litres, fill-ups or L/100km.
+FUEL_PRODUCT_WORDS = ("diesel", "unleaded", "petrol", "lpg", "ulp", "e10")
+
+
+def fuel_only_q(prefix=""):
+    """Fuel-log rows that are actual fuel. Hand-logged rows have no product
+    and are always fuel."""
+    q = models.Q(**{f"{prefix}product": ""})
+    for word in FUEL_PRODUCT_WORDS:
+        q |= models.Q(**{f"{prefix}product__icontains": word})
+    return q
+
+
 class FuelLog(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.PROTECT, related_name="fuel_logs")
     date = models.DateField()
     litres = models.DecimalField(max_digits=8, decimal_places=2)
     cost = models.DecimalField(max_digits=10, decimal_places=2)
+    # What the fuel card statement calls the line ("Diesel", "Premium diesel",
+    # "AdBlue", "Card fee"...). Blank for fuel logged by hand.
+    product = models.CharField(max_length=40, blank=True)
     odometer = models.PositiveIntegerField(null=True, blank=True)
     invoice_number = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
@@ -167,7 +211,69 @@ class FuelLog(models.Model):
         indexes = [models.Index(fields=["vehicle", "date"])]
 
     @property
+    def is_fuel(self):
+        product = self.product.lower()
+        return not product or any(word in product for word in FUEL_PRODUCT_WORDS)
+
+    @property
     def price_per_litre(self):
-        if self.litres:
+        if self.litres and self.is_fuel:
             return round(self.cost / self.litres, 3)
         return None
+
+
+ATTACHMENT_KIND_CHOICES = [
+    ("Invoice", "Invoice"),
+    ("Quote", "Quote"),
+    ("Registration", "Registration"),
+    ("Insurance", "Insurance"),
+    ("Photo", "Photo"),
+    ("Other", "Other"),
+]
+
+
+def attachment_path(instance, filename):
+    return f"attachments/{timezone.now():%Y/%m}/{secrets.token_hex(6)}-{filename}"
+
+
+class Attachment(models.Model):
+    """A file kept with a van, a service or an incident: the mechanic's
+    invoice, rego papers, a photo of the damage."""
+
+    file = models.FileField(upload_to=attachment_path)
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    kind = models.CharField(max_length=20, choices=ATTACHMENT_KIND_CHOICES, default="Other")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="attachments")
+    service = models.ForeignKey(ServiceRecord, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
+    incident = models.ForeignKey(Incident, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+
+class ActivityLog(models.Model):
+    """Who added, changed or deleted what — one line per change."""
+
+    who = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    who_label = models.CharField(max_length=150, blank=True)  # kept if the user is deleted; "Driver (QR)" for sticker reports
+    action = models.CharField(max_length=20)  # Added / Changed / Deleted / Imported
+    kind = models.CharField(max_length=30)  # Service, Fuel, Wash, Incident, Van, Driver, Document, Budget, User
+    summary = models.CharField(max_length=300)
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+
+BUDGET_CATEGORY_CHOICES = [("fuel", "Fuel card"), ("maintenance", "Maintenance")]
+
+
+class Budget(models.Model):
+    category = models.CharField(max_length=20, choices=BUDGET_CATEGORY_CHOICES, unique=True)
+    monthly_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    updated_at = models.DateTimeField(auto_now=True)

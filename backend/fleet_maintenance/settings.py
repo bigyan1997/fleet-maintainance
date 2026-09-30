@@ -13,6 +13,8 @@ SECRET_KEY = config('DJANGO_SECRET_KEY', default='dev-only-secret-key-change-me'
 DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+# Extra names this PC answers to, e.g. its Tailscale address for remote access.
+ALLOWED_HOSTS += config('DJANGO_EXTRA_HOSTS', default='', cast=Csv())
 
 # Google Sheets one-way mirror sync (see .env.example) — a brand-new, separate
 # sheet from the legacy fleet app's, to avoid the two apps' writes colliding.
@@ -142,3 +144,18 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Uploaded documents (service invoices, rego papers, photos). Never served
+# straight from disk: the API streams them to logged-in users only.
+MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
+MEDIA_URL = '/api/media-not-served/'
+
+# Weekly summary email (fleet.weekly / manage.py send_weekly_summary). Stays
+# off until EMAIL_HOST and WEEKLY_EMAIL_TO are set in .env.
+EMAIL_HOST = config('EMAIL_HOST', default='')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'fleet@localhost')
+WEEKLY_EMAIL_TO = config('WEEKLY_EMAIL_TO', default='', cast=Csv())

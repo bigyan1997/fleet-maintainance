@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif;
 
-  --color-ink: #1a1a1a;
-  --color-paper: #f8f9fa;
-  --color-line: #e0e0e0;
+  --color-ink: #16202a;
+  --color-paper: #f4f6f9;
+  --color-line: #e1e6ed;
   --color-primary: #185fa5;
   --color-primary-dark: #14508a;
   --color-ok: #166534;
@@ -14,7 +14,7 @@
   --color-warn-bg: #fef9c3;
   --color-due: #991b1b;
   --color-due-bg: #fee2e2;
-  --color-off: #666666;
+  --color-off: #5b6775;
   --color-card: #ffffff;
 }
 
@@ -24,4 +24,22 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
+}
+
+/* Keyboard focus is always visible. */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+
+/* Printing the QR sticker sheet: only the stickers go on paper. */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; inset: 0 auto auto 0; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  aside, header { display: none !important; }
 }

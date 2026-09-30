@@ -1,11 +1,15 @@
 import re
 
 from django.conf import settings
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import services
+import json
+
+from . import activity, fuel_import, services
+from .models import FuelLog, Incident, ServiceRecord, Vehicle
 from .pagination import FleetPagination
 from .serializers import (
     FuelLogSerializer,
@@ -32,29 +36,35 @@ class VehicleViewSet(viewsets.ViewSet):
     def create(self, request):
         serializer = VehicleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        vehicle = serializer.save()
+        activity.log(request.user, "Added", "Van", f"{vehicle} ({vehicle.rego or 'no rego'})", vehicle)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def update(self, request, pk=None):
+    def update(self, request, pk=None, partial=False):
         try:
             vehicle = services.get_vehicle(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
-        serializer = VehicleSerializer(vehicle, data=request.data)
+        serializer = VehicleSerializer(vehicle, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        vehicle = serializer.save()
+        changed = ", ".join(k.replace("_", " ") for k in request.data.keys()) if partial else "details"
+        activity.log(request.user, "Changed", "Van", f"{vehicle}: {changed}", vehicle)
         return Response(serializer.data)
 
     def partial_update(self, request, pk=None):
-        return self.update(request, pk=pk)
+        # Truly partial, so the Tyres and Drivers screens can send one field.
+        return self.update(request, pk=pk, partial=True)
 
     def destroy(self, request, pk=None):
+        label = str(Vehicle.objects.filter(pk=pk).first() or f"Vehicle {pk}")
         try:
             services.delete_vehicle(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
         except services.HasRelatedRecordsError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        activity.log(request.user, "Deleted", "Van", label)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -94,6 +104,7 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         serializer = ServiceRecordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         record = services.create_service(serializer.validated_data)
+        activity.log(request.user, "Added", activity.service_kind(record), activity.describe_service(record), record.vehicle)
         return Response(ServiceRecordSerializer(record).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None, partial=False):
@@ -103,6 +114,12 @@ class ServiceRecordViewSet(viewsets.ViewSet):
             record = services.update_service(pk, serializer.validated_data)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        summary = (
+            f"{record.service_type} for {record.vehicle} moved to {record.status}"
+            if partial and set(request.data.keys()) == {"status"}
+            else activity.describe_service(record)
+        )
+        activity.log(request.user, "Changed", activity.service_kind(record), summary, record.vehicle)
         return Response(ServiceRecordSerializer(record).data)
 
     def partial_update(self, request, pk=None):
@@ -111,10 +128,12 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         return self.update(request, pk=pk, partial=True)
 
     def destroy(self, request, pk=None):
+        record = ServiceRecord.objects.select_related("vehicle").filter(pk=pk).first()
         try:
             services.delete_service(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        activity.log(request.user, "Deleted", activity.service_kind(record), activity.describe_service(record), record.vehicle)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -133,7 +152,8 @@ class IncidentViewSet(viewsets.ViewSet):
     def create(self, request):
         serializer = IncidentSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        incident = serializer.save()
+        activity.log(request.user, "Added", "Incident", activity.describe_incident(incident), incident.vehicle)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
@@ -143,17 +163,20 @@ class IncidentViewSet(viewsets.ViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
         serializer = IncidentSerializer(incident, data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        incident = serializer.save()
+        activity.log(request.user, "Changed", "Incident", activity.describe_incident(incident), incident.vehicle)
         return Response(serializer.data)
 
     def partial_update(self, request, pk=None):
         return self.update(request, pk=pk)
 
     def destroy(self, request, pk=None):
+        record = Incident.objects.select_related("vehicle").filter(pk=pk).first()
         try:
             services.delete_incident(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        activity.log(request.user, "Deleted", "Incident", activity.describe_incident(record), record.vehicle)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -166,6 +189,7 @@ class FuelLogViewSet(viewsets.ViewSet):
         serializer = FuelLogSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         record = services.create_fuel_log(serializer.validated_data)
+        activity.log(request.user, "Added", "Fuel", activity.describe_fuel(record), record.vehicle)
         return Response(FuelLogSerializer(record).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
@@ -175,17 +199,46 @@ class FuelLogViewSet(viewsets.ViewSet):
             record = services.update_fuel_log(pk, serializer.validated_data)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        activity.log(request.user, "Changed", "Fuel", activity.describe_fuel(record), record.vehicle)
         return Response(FuelLogSerializer(record).data)
 
     def partial_update(self, request, pk=None):
         return self.update(request, pk=pk)
 
     def destroy(self, request, pk=None):
+        record = FuelLog.objects.select_related("vehicle").filter(pk=pk).first()
+        if record:
+            activity.log(request.user, "Deleted", "Fuel", activity.describe_fuel(record), record.vehicle)
         try:
             services.delete_fuel_log(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FuelImportView(APIView):
+    """Monthly fuel statement upload. POST with just `file` returns a
+    preview; with `assignments` too (JSON: card number -> vehicle id) it
+    imports."""
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "Choose the statement file to upload."}, status=status.HTTP_400_BAD_REQUEST)
+        raw = upload.read()
+        try:
+            if "assignments" in request.data:
+                assignments = json.loads(request.data["assignments"])
+                result = fuel_import.import_statement(raw, assignments)
+                activity.log(
+                    request.user, "Imported", "Fuel",
+                    f"Fuel statement {upload.name}: {result['created']} fill-ups and {result['charges']} fees/charges added"
+                    + (f", {result['duplicates']} already logged" if result["duplicates"] else ""),
+                )
+                return Response(result, status=status.HTTP_201_CREATED)
+            return Response(fuel_import.preview(raw))
+        except fuel_import.ImportFileError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DashboardView(APIView):
@@ -225,8 +278,8 @@ class AnalyticsView(APIView):
     def get(self, request):
         result = services.analytics(
             vehicle=request.query_params.get("vehicle") or None,
-            date_from=request.query_params.get("date_from") or None,
-            date_to=request.query_params.get("date_to") or None,
+            date_from=parse_date(request.query_params.get("date_from") or ""),
+            date_to=parse_date(request.query_params.get("date_to") or ""),
         )
         return Response(result)
 

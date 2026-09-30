@@ -18,3 +18,12 @@ export async function updateFuelLog(id, data) {
 export async function deleteFuelLog(id) {
   await api.delete(`/fuel-logs/${id}/`)
 }
+
+// Monthly fuel card statement: no assignments -> preview, with them -> import.
+export async function uploadFuelStatement(file, assignments) {
+  const form = new FormData()
+  form.append('file', file)
+  if (assignments) form.append('assignments', JSON.stringify(assignments))
+  const res = await api.post('/fuel-import/', form)
+  return res.data
+}

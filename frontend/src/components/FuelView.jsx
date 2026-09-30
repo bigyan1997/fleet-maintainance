@@ -4,9 +4,11 @@ import { fetchVehicles } from '../api/vehicles'
 import { deleteFuelLog, fetchFuelLogs } from '../api/fuelLogs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
+import { FuelByVan } from './FuelByVan'
+import { FuelImport } from './FuelImport'
 import { fmtDate } from '../lib/formatDate'
 
-export function FuelView({ onEdit, onAdd }) {
+export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
   const [vehicle, setVehicle] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -14,11 +16,15 @@ export function FuelView({ onEdit, onAdd }) {
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [view, setView] = useState('van')
   const queryClient = useQueryClient()
 
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const filters = { vehicle: vehicle || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined, search: search || undefined, page }
-  const fuelQuery = useQuery({ queryKey: ['fuel-logs', filters], queryFn: () => fetchFuelLogs(filters) })
+  // By van needs every matching fill-up to total them, not just one page.
+  const queryFilters = view === 'van' ? { ...filters, page: undefined, page_size: 5000 } : filters
+  const fuelQuery = useQuery({ queryKey: ['fuel-logs', queryFilters], queryFn: () => fetchFuelLogs(queryFilters) })
 
   const deleteMutation = useMutation({
     mutationFn: deleteFuelLog,
@@ -33,14 +39,17 @@ export function FuelView({ onEdit, onAdd }) {
   const rows = fuelQuery.data?.results ?? []
   const count = fuelQuery.data?.count ?? 0
   const pageSize = 25
-  const totalPages = Math.max(1, Math.ceil(count / pageSize))
+  const totalPages = view === 'van' ? 1 : Math.max(1, Math.ceil(count / pageSize))
   const hasFilters = Boolean(vehicle || dateFrom || dateTo || search)
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white">
       <div className="flex items-center justify-between border-b border-line px-3.5 py-3">
         <h2 className="text-[15px] font-semibold text-ink">Fuel log</h2>
-        <button onClick={onAdd} className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:bg-[#f5f5f5]">Log fuel</button>
+        <div className={hideHeaderActions ? 'hidden' : 'flex gap-2'}>
+          <button onClick={() => setImporting(true)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-dark">Import statement</button>
+          <button onClick={onAdd} className="rounded-md border border-line bg-white px-3 py-1.5 text-xs font-medium hover:bg-[#f5f5f5]">Log fuel</button>
+        </div>
       </div>
       <div className="flex flex-wrap items-end gap-2.5 border-b border-line bg-[#fafafa] p-3">
         <div className="flex flex-col gap-1">
@@ -63,8 +72,22 @@ export function FuelView({ onEdit, onAdd }) {
           <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Van 1, rego, VIN, make, invoice #…" className="h-[34px] rounded-md border border-line px-2.5 text-[13px]" />
         </div>
         <button onClick={clearFilters} className="h-[34px] rounded-md border border-line bg-white px-3 text-xs font-medium hover:bg-[#f5f5f5]">Clear</button>
+        <div className="flex h-[34px] overflow-hidden rounded-md border border-line text-xs font-medium">
+          {[['van', 'By van'], ['list', 'All fill-ups']].map(([key, label]) => (
+            <button key={key} onClick={() => { setView(key); setPage(1) }} className={`px-3 ${view === key ? 'bg-primary text-white' : 'bg-white hover:bg-[#f5f5f5]'}`}>{label}</button>
+          ))}
+        </div>
         <span className="ml-auto self-center text-xs text-off">{count} record{count === 1 ? '' : 's'}</span>
       </div>
+      {view === 'van' ? (
+        <FuelByVan
+          rows={rows}
+          emptyText={hasFilters ? 'No fuel records match the current filters.' : 'No fuel records yet — use Import statement to add the monthly fuel card statement.'}
+          onPick={setDetail}
+          onEdit={onEdit}
+          onDelete={setDeleteTarget}
+        />
+      ) : (
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-[13px]">
           <thead>
@@ -87,7 +110,7 @@ export function FuelView({ onEdit, onAdd }) {
                 <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(f)}>
                   <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(f.date)}</td>
-                  <td className="px-3 py-2.5">{f.litres} L</td>
+                  <td className="px-3 py-2.5">{f.isFuel ? `${f.litres} L` : <span className="text-off">{f.product}</span>}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">${f.cost}</td>
                   <td className="px-3 py-2.5">{f.pricePerLitre ? `$${f.pricePerLitre}` : '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{f.odometer ? `${f.odometer.toLocaleString()} km` : '—'}</td>
@@ -102,6 +125,7 @@ export function FuelView({ onEdit, onAdd }) {
           </tbody>
         </table>
       </div>
+      )}
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2.5 border-t border-line px-3.5 py-2.5">
           <span className="text-xs text-off">Page {page} of {totalPages}</span>
@@ -113,7 +137,7 @@ export function FuelView({ onEdit, onAdd }) {
         <DetailModal
           title={detail.vehicleLabel}
           rows={[
-            ['Date', fmtDate(detail.date)], ['Litres', `${detail.litres} L`], ['Cost', `$${detail.cost}`],
+            ['Date', fmtDate(detail.date)], ['Product', detail.product || 'Fuel'], ['Litres', `${detail.litres} L`], ['Cost', `$${detail.cost}`],
             ['Price per litre', detail.pricePerLitre ? `$${detail.pricePerLitre}` : '—'],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],
             ['Invoice #', detail.invoice_number || '—'], ['Notes', detail.notes || '—'],
@@ -122,6 +146,7 @@ export function FuelView({ onEdit, onAdd }) {
           onEdit={() => { onEdit(detail); setDetail(null) }}
         />
       )}
+      {importing && <FuelImport onClose={() => setImporting(false)} />}
       {deleteTarget && (
         <ConfirmDialog title="Delete fuel record?" message="This can't be undone." confirming={deleteMutation.isPending} onCancel={() => setDeleteTarget(null)} onConfirm={() => deleteMutation.mutate(deleteTarget.id)} />
       )}

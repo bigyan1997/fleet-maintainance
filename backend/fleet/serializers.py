@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from . import services
-from .models import FuelLog, Incident, IncidentUpdate, ServiceRecord, Vehicle
+from .models import ActivityLog, Attachment, Driver, FuelLog, Incident, IncidentUpdate, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -12,6 +12,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     nextTyreDue = serializers.SerializerMethodField()
     lastWashed = serializers.SerializerMethodField()
     openJob = serializers.SerializerMethodField()
+    driverName = serializers.CharField(source="driver.name", read_only=True, default="")
 
     class Meta:
         model = Vehicle
@@ -19,8 +20,10 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "label", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
+            "wash_needed", "driver", "driverName", "report_token", "label", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
         ]
+
+        read_only_fields = ["report_token"]
 
     def get_label(self, obj):
         return str(obj)
@@ -119,13 +122,63 @@ class IncidentSerializer(serializers.ModelSerializer):
 class FuelLogSerializer(serializers.ModelSerializer):
     vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
     pricePerLitre = serializers.SerializerMethodField()
+    isFuel = serializers.BooleanField(source="is_fuel", read_only=True)
 
     class Meta:
         model = FuelLog
         fields = [
-            "id", "vehicle", "vehicleLabel", "date", "litres", "cost",
+            "id", "vehicle", "vehicleLabel", "date", "product", "isFuel", "litres", "cost",
             "pricePerLitre", "odometer", "invoice_number", "notes",
         ]
 
     def get_pricePerLitre(self, obj):
         return obj.price_per_litre
+
+
+class DriverSerializer(serializers.ModelSerializer):
+    vans = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Driver
+        fields = ["id", "name", "phone", "notes", "active", "vans"]
+
+    def get_vans(self, obj):
+        return [{"id": v.pk, "label": str(v)} for v in obj.vehicles.all()]
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    uploadedBy = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField()
+    linkedTo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attachment
+        fields = [
+            "id", "original_name", "content_type", "size", "kind", "vehicle", "vehicleLabel",
+            "service", "incident", "uploadedBy", "created_at", "url", "linkedTo",
+        ]
+
+    def get_uploadedBy(self, obj):
+        return obj.uploaded_by.get_username() if obj.uploaded_by else ""
+
+    def get_url(self, obj):
+        return f"/api/attachments/{obj.pk}/file/"
+
+    def get_linkedTo(self, obj):
+        if obj.service_id:
+            return f"{obj.service.service_type} {obj.service.date:%d-%m-%Y}"
+        if obj.incident_id:
+            return f"{obj.incident.incident_type} {obj.incident.date:%d-%m-%Y}"
+        return ""
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    vehicleLabel = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActivityLog
+        fields = ["id", "who_label", "action", "kind", "summary", "vehicle", "vehicleLabel", "created_at"]
+
+    def get_vehicleLabel(self, obj):
+        return str(obj.vehicle) if obj.vehicle_id else ""

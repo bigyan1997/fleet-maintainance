@@ -97,12 +97,12 @@ def _fuel_rows():
     from .models import FuelLog
 
     header = [
-        "ID", "Vehicle ID", "Vehicle", "Rego", "Date", "Litres", "Cost", "Price per litre",
+        "ID", "Vehicle ID", "Vehicle", "Rego", "Date", "Product", "Litres", "Cost", "Price per litre",
         "Odometer (km)", "Invoice number", "Notes",
     ]
     rows = [
         [
-            f.pk, f.vehicle_id, str(f.vehicle), f.vehicle.rego, _date(f.date), _num(f.litres),
+            f.pk, f.vehicle_id, str(f.vehicle), f.vehicle.rego, _date(f.date), f.product or "Fuel", _num(f.litres),
             _num(f.cost), _num(f.price_per_litre), _num(f.odometer), f.invoice_number, f.notes,
         ]
         for f in FuelLog.objects.select_related("vehicle").order_by("date", "pk")
