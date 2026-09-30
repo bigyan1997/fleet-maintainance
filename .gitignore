@@ -21,3 +21,6 @@ frontend/dist-next/
 # editor/OS
 .DS_Store
 Thumbs.db
+
+# Real invoices / statements used to build importers (card numbers, amounts)
+samples/
