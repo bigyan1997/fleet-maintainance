@@ -127,8 +127,9 @@ def recent_washes():
 
 
 def vehicle_status_badge(vehicle):
-    """"Attention" (rego/insurance already overdue), "Due soon" (within
-    EXPIRY_DUE_SOON_DAYS), else "OK". Ported from the legacy app's statusBadge()."""
+    """"attention" (rego/insurance expired, or a service/tyre change
+    overdue), "due_soon" (expiry within EXPIRY_DUE_SOON_DAYS, or a
+    service/tyre change within DUE_SOON_KM_THRESHOLD), else "ok"."""
     today = timezone.localdate()
 
     def is_over(d):
@@ -137,9 +138,10 @@ def vehicle_status_badge(vehicle):
     def is_soon(d):
         return d is not None and not is_over(d) and (d - today).days < EXPIRY_DUE_SOON_DAYS
 
-    if is_over(vehicle.rego_expiry) or is_over(vehicle.insurance_expiry):
+    km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due]
+    if is_over(vehicle.rego_expiry) or is_over(vehicle.insurance_expiry) or any(k < 0 for k in km_left):
         return "attention"
-    if is_soon(vehicle.rego_expiry) or is_soon(vehicle.insurance_expiry):
+    if is_soon(vehicle.rego_expiry) or is_soon(vehicle.insurance_expiry) or any(k < DUE_SOON_KM_THRESHOLD for k in km_left):
         return "due_soon"
     return "ok"
 
