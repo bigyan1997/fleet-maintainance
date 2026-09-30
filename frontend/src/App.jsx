@@ -116,7 +116,7 @@ function MainApp({ username }) {
     <div className="min-h-screen bg-paper">
       <UpdateBanner />
       <TopBar username={username} links={linksQuery.data} onLogout={() => logoutMutation.mutate()} />
-      <div className="mx-auto max-w-[1100px] px-4 py-6">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <h1 className="flex items-center gap-2 text-lg font-semibold text-ink">Fleet Maintenance</h1>
           <div className="flex flex-wrap items-center gap-2">

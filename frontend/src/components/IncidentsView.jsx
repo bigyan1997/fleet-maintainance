@@ -93,13 +93,13 @@ export function IncidentsView({ onEdit, onAdd }) {
             ) : (
               rows.map((x) => (
                 <tr key={x.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(x)}>
-                  <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{x.vehicleLabel}</td>
+                  <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{x.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{x.incident_type}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(x.date)}</td>
                   <td className="px-3 py-2.5">{x.severity}</td>
                   <td className="px-3 py-2.5"><span className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + (STATUS_BADGE[x.status] ?? '')}>{x.status}</span></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{x.cost ? `$${x.cost}` : '—'}</td>
-                  <td className="max-w-[220px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{x.description || '—'}</td>
+                  <td className="max-w-[360px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{x.description || '—'}</td>
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => onEdit(x)} className="mr-1 rounded px-1.5 py-1 text-off hover:bg-[#f0f0f0]" title="Edit">✎</button>
                     <button onClick={() => setDeleteTarget(x)} className="rounded px-1.5 py-1 text-off hover:bg-due-bg hover:text-due" title="Delete">✕</button>

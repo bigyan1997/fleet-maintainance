@@ -85,7 +85,7 @@ export function FuelView({ onEdit, onAdd }) {
             ) : (
               rows.map((f) => (
                 <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(f)}>
-                  <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
+                  <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(f.date)}</td>
                   <td className="px-3 py-2.5">{f.litres} L</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">${f.cost}</td>

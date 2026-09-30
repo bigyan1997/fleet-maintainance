@@ -1,7 +1,7 @@
 export function DetailModal({ title, rows, onClose, onEdit }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,.45)] px-5" onClick={onClose}>
-      <div className="w-full max-w-[440px] rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-[560px] rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 text-base font-semibold text-ink">{title}</h3>
         <div className="mb-4 text-[13px] text-[#333]">
           {rows.map(([label, value], i) => (

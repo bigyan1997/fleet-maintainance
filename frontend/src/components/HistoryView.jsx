@@ -111,13 +111,13 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
             ) : (
               rows.map((s) => (
                 <tr key={s.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(s)}>
-                  <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{s.vehicleLabel}</td>
+                  <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{s.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{s.service_type}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(s.date)}</td>
                   <td className="px-3 py-2.5"><StatusSelect service={s} onError={onError} /></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.odometer ? `${s.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.cost ? `$${s.cost}` : '—'}</td>
-                  <td className="max-w-[180px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{s.notes || '—'}</td>
+                  <td className="max-w-[320px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{s.notes || '—'}</td>
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => onEdit(s)} className="mr-1 rounded px-1.5 py-1 text-off hover:bg-[#f0f0f0]" title="Edit">✎</button>
                     <button onClick={() => setDeleteTarget(s)} className="rounded px-1.5 py-1 text-off hover:bg-due-bg hover:text-due" title="Delete">✕</button>
