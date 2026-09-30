@@ -11,7 +11,7 @@ function blankForm() {
   return {
     make: '', model: '', year: '', rego: '', vin: '', vehicle_number: '',
     fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '', insurance_expiry: '',
-    service_interval_km: '', tyre_interval_km: '',
+    service_interval_km: '', tyre_interval_km: '', wash_needed: true,
   }
 }
 
@@ -21,7 +21,7 @@ function fromVehicle(v) {
     vin: v.vin || '', vehicle_number: v.vehicle_number || '', fuel_card_number: v.fuel_card_number || '',
     fuel_type: v.fuel_type || '', odometer: v.odometer ?? '', rego_expiry: v.rego_expiry || '',
     insurance_expiry: v.insurance_expiry || '', service_interval_km: v.service_interval_km ?? '',
-    tyre_interval_km: v.tyre_interval_km ?? '',
+    tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true,
   }
 }
 
@@ -115,7 +115,16 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         <Field label="Tyre replacement interval (km)">
           <NumberInput value={form.tyre_interval_km} onChange={set('tyre_interval_km')} placeholder="e.g. 40000" />
         </Field>
-        <div />
+        <Field label="Washing">
+          <select
+            value={form.wash_needed ? 'yes' : 'no'}
+            onChange={(e) => set('wash_needed')(e.target.value === 'yes')}
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="yes">Needed — track washes</option>
+            <option value="no">No need — driver takes it home</option>
+          </select>
+        </Field>
       </FormRow>
 
       <div className="mt-4 flex items-center gap-3">

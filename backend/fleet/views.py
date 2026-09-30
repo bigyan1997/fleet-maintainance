@@ -18,7 +18,9 @@ from .serializers import (
 class VehicleViewSet(viewsets.ViewSet):
     def list(self, request):
         rows = services.list_vehicles(search=request.query_params.get("search", ""))
-        return Response(VehicleSerializer(rows, many=True).data)
+        return Response(
+            VehicleSerializer(rows, many=True, context={"last_washed": services.last_washed_by_vehicle()}).data
+        )
 
     def retrieve(self, request, pk=None):
         try:
@@ -199,6 +201,17 @@ class DashboardView(APIView):
                 "recentServices": ServiceRecordSerializer(summary["recent_services"], many=True).data,
                 "statusCounts": summary["status_counts"],
                 "inProgressServices": ServiceRecordSerializer(summary["in_progress_services"], many=True).data,
+            }
+        )
+
+
+class WashesView(APIView):
+    def get(self, request):
+        return Response(
+            {
+                "cycleDays": services.WASH_CYCLE_DAYS,
+                "vans": services.wash_summary(),
+                "recent": services.recent_washes(),
             }
         )
 

@@ -12,6 +12,7 @@ import { VehicleForm } from './components/VehicleForm'
 import { HistoryView } from './components/HistoryView'
 import { ServiceForm } from './components/ServiceForm'
 import { AlertsView } from './components/AlertsView'
+import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
 import { IncidentForm } from './components/IncidentForm'
 import { FuelView } from './components/FuelView'
@@ -24,6 +25,7 @@ const TABS = [
   { key: 'fleet', label: 'Fleet' },
   { key: 'history', label: 'History' },
   { key: 'alerts', label: 'Alerts' },
+  { key: 'washes', label: 'Van washes' },
   { key: 'incidents', label: 'Incidents' },
   { key: 'fuel', label: 'Fuel' },
   { key: 'analytics', label: 'Analytics' },
@@ -179,6 +181,7 @@ function MainApp({ username }) {
         )}
 
         {activeTab === 'alerts' && <AlertsView />}
+        {activeTab === 'washes' && <WashesView onError={(msg) => show(msg, true)} />}
 
         {activeTab === 'incidents' && <IncidentsView onEdit={openEditIncident} onAdd={openLogIncident} />}
         {activeTab === 'log-incident' && (

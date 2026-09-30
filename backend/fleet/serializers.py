@@ -10,6 +10,8 @@ class VehicleSerializer(serializers.ModelSerializer):
     statusBadge = serializers.SerializerMethodField()
     nextServiceDue = serializers.SerializerMethodField()
     nextTyreDue = serializers.SerializerMethodField()
+    lastWashed = serializers.SerializerMethodField()
+    openJob = serializers.SerializerMethodField()
 
     class Meta:
         model = Vehicle
@@ -17,7 +19,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "label", "statusBadge", "nextServiceDue", "nextTyreDue",
+            "wash_needed", "label", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
         ]
 
     def get_label(self, obj):
@@ -31,6 +33,17 @@ class VehicleSerializer(serializers.ModelSerializer):
 
     def get_nextTyreDue(self, obj):
         return services.next_tyre_due(obj)
+
+    def get_openJob(self, obj):
+        return services.open_job(obj)
+
+    def get_lastWashed(self, obj):
+        # The list view passes one precomputed map in context rather than a
+        # query per vehicle; single-vehicle views fall back to computing it.
+        washes = self.context.get("last_washed")
+        if washes is None:
+            washes = services.last_washed_by_vehicle()
+        return washes.get(obj.pk)
 
 
 class ServiceRecordSerializer(serializers.ModelSerializer):

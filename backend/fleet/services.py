@@ -1,6 +1,7 @@
-from datetime import date
+import re
+from datetime import date, timedelta
 
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
@@ -24,22 +25,46 @@ class HasRelatedRecordsError(Exception):
 # and the inlined tyre-interval block in its vehicle-card renderer) ──────────
 
 DUE_SOON_KM_THRESHOLD = 2000
-EXPIRY_DUE_SOON_DAYS = 30
+# One warning window for rego/insurance expiry, used by the Alerts page and
+# the vehicle status badge alike.
+EXPIRY_DUE_SOON_DAYS = 60
+# Only work that has actually happened counts towards "last serviced at" —
+# a Booked / In service job hasn't reset the interval yet.
+DONE_SERVICE_STATUSES = ["Completed, awaiting invoice", "Invoiced"]
+# Vans are washed every 2 weeks: due at 14 days since the last wash.
+WASH_CYCLE_DAYS = 14
+# Washes are stored as service records of this type, but live on their own
+# Van washes tab — the service views (dashboard, History) leave them out.
+WASH_SERVICE_TYPE = "Van wash"
+
+
+def open_job(vehicle, service_type=None):
+    """The vehicle's earliest job that's booked or underway (not yet
+    completed), optionally of one service type — or None."""
+    qs = vehicle.services.exclude(status__in=DONE_SERVICE_STATUSES)
+    if service_type:
+        qs = qs.filter(service_type=service_type)
+    else:
+        qs = qs.exclude(service_type=WASH_SERVICE_TYPE)
+    job = qs.order_by("date", "id").first()
+    if not job:
+        return None
+    return {"id": job.pk, "service_type": job.service_type, "status": job.status, "date": job.date}
 
 
 def next_service_due(vehicle):
     """km remaining until the next scheduled service, based on the last
-    "Scheduled service" record's odometer plus the vehicle's interval.
-    Returns None if there's no scheduled-service history yet."""
+    completed "Scheduled service" record's odometer plus the vehicle's
+    interval. Returns None if there's no completed scheduled service yet."""
     last = (
-        vehicle.services.filter(service_type="Scheduled service", odometer__gt=0)
+        vehicle.services.filter(service_type="Scheduled service", status__in=DONE_SERVICE_STATUSES, odometer__gt=0)
         .order_by("-odometer")
         .first()
     )
     if not last:
         return None
     due_at = last.odometer + vehicle.service_interval_km
-    return {"due_at": due_at, "km_left": due_at - vehicle.odometer}
+    return {"due_at": due_at, "km_left": due_at - vehicle.odometer, "booked": open_job(vehicle, "Scheduled service")}
 
 
 def next_tyre_due(vehicle):
@@ -47,19 +72,63 @@ def next_tyre_due(vehicle):
     if not vehicle.tyre_interval_km:
         return None
     last = (
-        vehicle.services.filter(service_type="Tyre replacement", odometer__gt=0)
+        vehicle.services.filter(service_type="Tyre replacement", status__in=DONE_SERVICE_STATUSES, odometer__gt=0)
         .order_by("-odometer")
         .first()
     )
     if not last:
         return None
     due_at = last.odometer + vehicle.tyre_interval_km
-    return {"due_at": due_at, "km_left": due_at - vehicle.odometer}
+    return {"due_at": due_at, "km_left": due_at - vehicle.odometer, "booked": open_job(vehicle, "Tyre replacement")}
+
+
+def last_washed_by_vehicle():
+    """{vehicle_id: date of its most recent "Van wash"} — only washes that
+    have happened (date today or earlier), not ones booked ahead."""
+    rows = (
+        ServiceRecord.objects.filter(service_type=WASH_SERVICE_TYPE, date__lte=timezone.localdate())
+        .order_by()
+        .values("vehicle_id")
+        .annotate(last=Max("date"))
+    )
+    return {r["vehicle_id"]: r["last"] for r in rows}
+
+
+def wash_summary():
+    """Every vehicle with its last wash, least recently washed (or never) first."""
+    today = timezone.localdate()
+    last = last_washed_by_vehicle()
+    rows = [
+        {
+            "vehicle": v.pk,
+            "vehicleLabel": str(v),
+            "rego": v.rego,
+            "lastWashed": last.get(v.pk),
+            "daysSince": (today - last[v.pk]).days if v.pk in last else None,
+            "washNeeded": v.wash_needed,
+        }
+        for v in Vehicle.objects.all()
+    ]
+    # Vans that need washing first — never washed, then longest ago — and
+    # "no need" vans (driver takes them home) at the bottom.
+    rows.sort(key=lambda r: (not r["washNeeded"], r["daysSince"] is not None, -(r["daysSince"] or 0)))
+    return rows
+
+
+def recent_washes():
+    """Washes logged in the last wash cycle, newest first."""
+    today = timezone.localdate()
+    return [
+        {"id": s.pk, "vehicle": s.vehicle_id, "vehicleLabel": str(s.vehicle), "rego": s.vehicle.rego, "date": s.date}
+        for s in ServiceRecord.objects.select_related("vehicle")
+        .filter(service_type=WASH_SERVICE_TYPE, date__lte=today, date__gt=today - timedelta(days=WASH_CYCLE_DAYS))
+        .order_by("-date", "-id")
+    ]
 
 
 def vehicle_status_badge(vehicle):
-    """"Attention" (rego/insurance already overdue), "Due soon" (within 30
-    days), else "OK". Ported from the legacy app's statusBadge()."""
+    """"Attention" (rego/insurance already overdue), "Due soon" (within
+    EXPIRY_DUE_SOON_DAYS), else "OK". Ported from the legacy app's statusBadge()."""
     today = timezone.localdate()
 
     def is_over(d):
@@ -78,9 +147,23 @@ def vehicle_status_badge(vehicle):
 # ── Vehicle CRUD ──────────────────────────────────────────────────────────
 
 
+def van_number_q(search, prefix=""):
+    """ "van 1" / "Van1" / "VAN 12" matches exactly that van (by the "Van N"
+    in its name, or its vehicle number) — so "van 1" doesn't also bring up
+    Van 10 and 11. Returns None for any other search text."""
+    m = re.fullmatch(r"\s*van\s*#?0*(\d+)\s*", search, re.IGNORECASE)
+    if not m:
+        return None
+    n = m.group(1)
+    return Q(**{f"{prefix}make__iregex": rf"^\s*van\s*0*{n}([^0-9]|$)"}) | Q(**{f"{prefix}vehicle_number": n})
+
+
 def list_vehicles(search=""):
     qs = Vehicle.objects.all()
-    if search:
+    van_q = van_number_q(search)
+    if van_q is not None:
+        qs = qs.filter(van_q)
+    elif search:
         qs = qs.filter(
             Q(make__icontains=search)
             | Q(model__icontains=search)
@@ -126,11 +209,16 @@ def list_services(vehicle=None, service_type="", status="", date_from=None, date
         qs = qs.filter(status=status)
     if service_type:
         qs = qs.filter(service_type=service_type)
+    else:
+        qs = qs.exclude(service_type=WASH_SERVICE_TYPE)  # only shown when "Van wash" is picked
     if date_from:
         qs = qs.filter(date__gte=date_from)
     if date_to:
         qs = qs.filter(date__lte=date_to)
-    if search:
+    van_q = van_number_q(search, "vehicle__")
+    if van_q is not None:
+        qs = qs.filter(van_q)
+    elif search:
         qs = qs.filter(
             Q(vehicle__make__icontains=search)
             | Q(vehicle__model__icontains=search)
@@ -142,8 +230,17 @@ def list_services(vehicle=None, service_type="", status="", date_from=None, date
     return qs
 
 
+def _fill_next_due(record):
+    """A scheduled service with an odometer reading and no "next due" gets
+    odometer + the van's service interval (the form does the same live)."""
+    if record.service_type == "Scheduled service" and record.odometer and not record.next_due:
+        record.next_due = str(record.odometer + record.vehicle.service_interval_km)
+
+
 def create_service(data):
-    record = ServiceRecord.objects.create(**data)
+    record = ServiceRecord(**data)
+    _fill_next_due(record)
+    record.save()
     _bump_odometer_if_higher(record.vehicle, record.odometer)
     return record
 
@@ -155,6 +252,7 @@ def update_service(pk, data):
         raise NotFoundError(f"Service record {pk} not found.")
     for key, value in data.items():
         setattr(record, key, value)
+    _fill_next_due(record)
     record.save()
     _bump_odometer_if_higher(record.vehicle, record.odometer)
     return record
@@ -182,7 +280,10 @@ def list_incidents(vehicle=None, incident_type="", status="", date_from=None, da
         qs = qs.filter(incident_type=incident_type)
     if status:
         qs = qs.filter(status=status)
-    if search:
+    van_q = van_number_q(search, "vehicle__")
+    if van_q is not None:
+        qs = qs.filter(van_q)
+    elif search:
         qs = qs.filter(
             Q(vehicle__make__icontains=search)
             | Q(vehicle__model__icontains=search)
@@ -216,7 +317,10 @@ def list_fuel_logs(vehicle=None, date_from=None, date_to=None, search=""):
         qs = qs.filter(date__gte=date_from)
     if date_to:
         qs = qs.filter(date__lte=date_to)
-    if search:
+    van_q = van_number_q(search, "vehicle__")
+    if van_q is not None:
+        qs = qs.filter(van_q)
+    elif search:
         qs = qs.filter(
             Q(vehicle__make__icontains=search)
             | Q(vehicle__model__icontains=search)
@@ -266,17 +370,20 @@ def dashboard_summary():
         overdue_ins = v.insurance_expiry is not None and v.insurance_expiry < today
         if overdue_svc or overdue_rego or overdue_ins:
             due_count += 1
-    total_spend = ServiceRecord.objects.aggregate(total=Sum("cost"))["total"] or 0
-    recent = ServiceRecord.objects.select_related("vehicle").order_by("-date", "-id")[:5]
-    counts = dict(ServiceRecord.objects.order_by().values_list("status").annotate(n=Count("id")))
+    # Washes (done in-house at the warehouse, no cost) have their own Van
+    # washes tab, so every service figure here leaves them out.
+    services_qs = ServiceRecord.objects.exclude(service_type=WASH_SERVICE_TYPE)
+    total_spend = services_qs.aggregate(total=Sum("cost"))["total"] or 0
+    recent = services_qs.select_related("vehicle").order_by("-date", "-id")[:5]
+    counts = dict(services_qs.order_by().values_list("status").annotate(n=Count("id")))
     in_progress = (
-        ServiceRecord.objects.select_related("vehicle")
+        services_qs.select_related("vehicle")
         .exclude(status=SERVICE_STATUS_DONE)
         .order_by("date", "id")
     )
     return {
         "vehicle_count": len(vehicles),
-        "service_count": ServiceRecord.objects.count(),
+        "service_count": services_qs.count(),
         "due_count": due_count,
         "open_incident_count": Incident.objects.exclude(status="Resolved").count(),
         "total_spend": total_spend,
@@ -305,18 +412,24 @@ def alerts():
 
         if v.rego_expiry:
             diff = (v.rego_expiry - today).days
-            if diff < 60:
+            if diff < EXPIRY_DUE_SOON_DAYS:
                 add("Registration expires", v.rego_expiry.strftime("%d-%m-%Y"), diff)
         if v.insurance_expiry:
             diff = (v.insurance_expiry - today).days
-            if diff < 60:
+            if diff < EXPIRY_DUE_SOON_DAYS:
                 add("Insurance expires", v.insurance_expiry.strftime("%d-%m-%Y"), diff)
+        def booked_note(due):
+            # A due/overdue item that already has a job open says so, so it
+            # doesn't read as forgotten.
+            job = due["booked"]
+            return f" · {job['status'].lower()} {job['date'].strftime('%d-%m-%Y')}" if job else ""
+
         svc = next_service_due(v)
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Scheduled service due", f"{svc['due_at']} km", svc["km_left"])
+            add("Scheduled service due", f"{svc['due_at']} km{booked_note(svc)}", svc["km_left"])
         tyre = next_tyre_due(v)
         if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Tyre replacement due", f"{tyre['due_at']} km", tyre["km_left"])
+            add("Tyre replacement due", f"{tyre['due_at']} km{booked_note(tyre)}", tyre["km_left"])
     return rows
 
 

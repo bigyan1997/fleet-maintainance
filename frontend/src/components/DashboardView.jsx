@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchDashboard } from '../api/dashboard'
 import { STATUS_STYLES } from '../lib/serviceStatus'
 import { useSort } from '../lib/useSort'
+import { SortTh } from './SortTh'
 import { StatusSelect } from './StatusSelect'
 import { fmtDate } from '../lib/formatDate'
 
@@ -22,16 +23,6 @@ function StatusTile({ status, count, onClick }) {
       <div className="mb-1 text-xs font-medium">{status}</div>
       <div className="text-2xl font-semibold">{count}</div>
     </button>
-  )
-}
-
-// Clickable column header, same look as NPD Tracker's: ▲/▼ on the active column.
-function SortTh({ label, col, sort }) {
-  return (
-    <th className="cursor-pointer px-2 py-2 text-left font-medium select-none hover:text-ink" onClick={() => sort.onSort(col)}>
-      {label}
-      {sort.sortKey === col && <span className="ml-1">{sort.sortDir === 'asc' ? '▲' : '▼'}</span>}
-    </th>
   )
 }
 

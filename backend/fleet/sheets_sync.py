@@ -43,13 +43,14 @@ def _vehicle_rows():
     header = [
         "ID", "Make", "Model", "Year", "Rego", "VIN", "Vehicle number", "Fuel card number",
         "Fuel type", "Odometer (km)", "Rego expiry", "Insurance expiry",
-        "Service interval (km)", "Tyre interval (km)",
+        "Service interval (km)", "Tyre interval (km)", "Washing",
     ]
     rows = [
         [
             v.pk, v.make, v.model, _num(v.year), v.rego, v.vin, v.vehicle_number,
             v.fuel_card_number, v.fuel_type, v.odometer, _date(v.rego_expiry),
             _date(v.insurance_expiry), v.service_interval_km, _num(v.tyre_interval_km),
+            "Needed" if v.wash_needed else "No need",
         ]
         for v in Vehicle.objects.order_by("pk")
     ]

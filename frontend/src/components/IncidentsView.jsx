@@ -68,7 +68,7 @@ export function IncidentsView({ onEdit, onAdd }) {
         </div>
         <div className="flex min-w-[180px] flex-1 flex-col gap-1">
           <label className="text-[11px] font-medium tracking-wide text-off uppercase">Search</label>
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rego, VIN, make, description…" className="h-[34px] rounded-md border border-line px-2.5 text-[13px]" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Van 1, rego, make, description…" className="h-[34px] rounded-md border border-line px-2.5 text-[13px]" />
         </div>
         <button onClick={clearFilters} className="h-[34px] rounded-md border border-line bg-white px-3 text-xs font-medium hover:bg-[#f5f5f5]">Clear</button>
         <span className="ml-auto self-center text-xs text-off">{count} record{count === 1 ? '' : 's'}</span>

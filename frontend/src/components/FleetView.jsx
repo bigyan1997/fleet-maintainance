@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { deleteVehicle, fetchVehicles } from '../api/vehicles'
 import { ConfirmDialog } from './ConfirmDialog'
-import { fmtDate } from '../lib/formatDate'
+import { fmtAgo, fmtDate } from '../lib/formatDate'
 
 const BADGE = {
   ok: { label: 'OK', className: 'bg-ok-bg text-ok' },
@@ -13,6 +13,16 @@ const BADGE = {
 function StatusBadge({ status }) {
   const b = BADGE[status] ?? BADGE.ok
   return <span className={'inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ' + b.className}>{b.label}</span>
+}
+
+// "· Booked 30-09-2026 (tomorrow)" — shown when a due service already has a job open.
+function BookedNote({ job }) {
+  const verb = job.status === 'Booked' ? 'Booked' : job.status
+  return (
+    <span className="font-medium text-primary">
+      {' '}· {verb} {fmtDate(job.date)} ({fmtAgo(job.date)})
+    </span>
+  )
 }
 
 function VehicleCard({ vehicle, onEdit, onDelete }) {
@@ -43,11 +53,21 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
       {svc && (
         <div className={'mt-2 text-[11px] ' + svcColor}>
           Service due: {svc.due_at.toLocaleString()} km{svc.km_left < 0 ? ' — overdue' : ` (${svc.km_left.toLocaleString()} km left)`}
+          {svc.booked && <BookedNote job={svc.booked} />}
+        </div>
+      )}
+      {vehicle.openJob && vehicle.openJob.id !== svc?.booked?.id && (
+        <div className="mt-1 text-[11px] font-medium text-primary">
+          🔧 {vehicle.openJob.service_type}: {vehicle.openJob.status.toLowerCase()} {fmtDate(vehicle.openJob.date)} ({fmtAgo(vehicle.openJob.date)})
         </div>
       )}
       <div className="mt-2 text-[11px] text-[#aaa]">
         {vehicle.rego_expiry && <div>Rego: {fmtDate(vehicle.rego_expiry)}</div>}
         {vehicle.insurance_expiry && <div>Insurance: {fmtDate(vehicle.insurance_expiry)}</div>}
+        <div>
+          Last washed:{' '}
+          {!vehicle.wash_needed ? 'no need (driver takes it home)' : vehicle.lastWashed ? `${fmtDate(vehicle.lastWashed)} (${fmtAgo(vehicle.lastWashed)})` : 'never logged'}
+        </div>
       </div>
     </div>
   )
@@ -79,7 +99,7 @@ export function FleetView({ onEdit, onAdd }) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search make, model, rego, VIN, vehicle #…"
+          placeholder="Search Van 1, make, model, rego, VIN…"
           className="max-w-[280px] flex-1 rounded-md border border-line bg-white px-2.5 py-1.5 text-[13px]"
         />
       </div>

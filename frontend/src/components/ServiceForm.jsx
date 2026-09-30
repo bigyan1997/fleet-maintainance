@@ -7,7 +7,7 @@ import { SERVICE_STATUSES } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
-  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
+  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log', 'Van wash',
 ]
 
 function today() {
@@ -31,6 +31,25 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+  const vehicleOptions = vehiclesQuery.data ?? []
+
+  // "Next due" for a scheduled service = odometer + the van's service
+  // interval (usually 10,000 km). Filled in automatically until someone types
+  // their own value, so a manual entry is never overwritten.
+  const [nextDueManual, setNextDueManual] = useState(() => isEdit && Boolean(service.next_due))
+  const autoNextDue = (f) => {
+    const interval = vehicleOptions.find((v) => v.id === f.vehicle)?.service_interval_km || 10000
+    return f.service_type === 'Scheduled service' && f.odometer ? String(Number(f.odometer) + interval) : ''
+  }
+  const setWithNextDue = (key) => (value) =>
+    setForm((f) => {
+      const next = { ...f, [key]: value }
+      return nextDueManual ? next : { ...next, next_due: autoNextDue(next) }
+    })
+  const setNextDue = (value) => {
+    setNextDueManual(value !== '')
+    setForm((f) => ({ ...f, next_due: value }))
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -47,8 +66,6 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
     onError: (err) => onError(err?.response?.data?.detail ?? 'Could not save record.'),
   })
 
-  const vehicleOptions = vehiclesQuery.data ?? []
-
   return (
     <div className="rounded-lg border border-line bg-white p-5">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit service record' : 'Log a service'}</h2>
@@ -56,7 +73,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
         <Field label="Vehicle">
           <select
             value={form.vehicle}
-            onChange={(e) => set('vehicle')(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => setWithNextDue('vehicle')(e.target.value ? Number(e.target.value) : '')}
             className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
           >
             <option value="">Select vehicle…</option>
@@ -68,7 +85,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
           </select>
         </Field>
         <Field label="Service type">
-          <SelectInput value={form.service_type} onChange={set('service_type')} options={SERVICE_TYPES} />
+          <SelectInput value={form.service_type} onChange={setWithNextDue('service_type')} options={SERVICE_TYPES} />
         </Field>
       </FormRow>
       <FormRow>
@@ -92,15 +109,15 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
       </div>
       <FormRow>
         <Field label="Odometer (km)">
-          <NumberInput value={form.odometer} onChange={set('odometer')} placeholder="e.g. 85000" />
+          <NumberInput value={form.odometer} onChange={setWithNextDue('odometer')} placeholder="e.g. 85000" />
         </Field>
         <Field label="Cost ($)">
           <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 250" />
         </Field>
       </FormRow>
       <FormRow>
-        <Field label="Next due (km or date)">
-          <TextInput value={form.next_due} onChange={set('next_due')} placeholder="e.g. 95000 or 01-06-2026" />
+        <Field label={nextDueManual || !form.next_due ? 'Next due (km or date)' : 'Next due (km or date) — auto: odometer + interval'}>
+          <TextInput value={form.next_due} onChange={setNextDue} placeholder="e.g. 95000 or 01-06-2026" />
         </Field>
         <Field label="Work done / parts replaced">
           <TextInput value={form.notes} onChange={set('notes')} />

@@ -24,6 +24,7 @@ SERVICE_TYPE_CHOICES = [
     ("Registration", "Registration"),
     ("Insurance", "Insurance"),
     ("Fuel log", "Fuel log"),
+    ("Van wash", "Van wash"),
 ]
 
 # A service job's progress, booking through to paid-up. Everything but
@@ -72,6 +73,9 @@ class Vehicle(models.Model):
     insurance_expiry = models.DateField(null=True, blank=True)
     service_interval_km = models.PositiveIntegerField(default=DEFAULT_SERVICE_INTERVAL_KM)
     tyre_interval_km = models.PositiveIntegerField(null=True, blank=True)
+    # False for vans a driver takes home after each run — they're not washed
+    # by us, so the dashboard doesn't nag about them.
+    wash_needed = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
