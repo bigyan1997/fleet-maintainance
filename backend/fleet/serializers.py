@@ -26,6 +26,18 @@ class VehicleSerializer(serializers.ModelSerializer):
 
         read_only_fields = ["report_token"]
 
+    def _real_date(self, value, what):
+        # A half-typed year (the browser reads "2" as 0002) must never be saved.
+        if value and not 2000 <= value.year <= 2099:
+            raise serializers.ValidationError(f"That {what} has the year {value.year}. Check the date.")
+        return value
+
+    def validate_rego_expiry(self, value):
+        return self._real_date(value, "rego expiry")
+
+    def validate_insurance_expiry(self, value):
+        return self._real_date(value, "insurance expiry")
+
     def get_label(self, obj):
         return str(obj)
 

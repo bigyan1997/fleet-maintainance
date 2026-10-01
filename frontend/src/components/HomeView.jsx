@@ -123,56 +123,59 @@ export function HomeView() {
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
-          <h2 className="text-[15px] font-semibold text-ink">Needs doing</h2>
-          <span className="text-xs text-off">most urgent first</span>
-        </div>
-        {items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-off">All clear: nothing needs doing right now.</div>
-        ) : (
-          <ul className="divide-y divide-[#f0f0f0]">
-            {items.map((it) => (
-              <li key={it.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
-                <div className="min-w-[220px] flex-1">
-                  <div>
-                    <a href={it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
-                    {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
+      {/* Needs doing and Jobs in progress side by side on a computer, stacked on a phone. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="overflow-hidden rounded-lg border border-line bg-white">
+          <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
+            <h2 className="text-[15px] font-semibold text-ink">Needs doing</h2>
+            <span className="text-xs text-off">most urgent first</span>
+          </div>
+          {items.length === 0 ? (
+            <div className="px-4 py-8 text-center text-[13px] text-off">All clear: nothing needs doing right now.</div>
+          ) : (
+            <ul className="divide-y divide-[#f0f0f0]">
+              {items.map((it) => (
+                <li key={it.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
+                  <div className="min-w-[220px] flex-1">
+                    <div>
+                      <a href={it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
+                      {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
+                    </div>
+                    <div className="text-[13px] text-ink">{it.text}</div>
+                    {it.detail && <div className="text-xs text-off">{it.detail}</div>}
                   </div>
-                  <div className="text-[13px] text-ink">{it.text}</div>
-                  {it.detail && <div className="text-xs text-off">{it.detail}</div>}
-                </div>
-                <span className={'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + PILL[it.pill[0]]}>{it.pill[1]}</span>
-                {it.action}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  <span className={'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + PILL[it.pill[0]]}>{it.pill[1]}</span>
+                  {it.action}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
-          <h2 className="text-[15px] font-semibold text-ink">Jobs in progress</h2>
-          <a href={href('services')} className="text-xs font-medium text-primary no-underline hover:underline">All services →</a>
-        </div>
-        {jobs.length === 0 ? (
-          <div className="px-4 py-8 text-center text-[13px] text-off">Nothing in progress: every job is done.</div>
-        ) : (
-          <ul className="divide-y divide-[#f0f0f0]">
-            {jobs.map((s) => (
-              <li key={s.id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-[#fafafa]" onClick={() => openForm('service', s)}>
-                <div className="min-w-[220px] flex-1">
-                  <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
-                  <div className="text-xs text-off">
-                    {fmtDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
+        <div className="overflow-hidden rounded-lg border border-line bg-white">
+          <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
+            <h2 className="text-[15px] font-semibold text-ink">Jobs in progress</h2>
+            <a href={href('services')} className="text-xs font-medium text-primary no-underline hover:underline">All services →</a>
+          </div>
+          {jobs.length === 0 ? (
+            <div className="px-4 py-8 text-center text-[13px] text-off">Nothing in progress: every job is done.</div>
+          ) : (
+            <ul className="divide-y divide-[#f0f0f0]">
+              {jobs.map((s) => (
+                <li key={s.id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-[#fafafa]" onClick={() => openForm('service', s)}>
+                  <div className="min-w-[220px] flex-1">
+                    <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
+                    <div className="text-xs text-off">
+                      {fmtDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
+                    </div>
+                    {s.issues && <div className="text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
                   </div>
-                  {s.issues && <div className="text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
-                </div>
-                <StatusSelect service={s} onError={(m) => toast(m, true)} />
-              </li>
-            ))}
-          </ul>
-        )}
+                  <StatusSelect service={s} onError={(m) => toast(m, true)} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )

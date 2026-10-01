@@ -298,15 +298,30 @@ function ExpiryInput({ van, field, label }) {
     onError: () => toast(`Could not save the ${label}.`, true),
   })
   const value = van[field] || ''
+  // Typed text is kept locally and only saved when you leave the box (or
+  // press Enter). Saving on every keystroke cut people off mid-year, because
+  // the browser reads a half-typed year like "2" as 0002.
+  const [draft, setDraft] = useState(value) // the box restarts (key) when the saved value changes
+  const looksReal = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && Number(d.slice(0, 4)) >= 2000 && Number(d.slice(0, 4)) <= 2099
+  const commit = () => {
+    if (draft === value) return
+    if (!draft) return save.mutate('')
+    if (looksReal(draft)) return save.mutate(draft)
+    toast(`${van.label}: that ${label} doesn't look right. Check the year.`, true)
+    setDraft(value)
+  }
   const days = value ? Math.round((new Date(value) - new Date(new Date().toDateString())) / 86400000) : null
   return (
     <div className="flex flex-wrap items-center gap-2">
       <input
         type="date"
-        defaultValue={value}
-        key={value}
+        value={draft}
+        min="2000-01-01"
+        max="2099-12-31"
         disabled={save.isPending}
-        onChange={(e) => e.target.value !== value && e.target.value.length === 10 && save.mutate(e.target.value)}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         aria-label={`${label} for ${van.label}`}
         className={inputCls + ' w-[150px]'}
       />
@@ -331,7 +346,7 @@ export function RegoDates() {
   return (
     <Card
       title="Rego & insurance dates"
-      description="Pick each date once from the papers or the rego/insurance renewal notice. It saves straight away. Home then warns you 60 days before anything expires."
+      description="Type or pick each date once from the papers or renewal notice. It saves when you click out of the box (or press Enter). Home then warns you 60 days before anything expires."
       padded={false}
     >
       <div className="overflow-x-auto">
@@ -350,8 +365,8 @@ export function RegoDates() {
                   <a href={href('vans', v.id)} className="font-semibold text-ink no-underline hover:text-primary">{v.label}</a>
                   <div className="text-xs text-off">{v.subtitle}</div>
                 </td>
-                <td className="px-2 py-2.5"><ExpiryInput van={v} field="rego_expiry" label="rego expiry" /></td>
-                <td className="px-2 py-2.5"><ExpiryInput van={v} field="insurance_expiry" label="insurance expiry" /></td>
+                <td className="px-2 py-2.5"><ExpiryInput key={`r${v.rego_expiry}`} van={v} field="rego_expiry" label="rego expiry" /></td>
+                <td className="px-2 py-2.5"><ExpiryInput key={`i${v.insurance_expiry}`} van={v} field="insurance_expiry" label="insurance expiry" /></td>
               </tr>
             ))}
           </tbody>

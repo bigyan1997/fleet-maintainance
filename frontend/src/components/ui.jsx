@@ -67,13 +67,13 @@ export function Button({ variant = 'secondary', icon, children, className = '', 
 // Segmented control: [{ key, label, count? }]
 export function Tabs({ items, value, onChange }) {
   return (
-    <div className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
+    <div className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line [scrollbar-width:none]">
       {items.map((t) => (
         <button
           key={t.key}
           onClick={() => onChange(t.key)}
           className={
-            '-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium whitespace-nowrap ' +
+            'flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium whitespace-nowrap ' +
             (value === t.key ? 'border-primary text-primary' : 'border-transparent text-off hover:text-ink')
           }
         >

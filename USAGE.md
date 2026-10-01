@@ -63,7 +63,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
   - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too.
   - **Details:** rego, VIN, fuel card, intervals, tyres, rego/insurance expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
-  - **Rego & insurance dates:** pick each van's two dates once; they save straight away. Home then warns 60 days before anything expires.
+  - **Rego & insurance dates:** type or pick each van's two dates once; each saves when you click out of the box (or press Enter). Home then warns 60 days before anything expires.
   - **Drivers:** add drivers and choose each van's usual driver.
   - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
   - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.

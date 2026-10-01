@@ -195,13 +195,13 @@ function MainApp({ username }) {
         <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
           {/* Tabs and the two everyday buttons share one line. */}
           <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line">
-            <div className="flex gap-1 overflow-x-auto">
+            <div className="flex gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
               {TABS.map((t) => (
                 <a
                   key={t.key}
                   href={href(t.key)}
                   className={
-                    '-mb-px border-b-2 px-3.5 py-2.5 text-[14px] font-medium whitespace-nowrap no-underline ' +
+                    'border-b-2 px-3.5 py-2.5 text-[14px] font-medium whitespace-nowrap no-underline ' +
                     (tab === t.key ? 'border-primary text-primary' : 'border-transparent text-off hover:text-ink')
                   }
                 >
