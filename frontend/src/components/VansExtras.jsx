@@ -259,7 +259,7 @@ export function QrStickers() {
           <Button variant="primary" icon="sheet" onClick={() => window.print()}>Print stickers</Button>
         </div>
         <p className="mt-3 max-w-[80ch] text-xs text-off">
-          Phones can only open it while on the office Wi-Fi, or with Tailscale on the phone. Reports go straight into Jobs → Incidents and show on Today; each one is marked "Driver … (QR sticker)" in Team → Activity.
+          Phones can only open it while on the office Wi-Fi, or with Tailscale on the phone. Reports go straight into the Incidents tab, marked "Reported by … using the van's QR sticker".
         </p>
       </Card>
       <div className="print-area grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

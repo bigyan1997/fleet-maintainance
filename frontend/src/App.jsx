@@ -17,7 +17,6 @@ import { IncidentsView } from './components/IncidentsView'
 import { FuelView } from './components/FuelView'
 import { FuelImport } from './components/FuelImport'
 import { ReportsView } from './components/ReportsView'
-import { TeamView } from './components/TeamView'
 import { DriversView, QrStickers, TyresView } from './components/VansExtras'
 import { VehicleForm } from './components/VehicleForm'
 import { ServiceForm } from './components/ServiceForm'
@@ -131,7 +130,7 @@ function MainApp({ username }) {
 
   const actions = useMemo(() => ({ openForm: (kind, record) => setForm({ kind, record }), toast: show }), [show])
   const openForm = actions.openForm
-  const tab = path[0] === 'team' ? 'team' : TABS.some((t) => t.key === path[0]) ? path[0] : 'dashboard'
+  const tab = TABS.some((t) => t.key === path[0]) ? path[0] : 'dashboard'
 
   useEffect(() => {
     if (path.length === 0) navigate('dashboard')
@@ -185,7 +184,6 @@ function MainApp({ username }) {
   else if (tab === 'incidents') page = <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />
   else if (tab === 'fuel') page = <FuelView onEdit={(f) => openForm('fuel', f)} onAdd={() => openForm('fuel')} />
   else if (tab === 'reports') page = <ReportsView sub={path[1]} />
-  else if (tab === 'team') page = <TeamView sub={path[1]} />
 
   return (
     <ActionsContext.Provider value={actions}>

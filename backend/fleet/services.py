@@ -235,11 +235,18 @@ def list_services(vehicle=None, service_type="", status="", date_from=None, date
     return qs
 
 
-def _fill_next_due(record):
-    """A scheduled service with an odometer reading and no "next due" gets
-    odometer + the van's service interval (the form does the same live)."""
-    if record.service_type == "Scheduled service" and record.odometer and not record.next_due:
-        record.next_due = str(record.odometer + record.vehicle.service_interval_km)
+def _fill_next_due(record, old_odometer=None):
+    """A scheduled service with an odometer reading gets "next due" =
+    odometer + the van's service interval (the form does the same live) when
+    it's blank, or when it still holds the figure worked out from the old
+    reading (e.g. set at booking, then the real km typed in when it's done).
+    A value someone typed themselves is left alone."""
+    if record.service_type != "Scheduled service" or not record.odometer:
+        return
+    interval = record.vehicle.service_interval_km
+    stale = old_odometer is not None and record.next_due == str(old_odometer + interval)
+    if not record.next_due or stale:
+        record.next_due = str(record.odometer + interval)
 
 
 def create_service(data):
@@ -255,9 +262,10 @@ def update_service(pk, data):
         record = ServiceRecord.objects.get(pk=pk)
     except ServiceRecord.DoesNotExist:
         raise NotFoundError(f"Service record {pk} not found.")
+    old_odometer = record.odometer
     for key, value in data.items():
         setattr(record, key, value)
-    _fill_next_due(record)
+    _fill_next_due(record, old_odometer)
     record.save()
     _bump_odometer_if_higher(record.vehicle, record.odometer)
     return record

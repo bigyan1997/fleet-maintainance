@@ -40,9 +40,10 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const [newMechanic, setNewMechanic] = useState(null) // text while adding a new one, else null
 
   // "Next due" for a scheduled service = odometer + the van's service
-  // interval (usually 10,000 km). Filled in automatically until someone types
-  // their own value, so a manual entry is never overwritten.
-  const [nextDueManual, setNextDueManual] = useState(() => isEdit && Boolean(service.next_due))
+  // interval (usually 10,000 km). It follows the odometer as you type, also
+  // when finishing a booked job, unless someone typed their own value: a
+  // figure that isn't odometer + interval is never overwritten.
+  const [nextDueTyped, setNextDueTyped] = useState(false)
   const autoNextDue = (f) => {
     const interval = vehicleOptions.find((v) => v.id === f.vehicle)?.service_interval_km || 10000
     return f.service_type === 'Scheduled service' && f.odometer ? String(Number(f.odometer) + interval) : ''
@@ -50,12 +51,14 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const setWithNextDue = (key) => (value) =>
     setForm((f) => {
       const next = { ...f, [key]: value }
-      return nextDueManual ? next : { ...next, next_due: autoNextDue(next) }
+      const wasAuto = !f.next_due || String(f.next_due) === autoNextDue(f)
+      return nextDueTyped || !wasAuto ? next : { ...next, next_due: autoNextDue(next) }
     })
   const setNextDue = (value) => {
-    setNextDueManual(value !== '')
+    setNextDueTyped(value !== '')
     setForm((f) => ({ ...f, next_due: value }))
   }
+  const nextDueIsAuto = Boolean(form.next_due) && String(form.next_due) === autoNextDue(form)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -152,7 +155,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
         </Field>
       </FormRow>
       <FormRow>
-        <Field label={nextDueManual || !form.next_due ? 'Next due (km or date)' : 'Next due (km or date) — auto: odometer + interval'}>
+        <Field label={nextDueIsAuto ? `Next due — auto: odometer + ${(vehicleOptions.find((v) => v.id === form.vehicle)?.service_interval_km || 10000).toLocaleString()} km` : 'Next due (km or date)'}>
           <TextInput value={form.next_due} onChange={setNextDue} placeholder="e.g. 95000 or 01-06-2026" />
         </Field>
         <Field label="Work done / parts replaced">

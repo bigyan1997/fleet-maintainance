@@ -149,13 +149,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # straight from disk: the API streams them to logged-in users only.
 MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
 MEDIA_URL = '/api/media-not-served/'
-
-# Weekly summary email (fleet.weekly / manage.py send_weekly_summary). Stays
-# off until EMAIL_HOST and WEEKLY_EMAIL_TO are set in .env.
-EMAIL_HOST = config('EMAIL_HOST', default='')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'fleet@localhost')
-WEEKLY_EMAIL_TO = config('WEEKLY_EMAIL_TO', default='', cast=Csv())

@@ -1,5 +1,5 @@
 """API for the Phase 2/3 features: drivers, documents, activity log,
-budgets, fuel trends and the weekly summary."""
+budgets and fuel trends."""
 
 import mimetypes
 from datetime import date, timedelta
@@ -319,13 +319,3 @@ class FuelTrendsView(APIView):
                 key=lambda r: r["avgPrice"],
             ),
         })
-
-
-# ── Weekly summary ─────────────────────────────────────────────────────────
-
-
-class WeeklySummaryView(APIView):
-    def get(self, request):
-        from . import weekly
-
-        return Response(weekly.build_summary())

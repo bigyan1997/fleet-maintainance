@@ -79,8 +79,9 @@ function FleetTable({ rows, onOpen }) {
                 <td className="px-2 py-2.5 whitespace-nowrap">{v.driverName || <span className="text-off">—</span>}</td>
                 <td className="px-2 py-2.5 whitespace-nowrap">{v.odometer ? `${v.odometer.toLocaleString()} km` : '—'}</td>
                 <td className="px-2 py-2.5">
-                  <span className={svc ? kmColour(svc.km_left) + (svc.km_left < 2000 ? ' font-medium' : '') : 'text-off'}>{serviceText(svc)}</span>
-                  {svc?.booked && <BookedNote job={svc.booked} />}
+                  {svc && <div className="font-semibold text-ink tabular-nums">{svc.due_at.toLocaleString()} km</div>}
+                  <span className={'text-xs ' + (svc ? kmColour(svc.km_left) + (svc.km_left < 2000 ? ' font-medium' : '') : 'text-off')}>{serviceText(svc)}</span>
+                  {svc?.booked && <span className="text-xs"><BookedNote job={svc.booked} /></span>}
                   {v.openJob && v.openJob.id !== svc?.booked?.id && (
                     <div className="text-[11px] font-medium text-primary">
                       🔧 {v.openJob.service_type}: {v.openJob.status.toLowerCase()} {fmtDate(v.openJob.date)}
@@ -114,7 +115,7 @@ function VehicleCard({ vehicle, onOpen }) {
       </div>
       <StatusBadge status={vehicle.statusBadge} />
       <div className={'mt-2 text-[11px] ' + (svc ? kmColour(svc.km_left) || 'text-off' : 'text-off')}>
-        Service: {serviceText(svc)}
+        Service: {svc ? `due at ${svc.due_at.toLocaleString()} km · ${serviceText(svc)}` : serviceText(svc)}
         {svc?.booked && <BookedNote job={svc.booked} />}
       </div>
       {vehicle.openJob && vehicle.openJob.id !== svc?.booked?.id && (

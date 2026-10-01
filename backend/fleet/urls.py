@@ -23,7 +23,6 @@ from .views_extra import (
     DriverViewSet,
     MechanicViewSet,
     FuelTrendsView,
-    WeeklySummaryView,
 )
 
 router = DefaultRouter()
@@ -42,7 +41,6 @@ urlpatterns = [
     path("activity/", ActivityView.as_view(), name="activity"),
     path("budget/", BudgetView.as_view(), name="budget"),
     path("fuel-trends/", FuelTrendsView.as_view(), name="fuel-trends"),
-    path("weekly-summary/", WeeklySummaryView.as_view(), name="weekly-summary"),
     path("fuel-import/", FuelImportView.as_view(), name="fuel-import"),
     path("washes/", WashesView.as_view(), name="washes"),
     path("analytics/", AnalyticsView.as_view(), name="analytics"),

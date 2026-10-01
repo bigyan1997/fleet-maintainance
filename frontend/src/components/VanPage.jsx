@@ -10,7 +10,7 @@ import { fmtAgo, fmtDate } from '../lib/formatDate'
 import { href, navigate } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Documents } from './Documents'
-import { ActivityList } from './TeamView'
+import { ChangeHistory } from './ChangeHistory'
 import { StatusBadge } from './FleetView'
 import { VanDetail } from './FuelByVan'
 import { byNewest, expiryCell, serviceText } from '../lib/fleet'
@@ -348,7 +348,7 @@ export function VanPage({ id }) {
 
       {tab === 'changes' && (
         <Card title="Change history" description="Every add, change and delete for this van, with who did it." padded={false}>
-          <ActivityList vehicle={vanId} compact />
+          <ChangeHistory vehicle={vanId} />
         </Card>
       )}
 

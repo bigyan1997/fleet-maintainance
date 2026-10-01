@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { fetchBudget, fetchFuelTrends, fetchWeeklySummary, saveBudget } from '../api/extra'
+import { fetchBudget, fetchFuelTrends, saveBudget } from '../api/extra'
 import { useActions } from '../lib/actions'
 import { href } from '../lib/router'
 import { Button, Card, Empty, Pill, Stat } from './ui'
@@ -212,61 +212,6 @@ export function BudgetView() {
           </table>
         </div>
         <p className="border-t border-line px-4 py-2.5 text-xs text-off">Fuel card = every line on the fuel statements (fuel + card fees), by the date on each line. Maintenance = service and repair costs plus incident costs. Van washes are free and not counted.</p>
-      </Card>
-    </div>
-  )
-}
-
-// ── Weekly email ───────────────────────────────────────────────────────────
-
-const SECTIONS = [
-  ['overdue', 'Overdue', (r) => `${r.vehicle} — ${r.what} (${r.detail})`, 'due'],
-  ['bookedThisWeek', 'Booked in this week', (r) => `${r.date} · ${r.vehicle} — ${r.what}${r.issues ? ` · issues: ${r.issues}` : ''}`, 'info'],
-  ['dueSoon', 'Coming up', (r) => `${r.vehicle} — ${r.what} (${r.detail})`, 'warn'],
-  ['awaitingInvoice', 'Done, waiting for the invoice', (r) => `${r.vehicle} — ${r.what} (serviced ${r.date})`, 'warn'],
-  ['openIncidents', 'Open incidents', (r) => `${r.date} · ${r.vehicle} — ${r.what}, ${r.status.toLowerCase()}`, 'due'],
-  ['washesDue', 'Vans due a wash', (r) => `${r.vehicle} — ${r.lastWashed ? `last washed ${r.lastWashed}` : 'no wash logged'}`, 'info'],
-]
-
-export function WeeklyEmail() {
-  const { data } = useQuery({ queryKey: ['weekly-summary'], queryFn: fetchWeeklySummary })
-  if (!data) return null
-  const f = data.fuel
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <Card title={`Preview: Fleet summary — week of ${data.date}`} description="This is exactly what the Monday-morning email says, built from today's data.">
-        <div className="grid gap-4 text-[13.5px]">
-          {SECTIONS.map(([key, title, fmt, tone]) => (
-            <div key={key}>
-              <div className="mb-1 flex items-center gap-2 font-semibold">{title} <Pill tone={data[key].length ? tone : 'off'}>{data[key].length}</Pill></div>
-              {data[key].length === 0 ? <div className="text-off">Nothing.</div> : (
-                <ul className="list-disc pl-5">{data[key].map((r, i) => <li key={i}>{fmt(r)}</li>)}</ul>
-              )}
-            </div>
-          ))}
-          <div>
-            <div className="mb-1 font-semibold">Fuel last month</div>
-            <div>{f.month} fuel card total {money(f.total)} (fuel {money(f.fuelOnly)} + card fees {money(f.fees)}, {Math.round(f.litres).toLocaleString()} L diesel)</div>
-          </div>
-        </div>
-      </Card>
-      <Card title="Sending" description="Who gets it and when.">
-        {data.emailReady ? (
-          <div className="grid gap-2 text-[13.5px]">
-            <Pill tone="ok">Switched on</Pill>
-            <div>Goes every Monday at 7:00 am to: <b>{data.recipients.join(', ')}</b></div>
-          </div>
-        ) : (
-          <div className="grid gap-3 text-[13.5px]">
-            <div><Pill tone="warn">Not sending yet</Pill></div>
-            <p>The email is ready; it just needs an email account to send from. To switch it on, tell Claude:</p>
-            <ol className="list-decimal space-y-1 pl-5">
-              <li>Which address should it come from (e.g. a Gmail account the office uses). For Gmail you'll need an <b>app password</b>: Google Account → Security → 2-Step Verification → App passwords.</li>
-              <li>Who should receive it (you, your boss, or both).</li>
-            </ol>
-            <p className="text-xs text-off">It then runs every Monday at 7:00 am from this PC, as long as the PC is on.</p>
-          </div>
-        )}
       </Card>
     </div>
   )
