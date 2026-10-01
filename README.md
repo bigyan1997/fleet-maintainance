@@ -4,7 +4,7 @@ Vehicle fleet tracker for Achieve Cafe Provisions — vehicles, service history,
 
 **Using the app?** See **[USAGE.md](USAGE.md)**: what each screen is for and how to do everyday jobs.
 
-**Status: live on the office PC.** Served by waitress on port 8001 (`run_server.bat`), hidden and kept running by `keep-alive.ps1` (a scheduled task checks every 2 minutes and restarts it if needed). Open it at http://DESKTOP-OB7PD9F:8001 on the office network, or http://bigyan-desktop:8001 over Tailscale. Project history and decisions are in [NOTES.md](NOTES.md).
+**Status: live on the orders PC, next to NPD Tracker v2 (which has port 8001).** Served by waitress on port 8002 (`run_server.bat`), kept running by `keep-alive.ps1` (scheduled task every 5 minutes) and auto-deployed from `main` by `auto_deploy.ps1` (every 5 minutes; tests, builds, migrates, restarts, rolls back on failure) — same setup as NPD Tracker v2. Open it at http://orders-hostcomputer:8002 over Tailscale. Project history and decisions are in [NOTES.md](NOTES.md).
 
 ## Architecture
 
