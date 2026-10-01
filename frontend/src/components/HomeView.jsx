@@ -162,12 +162,23 @@ export function HomeView() {
   ]
 
   const monthName = new Date().toLocaleString('en-AU', { month: 'long' })
+  // e.g. "Van 9 booked for 07-10" (one or two jobs) or "2 booked · 1 at the mechanic".
+  const booked = jobs.filter((j) => j.status === 'Booked')
+  const atMechanic = jobs.filter((j) => j.status !== 'Booked')
+  const jobsNote = [
+    jobs.length === 0
+      ? 'nothing booked or at the mechanic'
+      : jobs.length <= 2
+        ? jobs.map((j) => `${j.vehicleLabel} ${j.status === 'Booked' ? `booked for ${fmtDate(j.date).slice(0, 5)}` : 'at the mechanic'}`).join(' · ')
+        : [booked.length && `${booked.length} booked`, atMechanic.length && `${atMechanic.length} at the mechanic`].filter(Boolean).join(' · '),
+    waiting.length && `${waiting.length} waiting for an invoice`,
+  ].filter(Boolean).join(' · ')
 
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Tile label="Needs doing" value={items.length} note="see the list below" tone={items.length ? 'text-due' : 'text-ok'} />
-        <Tile label="At the mechanic" value={jobs.length} note={`booked or being worked on${waiting.length ? ` · ${waiting.length} waiting for an invoice` : ''}`} />
+        <Tile label="Booked & at the mechanic" value={jobs.length} note={jobsNote} />
         <Tile
           label={`Spent in ${monthName} so far`}
           value={money(Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0))}
