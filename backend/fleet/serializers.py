@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from . import services
-from .models import ActivityLog, Attachment, Driver, FuelLog, Incident, IncidentUpdate, ServiceRecord, Vehicle
+from .models import ActivityLog, Attachment, Driver, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -51,12 +51,13 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 class ServiceRecordSerializer(serializers.ModelSerializer):
     vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    mechanicName = serializers.CharField(source="mechanic.name", read_only=True, default="")
 
     class Meta:
         model = ServiceRecord
         fields = [
             "id", "vehicle", "vehicleLabel", "service_type", "date",
-            "odometer", "cost", "next_due", "issues", "notes", "status",
+            "odometer", "cost", "next_due", "issues", "notes", "status", "mechanic", "mechanicName",
         ]
 
 
@@ -182,3 +183,13 @@ class ActivityLogSerializer(serializers.ModelSerializer):
 
     def get_vehicleLabel(self, obj):
         return str(obj.vehicle) if obj.vehicle_id else ""
+
+
+class MechanicSerializer(serializers.ModelSerializer):
+    jobs = serializers.IntegerField(read_only=True, default=0)
+    spend = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, default=0)
+    lastJob = serializers.DateField(read_only=True, default=None)
+
+    class Meta:
+        model = Mechanic
+        fields = ["id", "name", "phone", "address", "notes", "active", "jobs", "spend", "lastJob"]

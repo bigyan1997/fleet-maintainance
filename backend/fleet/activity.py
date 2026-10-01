@@ -33,7 +33,8 @@ def describe_service(record):
     if service_kind(record) == "Wash":
         return f"{record.vehicle} washed {record.date:%d-%m-%Y}"
     cost = f" · ${record.cost}" if record.cost else ""
-    return f"{record.service_type} for {record.vehicle} · {record.date:%d-%m-%Y} · {record.status}{cost}"
+    by = f" · by {record.mechanic}" if record.mechanic_id else ""
+    return f"{record.service_type} for {record.vehicle} · {record.date:%d-%m-%Y} · {record.status}{by}{cost}"
 
 
 def describe_fuel(record):

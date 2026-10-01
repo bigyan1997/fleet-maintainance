@@ -34,3 +34,9 @@ export const fetchUsers = async () => (await api.get('/auth/users/')).data
 export const createUser = async (data) => (await api.post('/auth/users/', data)).data
 export const setUserActive = async (id, active) => (await api.patch(`/auth/users/${id}/`, { active })).data
 export const changePassword = async (data) => (await api.post('/auth/password/', data)).data
+
+// Mechanics / workshops
+export const fetchMechanics = async () => (await api.get('/mechanics/')).data
+export const createMechanic = async (data) => (await api.post('/mechanics/', data)).data
+export const updateMechanic = async (id, data) => (await api.patch(`/mechanics/${id}/`, data)).data
+export const deleteMechanic = async (id) => api.delete(`/mechanics/${id}/`)

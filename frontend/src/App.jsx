@@ -10,6 +10,7 @@ import { DashboardView } from './components/DashboardView'
 import { FleetView } from './components/FleetView'
 import { VanPage } from './components/VanPage'
 import { HistoryView } from './components/HistoryView'
+import { MechanicsView } from './components/MechanicsView'
 import { AlertsView } from './components/AlertsView'
 import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
@@ -38,6 +39,11 @@ const TABS = [
   { key: 'incidents', label: 'Incidents' },
   { key: 'fuel', label: 'Fuel' },
   { key: 'reports', label: 'Reports' },
+]
+
+const SERVICE_TABS = [
+  { key: '', label: 'All services' },
+  { key: 'mechanics', label: 'Mechanics' },
 ]
 
 const FLEET_TABS = [
@@ -155,7 +161,25 @@ function MainApp({ username }) {
       </div>
     )
   } else if (tab === 'services') {
-    page = <HistoryView key={path[1] || 'all'} initialStatus={path[1] || ''} onEdit={(s) => openForm('service', s)} onError={(m) => show(m, true)} />
+    // #/services, #/services/Booked (a status), #/services/mechanic/3, #/services/mechanics
+    const byMechanic = path[1] === 'mechanic' ? path[2] : ''
+    const status = path[1] && path[1] !== 'mechanic' && path[1] !== 'mechanics' ? path[1] : ''
+    page = (
+      <div>
+        <SubTabs items={SERVICE_TABS} value={path[1] === 'mechanics' ? 'mechanics' : ''} base="services" />
+        {path[1] === 'mechanics' ? (
+          <MechanicsView />
+        ) : (
+          <HistoryView
+            key={path.join('/')}
+            initialStatus={status}
+            initialMechanic={byMechanic}
+            onEdit={(s) => openForm('service', s)}
+            onError={(m) => show(m, true)}
+          />
+        )}
+      </div>
+    )
   } else if (tab === 'alerts') page = <AlertsView />
   else if (tab === 'washes') page = <WashesView onError={(m) => show(m, true)} />
   else if (tab === 'incidents') page = <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />

@@ -117,6 +117,25 @@ class Vehicle(models.Model):
         return label or f"Vehicle #{self.pk}"
 
 
+class Mechanic(models.Model):
+    """A mechanic or workshop that services the vans."""
+
+    name = models.CharField(max_length=120)
+    phone = models.CharField(max_length=30, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class ServiceRecord(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.PROTECT, related_name="services")
     service_type = models.CharField(max_length=32, choices=SERVICE_TYPE_CHOICES)
@@ -129,6 +148,7 @@ class ServiceRecord(models.Model):
     issues = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=32, choices=SERVICE_STATUS_CHOICES, default="Booked", db_index=True)
+    mechanic = models.ForeignKey(Mechanic, on_delete=models.SET_NULL, null=True, blank=True, related_name="services")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

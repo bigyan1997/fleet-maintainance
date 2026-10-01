@@ -203,10 +203,12 @@ def _bump_odometer_if_higher(vehicle, odometer):
 # ── Service record CRUD ──────────────────────────────────────────────────
 
 
-def list_services(vehicle=None, service_type="", status="", date_from=None, date_to=None, search=""):
-    qs = ServiceRecord.objects.select_related("vehicle").all()
+def list_services(vehicle=None, service_type="", status="", date_from=None, date_to=None, search="", mechanic=None):
+    qs = ServiceRecord.objects.select_related("vehicle", "mechanic").all()
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
+    if mechanic:
+        qs = qs.filter(mechanic_id=mechanic)
     if status:
         qs = qs.filter(status=status)
     if service_type:
@@ -228,6 +230,7 @@ def list_services(vehicle=None, service_type="", status="", date_from=None, date
             | Q(vehicle__vin__icontains=search)
             | Q(issues__icontains=search)
             | Q(notes__icontains=search)
+            | Q(mechanic__name__icontains=search)
         )
     return qs
 

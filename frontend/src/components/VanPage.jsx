@@ -135,7 +135,7 @@ export function VanPage({ id }) {
   const entries = [
     ...serviceRows.map((s) => ({
       key: `s${s.id}`, kind: 'Service', date: s.date, record: s,
-      title: s.service_type, sub: [s.status, s.odometer && km(s.odometer), s.issues && `issues: ${s.issues}`].filter(Boolean).join(' · '),
+      title: s.service_type, sub: [s.status, s.mechanicName && `by ${s.mechanicName}`, s.odometer && km(s.odometer), s.issues && `issues: ${s.issues}`].filter(Boolean).join(' · '),
       amount: s.cost ? money(s.cost) : null,
     })),
     ...washRows.map((w) => ({ key: `w${w.id}`, kind: 'Wash', date: w.date, record: w, title: 'Washed', sub: fmtAgo(w.date) })),
@@ -252,6 +252,7 @@ export function VanPage({ id }) {
                     <th className="px-4 py-2 font-medium">Date</th>
                     <th className="px-2 py-2 font-medium">Type</th>
                     <th className="px-2 py-2 font-medium">Status</th>
+                    <th className="px-2 py-2 font-medium">Mechanic</th>
                     <th className="px-2 py-2 text-right font-medium">Odometer</th>
                     <th className="px-2 py-2 text-right font-medium">Cost</th>
                     <th className="px-2 py-2 font-medium">Next due</th>
@@ -264,6 +265,7 @@ export function VanPage({ id }) {
                       <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{fmtDate(s.date)}</td>
                       <td className="px-2 py-2.5 font-medium">{s.service_type}</td>
                       <td className="px-2 py-2.5"><StatusSelect service={s} onError={(m) => toast(m, true)} /></td>
+                      <td className="px-2 py-2.5 whitespace-nowrap">{s.mechanicName || <span className="text-off">—</span>}</td>
                       <td className="px-2 py-2.5 text-right whitespace-nowrap tabular-nums">{s.odometer ? km(s.odometer) : '—'}</td>
                       <td className="px-2 py-2.5 text-right tabular-nums">{s.cost ? money(s.cost) : '—'}</td>
                       <td className="px-2 py-2.5 whitespace-nowrap">{s.next_due || '—'}</td>

@@ -5,7 +5,7 @@ import mimetypes
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.http import FileResponse, Http404
 from django.utils import timezone
@@ -14,8 +14,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import activity, services
-from .models import ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, ServiceRecord, Vehicle, fuel_only_q
-from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverSerializer
+from .models import ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, Vehicle, fuel_only_q
+from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverSerializer, MechanicSerializer
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ALLOWED_UPLOAD_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
@@ -55,6 +55,57 @@ class DriverViewSet(viewsets.ViewSet):
         name = driver.name
         driver.delete()  # their vans just lose the driver (SET_NULL)
         activity.log(request.user, "Deleted", "Driver", name)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ── Mechanics ──────────────────────────────────────────────────────────────
+
+
+def _mechanics_with_stats():
+    return Mechanic.objects.annotate(
+        jobs=Count("services", filter=~Q(services__service_type=services.WASH_SERVICE_TYPE)),
+        spend=Sum("services__cost"),
+        lastJob=Max("services__date"),
+    )
+
+
+class MechanicViewSet(viewsets.ViewSet):
+    def list(self, request):
+        return Response(MechanicSerializer(_mechanics_with_stats(), many=True).data)
+
+    def create(self, request):
+        name = (request.data.get("name") or "").strip()
+        if not name:
+            return Response({"detail": "Enter the mechanic or workshop name."}, status=status.HTTP_400_BAD_REQUEST)
+        existing = Mechanic.objects.filter(name__iexact=name).first()
+        if existing:  # typing a name that's already there just picks it
+            return Response(MechanicSerializer(_mechanics_with_stats().get(pk=existing.pk)).data)
+        serializer = MechanicSerializer(data={**request.data, "name": name})
+        serializer.is_valid(raise_exception=True)
+        mechanic = serializer.save()
+        activity.log(request.user, "Added", "Mechanic", mechanic.name)
+        return Response(MechanicSerializer(_mechanics_with_stats().get(pk=mechanic.pk)).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        mechanic = Mechanic.objects.filter(pk=pk).first()
+        if not mechanic:
+            return Response({"detail": "Mechanic not found."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = MechanicSerializer(mechanic, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        mechanic = serializer.save()
+        activity.log(request.user, "Changed", "Mechanic", mechanic.name)
+        return Response(MechanicSerializer(_mechanics_with_stats().get(pk=mechanic.pk)).data)
+
+    def update(self, request, pk=None):
+        return self.partial_update(request, pk)
+
+    def destroy(self, request, pk=None):
+        mechanic = Mechanic.objects.filter(pk=pk).first()
+        if not mechanic:
+            return Response({"detail": "Mechanic not found."}, status=status.HTTP_404_NOT_FOUND)
+        name = mechanic.name
+        mechanic.delete()  # their services keep everything but the name (SET_NULL)
+        activity.log(request.user, "Deleted", "Mechanic", name)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

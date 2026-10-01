@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { createMechanic, fetchMechanics } from '../api/extra'
 import { fetchVehicles } from '../api/vehicles'
 import { createService, updateService } from '../api/services'
 import { Documents } from './Documents'
@@ -16,13 +17,14 @@ function today() {
 }
 
 function blankForm() {
-  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', issues: '', odometer: '', cost: '', next_due: '', notes: '' }
+  return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', issues: '', odometer: '', cost: '', next_due: '', notes: '', mechanic: '' }
 }
 
 function fromService(s) {
   return {
     vehicle: s.vehicle, service_type: s.service_type, date: s.date, status: s.status, issues: s.issues || '',
     odometer: s.odometer ?? '', cost: s.cost ?? '', next_due: s.next_due || '', notes: s.notes || '',
+    mechanic: s.mechanic ?? '',
   }
 }
 
@@ -33,6 +35,9 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
   const vehicleOptions = vehiclesQuery.data ?? []
+  const mechanicsQuery = useQuery({ queryKey: ['mechanics'], queryFn: fetchMechanics })
+  const mechanics = (mechanicsQuery.data ?? []).filter((m) => m.active || m.id === form.mechanic)
+  const [newMechanic, setNewMechanic] = useState(null) // text while adding a new one, else null
 
   // "Next due" for a scheduled service = odometer + the van's service
   // interval (usually 10,000 km). Filled in automatically until someone types
@@ -53,11 +58,14 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   }
 
   const mutation = useMutation({
-    mutationFn: () => {
-      const payload = { ...form, odometer: form.odometer || null, cost: form.cost || null }
+    mutationFn: async () => {
+      // A newly typed mechanic is created first (or matched, if the name already exists).
+      const mechanic = newMechanic?.trim() ? (await createMechanic({ name: newMechanic.trim() })).id : form.mechanic || null
+      const payload = { ...form, mechanic, odometer: form.odometer || null, cost: form.cost || null }
       return isEdit ? updateService(service.id, payload) : createService(payload)
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mechanics'] })
       queryClient.invalidateQueries({ queryKey: ['services'] })
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -96,6 +104,33 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
         <Field label="Status">
           <SelectInput value={form.status} onChange={set('status')} options={SERVICE_STATUSES} />
         </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Mechanic / workshop">
+          <select
+            value={newMechanic !== null ? '__new' : form.mechanic}
+            onChange={(e) => {
+              if (e.target.value === '__new') {
+                setNewMechanic('')
+              } else {
+                setNewMechanic(null)
+                set('mechanic')(e.target.value ? Number(e.target.value) : '')
+              }
+            }}
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="">Not set</option>
+            {mechanics.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            <option value="__new">+ Add new mechanic…</option>
+          </select>
+        </Field>
+        {newMechanic !== null ? (
+          <Field label="New mechanic's name">
+            <TextInput value={newMechanic} onChange={setNewMechanic} placeholder="e.g. Canterbury Toyota" autoFocus />
+          </Field>
+        ) : (
+          <div className="self-end pb-2 text-xs text-off">Who did (or will do) the work. Manage the list on Services → Mechanics.</div>
+        )}
       </FormRow>
       <div className="mb-3">
         <Field label="Issues for the mechanic (what's wrong / needs checking)">

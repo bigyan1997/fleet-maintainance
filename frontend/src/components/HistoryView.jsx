@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { fetchMechanics } from '../api/extra'
 import { fetchVehicles } from '../api/vehicles'
 import { deleteService, fetchServices } from '../api/services'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -13,20 +14,22 @@ const SERVICE_TYPES = [
   'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log', 'Van wash',
 ]
 
-export function HistoryView({ onEdit, initialStatus = '', onError }) {
+export function HistoryView({ onEdit, initialStatus = '', initialMechanic = '', onError }) {
   const [vehicle, setVehicle] = useState('')
   const [serviceType, setServiceType] = useState('')
   const [statusFilter, setStatusFilter] = useState(initialStatus)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [search, setSearch] = useState('')
+  const [mechanic, setMechanic] = useState(initialMechanic)
   const [page, setPage] = useState(1)
   const [detail, setDetail] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const queryClient = useQueryClient()
 
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
-  const filters = { vehicle: vehicle || undefined, service_type: serviceType || undefined, status: statusFilter || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined, search: search || undefined, page }
+  const mechanicsQuery = useQuery({ queryKey: ['mechanics'], queryFn: fetchMechanics })
+  const filters = { vehicle: vehicle || undefined, service_type: serviceType || undefined, status: statusFilter || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined, search: search || undefined, mechanic: mechanic || undefined, page }
   const servicesQuery = useQuery({ queryKey: ['services', filters], queryFn: () => fetchServices(filters) })
 
   const deleteMutation = useMutation({
@@ -39,7 +42,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
   })
 
   const clearFilters = () => {
-    setVehicle(''); setServiceType(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); setSearch(''); setPage(1)
+    setVehicle(''); setServiceType(''); setStatusFilter(''); setDateFrom(''); setDateTo(''); setSearch(''); setMechanic(''); setPage(1)
   }
 
   const data = servicesQuery.data
@@ -47,7 +50,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
   const count = data?.count ?? 0
   const pageSize = 25
   const totalPages = Math.max(1, Math.ceil(count / pageSize))
-  const hasFilters = Boolean(vehicle || serviceType || statusFilter || dateFrom || dateTo || search)
+  const hasFilters = Boolean(vehicle || serviceType || statusFilter || dateFrom || dateTo || search || mechanic)
 
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white">
@@ -76,6 +79,13 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
           </select>
         </div>
         <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-medium tracking-wide text-off uppercase">Mechanic</label>
+          <select value={mechanic} onChange={(e) => { setMechanic(e.target.value); setPage(1) }} className="h-[34px] rounded-md border border-line px-2.5 text-[13px]">
+            <option value="">All mechanics</option>
+            {(mechanicsQuery.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium tracking-wide text-off uppercase">Date from</label>
           <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1) }} className="h-[34px] rounded-md border border-line px-2.5 text-[13px]" />
         </div>
@@ -99,6 +109,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
               <th className="px-3 py-2.5 text-left font-medium">Type</th>
               <th className="px-3 py-2.5 text-left font-medium">Date</th>
               <th className="px-3 py-2.5 text-left font-medium">Status</th>
+              <th className="px-3 py-2.5 text-left font-medium">Mechanic</th>
               <th className="px-3 py-2.5 text-left font-medium">Odometer</th>
               <th className="px-3 py-2.5 text-left font-medium">Cost</th>
               <th className="px-3 py-2.5 text-left font-medium">Notes</th>
@@ -107,7 +118,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-10 text-center text-off">{hasFilters ? 'No records match the current filters.' : 'No records yet.'}</td></tr>
+              <tr><td colSpan={9} className="px-3 py-10 text-center text-off">{hasFilters ? 'No records match the current filters.' : 'No records yet.'}</td></tr>
             ) : (
               rows.map((s) => (
                 <tr key={s.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(s)}>
@@ -115,6 +126,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
                   <td className="px-3 py-2.5">{s.service_type}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(s.date)}</td>
                   <td className="px-3 py-2.5"><StatusSelect service={s} onError={onError} /></td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{s.mechanicName || <span className="text-off">—</span>}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.odometer ? `${s.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{s.cost ? `$${s.cost}` : '—'}</td>
                   <td className="max-w-[320px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{s.notes || '—'}</td>
@@ -144,6 +156,7 @@ export function HistoryView({ onEdit, initialStatus = '', onError }) {
             ['Type', detail.service_type],
             ['Date', fmtDate(detail.date)],
             ['Status', detail.status],
+            ['Mechanic', detail.mechanicName || '—'],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],
             ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Next due', detail.next_due || '—'],

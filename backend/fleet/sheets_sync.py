@@ -61,15 +61,15 @@ def _service_rows():
     from .models import ServiceRecord
 
     header = [
-        "ID", "Vehicle ID", "Vehicle", "Rego", "Service type", "Date", "Status", "Odometer (km)", "Cost",
+        "ID", "Vehicle ID", "Vehicle", "Rego", "Service type", "Date", "Status", "Mechanic", "Odometer (km)", "Cost",
         "Next due", "Issues for mechanic", "Notes",
     ]
     rows = [
         [
             s.pk, s.vehicle_id, str(s.vehicle), s.vehicle.rego, s.service_type, _date(s.date), s.status,
-            _num(s.odometer), _num(s.cost), s.next_due, s.issues, s.notes,
+            s.mechanic.name if s.mechanic_id else "", _num(s.odometer), _num(s.cost), s.next_due, s.issues, s.notes,
         ]
-        for s in ServiceRecord.objects.select_related("vehicle").order_by("date", "pk")
+        for s in ServiceRecord.objects.select_related("vehicle", "mechanic").order_by("date", "pk")
     ]
     return header, rows
 

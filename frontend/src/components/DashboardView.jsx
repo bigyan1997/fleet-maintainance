@@ -50,6 +50,7 @@ function JobsInProgress({ rows, onOpenService, onError }) {
                   <td className="px-2 py-2">{s.vehicleLabel}</td>
                   <td className="px-2 py-2">
                     {s.service_type}
+                    {s.mechanicName && <div className="text-xs text-off">at {s.mechanicName}</div>}
                     {s.issues && <div className="mt-0.5 max-w-[320px] text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
                   </td>
                   <td className="px-2 py-2 whitespace-nowrap">{fmtDate(s.date)}</td>
@@ -83,6 +84,7 @@ function RecentServices({ rows, onOpenService, onGoTo }) {
                 <SortTh label="Type" col="service_type" sort={sort} />
                 <SortTh label="Date" col="date" sort={sort} />
                 <SortTh label="Status" col="status" sort={sort} />
+                <SortTh label="Mechanic" col="mechanicName" sort={sort} />
                 <SortTh label="Odometer" col="odometer" sort={sort} />
                 <SortTh label="Cost" col="cost" sort={sort} />
               </tr>
@@ -96,6 +98,7 @@ function RecentServices({ rows, onOpenService, onGoTo }) {
                   <td className="px-2 py-2">
                     <span className={'inline-block rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap ' + (STATUS_STYLES[s.status] ?? '')}>{s.status}</span>
                   </td>
+                  <td className="px-2 py-2 whitespace-nowrap">{s.mechanicName || '—'}</td>
                   <td className="px-2 py-2">{s.odometer ? `${s.odometer.toLocaleString()} km` : '—'}</td>
                   <td className="px-2 py-2">{s.cost ? `$${s.cost}` : '—'}</td>
                 </tr>

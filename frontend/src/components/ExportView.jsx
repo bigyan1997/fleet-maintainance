@@ -59,7 +59,7 @@ export function ExportView() {
       wb,
       XLSX.utils.json_to_sheet(
         services.map((s) => ({
-          Vehicle: s.vehicleLabel, 'Service Type': s.service_type, Date: fmtDate(s.date),
+          Vehicle: s.vehicleLabel, 'Service Type': s.service_type, Date: fmtDate(s.date), Mechanic: s.mechanicName || '',
           'Odometer (km)': s.odometer, 'Cost ($)': s.cost, 'Next Due': s.next_due, Status: s.status, 'Issues for Mechanic': s.issues, 'Work Done / Parts': s.notes,
         })),
       ),
@@ -99,7 +99,7 @@ export function ExportView() {
       )
     } else if (which === 'services') {
       const rows = await fetchAll(fetchServices)
-      download(toCSV(rows, ['vehicleLabel', 'service_type', 'date', 'odometer', 'cost', 'next_due', 'status', 'issues', 'notes']), 'fleet-services.csv', 'text/csv')
+      download(toCSV(rows, ['vehicleLabel', 'service_type', 'date', 'mechanicName', 'odometer', 'cost', 'next_due', 'status', 'issues', 'notes']), 'fleet-services.csv', 'text/csv')
     } else if (which === 'incidents') {
       const rows = await fetchAll(fetchIncidents)
       download(toCSV(rows, ['vehicleLabel', 'date', 'incident_type', 'severity', 'location', 'description', 'cost', 'status', 'notes', 'resolution', 'resolved_date']), 'fleet-incidents.csv', 'text/csv')

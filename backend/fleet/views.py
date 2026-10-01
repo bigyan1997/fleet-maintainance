@@ -96,6 +96,7 @@ class ServiceRecordViewSet(viewsets.ViewSet):
             lambda r: {
                 "service_type": r.query_params.get("service_type", ""),
                 "status": r.query_params.get("status", ""),
+                "mechanic": r.query_params.get("mechanic") or None,
             },
         )
         return _paginated(request, rows, ServiceRecordSerializer)
