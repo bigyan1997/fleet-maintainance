@@ -36,6 +36,28 @@ function alertText(a) {
   return a.overdue ? `${what} overdue by ${n} ${unit}` : `${what} due in ${n} ${unit}`
 }
 
+// Each service's invoice arrives about a month after the work. Up to 6 weeks
+// is normal; after that it's late and goes on the Needs doing list.
+const INVOICE_LATE_DAYS = 45
+
+function addMonth(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m, 1))
+  dt.setUTCDate(Math.min(d, new Date(Date.UTC(y, m + 1, 0)).getUTCDate()))
+  return dt.toISOString().slice(0, 10)
+}
+
+function localToday() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function daysSince(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const now = new Date()
+  return Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(y, m - 1, d)) / 86400000)
+}
+
 export function HomeView() {
   const { openForm, toast } = useActions()
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard })
@@ -48,15 +70,38 @@ export function HomeView() {
 
 
   const d = dashboard.data
-  const jobs = d?.inProgressServices ?? []
+  const allJobs = d?.inProgressServices ?? []
+  // Unfinished work (booked / at the mechanic) vs finished work waiting for its invoice.
+  const jobs = allJobs.filter((s) => s.status !== 'Completed, awaiting invoice')
+  const waiting = allJobs
+    .filter((s) => s.status === 'Completed, awaiting invoice')
+    .map((s) => ({ ...s, expected: addMonth(s.date), late: daysSince(s.date) > INVOICE_LATE_DAYS }))
   const cycle = washes.data?.cycleDays ?? 14
   const dueWashes = (washes.data?.vans ?? []).filter((w) => w.washNeeded && (w.daysSince === null || w.daysSince >= cycle))
 
+  const todayIso = localToday()
+  const allAlerts = alerts.data ?? []
+  // Why a booked job matters, e.g. "service overdue by 1,629 km" (shown on it).
+  const reasonFor = Object.fromEntries(allAlerts.filter((a) => a.booked).map((a) => [a.booked.id, alertText(a)]))
+  const missedBooking = (a) => a.booked && a.booked.status === 'Booked' && a.booked.date < todayIso
+
   // Everything that needs someone to do something, most urgent first.
   const items = [
-    ...(alerts.data ?? [])
+    ...allAlerts
+      .filter((a) => !a.booked || missedBooking(a))
       .sort((a, b) => b.overdue - a.overdue || a.days_or_km_left - b.days_or_km_left)
-      .map((a) => ({
+      .map((a) => missedBooking(a) ? ({
+        key: `m-${a.booked.id}`,
+        van: a.vehicle, vanId: a.vehicleId,
+        text: `Booked for ${fmtDate(a.booked.date)} but not done yet`,
+        detail: alertText(a),
+        pill: ['amber', 'Check booking'],
+        action: (
+          <button onClick={() => { const job = allJobs.find((j) => j.id === a.booked.id); if (job) openForm('service', job) }} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">
+            Open job
+          </button>
+        ),
+      }) : ({
         key: `a-${a.vehicleId}-${a.title}`,
         van: a.vehicle, vanId: a.vehicleId,
         text: alertText(a),
@@ -73,16 +118,17 @@ export function HomeView() {
         pill: ['red', 'Incident'],
         action: <button onClick={() => openForm('incident', i)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">Open</button>,
       })),
-    ...jobs
-      .filter((s) => s.status === 'Completed, awaiting invoice')
+    ...waiting
+      .filter((s) => s.late)
       .map((s) => ({
         key: `s-${s.id}`,
         van: s.vehicleLabel, vanId: s.vehicle,
-        text: `${s.service_type} done ${fmtDate(s.date)}, waiting for the invoice`,
-        pill: ['amber', 'Invoice'],
+        text: `Invoice late: ${s.service_type.toLowerCase()} done ${fmtDate(s.date)}, invoice was expected around ${fmtDate(s.expected)}`,
+        detail: s.mechanicName ? `Check with ${s.mechanicName}` : 'Check with the mechanic',
+        pill: ['amber', 'Invoice late'],
         action: (
           <button onClick={() => openForm('finish', { ...s, targetStatus: 'Invoiced' })} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark">
-            Mark done
+            Invoice arrived
           </button>
         ),
       })),
@@ -92,7 +138,13 @@ export function HomeView() {
         ? [{
             key: 'dates',
             van: missing.length === (vehicles.data ?? []).length ? 'All vans' : `Vans ${missing.map((v) => v.label.replace(/^Van\s*/i, '')).join(', ')}`,
-            text: `Rego / insurance expiry dates not entered (${missing.length} van${missing.length === 1 ? '' : 's'}), so expiry warnings can't show yet`,
+            text: (() => {
+              const vans = vehicles.data ?? []
+              const noRego = vans.filter((v) => !v.rego_expiry).length
+              const noIns = vans.filter((v) => !v.insurance_expiry).length
+              const parts = [noRego && `rego date missing for ${noRego} van${noRego === 1 ? '' : 's'}`, noIns && `insurance date missing for ${noIns} van${noIns === 1 ? '' : 's'}`].filter(Boolean)
+              return `${parts.join(', ').replace(/^./, (c) => c.toUpperCase())}, so those expiry warnings can't show yet`
+            })(),
             pill: ['blue', 'Set up'],
             action: <a href={href('vans', 'dates')} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white no-underline hover:bg-primary-dark">Enter dates</a>,
           }]
@@ -115,7 +167,7 @@ export function HomeView() {
     <div className="grid gap-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Tile label="Needs doing" value={items.length} note="see the list below" tone={items.length ? 'text-due' : 'text-ok'} />
-        <Tile label="Jobs in progress" value={jobs.length} note="booked, at mechanic or waiting for invoice" />
+        <Tile label="At the mechanic" value={jobs.length} note={`booked or being worked on${waiting.length ? ` · ${waiting.length} waiting for an invoice` : ''}`} />
         <Tile
           label={`Spent in ${monthName} so far`}
           value={money(Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0))}
@@ -123,7 +175,7 @@ export function HomeView() {
         />
       </div>
 
-      {/* Needs doing and Jobs in progress side by side on a computer, stacked on a phone. */}
+      {/* Needs doing on the left; work at the mechanic and invoices on the right (stacked on a phone). */}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-lg border border-line bg-white">
           <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
@@ -152,29 +204,59 @@ export function HomeView() {
           )}
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-line bg-white">
-          <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
-            <h2 className="text-[15px] font-semibold text-ink">Jobs in progress</h2>
-            <a href={href('services')} className="text-xs font-medium text-primary no-underline hover:underline">All services →</a>
-          </div>
-          {jobs.length === 0 ? (
-            <div className="px-4 py-8 text-center text-[13px] text-off">Nothing in progress: every job is done.</div>
-          ) : (
-            <ul className="divide-y divide-[#f0f0f0]">
-              {jobs.map((s) => (
-                <li key={s.id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-[#fafafa]" onClick={() => openForm('service', s)}>
-                  <div className="min-w-[220px] flex-1">
-                    <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
-                    <div className="text-xs text-off">
-                      {fmtDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
+        <div className="grid min-w-0 gap-4">
+          <div className="overflow-hidden rounded-lg border border-line bg-white">
+            <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
+              <h2 className="text-[15px] font-semibold text-ink">Booked &amp; at the mechanic</h2>
+              <a href={href('services')} className="text-xs font-medium text-primary no-underline hover:underline">All services →</a>
+            </div>
+            {jobs.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[13px] text-off">Nothing booked or at the mechanic.</div>
+            ) : (
+              <ul className="divide-y divide-[#f0f0f0]">
+                {jobs.map((s) => (
+                  <li key={s.id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-[#fafafa]" onClick={() => openForm('service', s)}>
+                    <div className="min-w-[200px] flex-1">
+                      <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
+                      <div className="text-xs text-off">
+                        {fmtDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
+                      </div>
+                      {reasonFor[s.id] && <div className="text-xs font-medium text-due">{reasonFor[s.id]}</div>}
+                      {s.issues && <div className="text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
                     </div>
-                    {s.issues && <div className="text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
-                  </div>
-                  <StatusSelect service={s} onError={(m) => toast(m, true)} />
-                </li>
-              ))}
-            </ul>
-          )}
+                    <StatusSelect service={s} onError={(m) => toast(m, true)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-line bg-white">
+            <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
+              <h2 className="text-[15px] font-semibold text-ink">Waiting for invoices</h2>
+              <span className="text-xs text-off">usually a month after the work</span>
+            </div>
+            {waiting.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[13px] text-off">No invoices outstanding.</div>
+            ) : (
+              <ul className="divide-y divide-[#f0f0f0]">
+                {waiting.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
+                    <div className="min-w-[200px] flex-1">
+                      <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
+                      <div className={'text-xs ' + (s.late ? 'font-medium text-warn' : 'text-off')}>
+                        done {fmtDate(s.date)} · invoice {s.late ? 'was expected' : 'expected'} around {fmtDate(s.expected)}
+                        {s.mechanicName ? ` · ${s.mechanicName}` : ''}
+                      </div>
+                    </div>
+                    <button onClick={() => openForm('finish', { ...s, targetStatus: 'Invoiced' })} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">
+                      Invoice arrived
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

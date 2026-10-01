@@ -24,9 +24,10 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 
 Start here each day.
 
-- **Three numbers:** how many things need doing, how many jobs are in progress, and what's been spent this month (services + fuel card).
-- **Needs doing** lists everything that needs action, most urgent first: services due or overdue, rego/insurance expiring within 60 days, open incidents, jobs waiting for an invoice, vans due a wash, and missing rego/insurance dates. Each line has a button for the next step.
-- **Jobs in progress:** every service not finished yet. Change its status right there.
+- **Three numbers:** how many things need doing, how many vans are booked in or at the mechanic, and what's been spent this month (services + fuel card).
+- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego/insurance expiring within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego/insurance dates. Each line has a button for the next step.
+- **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
+- **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
 
 ## Services
 

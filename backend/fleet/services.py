@@ -424,7 +424,7 @@ def alerts():
     for v in Vehicle.objects.all():
         label = str(v)
 
-        def add(title, sub, diff):
+        def add(title, sub, diff, job=None):
             rows.append(
                 {
                     "vehicle": label,
@@ -433,6 +433,9 @@ def alerts():
                     "sub": sub,
                     "days_or_km_left": diff,
                     "overdue": diff < 0,
+                    # The open job already booked for it, if any, so Home can
+                    # leave handled items off "Needs doing".
+                    "booked": {"id": job["id"], "date": job["date"].isoformat(), "status": job["status"]} if job else None,
                 }
             )
 
@@ -452,10 +455,10 @@ def alerts():
 
         svc = next_service_due(v)
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Scheduled service due", f"{svc['due_at']:,} km{booked_note(svc)}", svc["km_left"])
+            add("Scheduled service due", f"{svc['due_at']:,} km{booked_note(svc)}", svc["km_left"], svc["booked"])
         tyre = next_tyre_due(v)
         if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD:
-            add("Tyre replacement due", f"{tyre['due_at']:,} km{booked_note(tyre)}", tyre["km_left"])
+            add("Tyre replacement due", f"{tyre['due_at']:,} km{booked_note(tyre)}", tyre["km_left"], tyre["booked"])
     return rows
 
 
