@@ -1,0 +1,118 @@
+# Fleet Maintenance: how to use it
+
+A guide for the people who use the app day to day at Achieve Cafe Provisions. For how it's built and set up, see [README.md](README.md) and [NOTES.md](NOTES.md).
+
+## Opening the app
+
+| Where you are | Open this |
+|---|---|
+| At the office (on the Wi-Fi) | **http://DESKTOP-OB7PD9F:8001** |
+| Anywhere else, with Tailscale on your laptop or phone | **http://bigyan-desktop:8001** |
+
+Sign in with the shared office login. Bookmark one of the addresses above, not one with numbers like `192.168.15.20`: that number can change when the router restarts.
+
+Every page has its own address, so you can bookmark a page or send a link to it, for example `…:8001/vans` or `…:8001/services/incidents`. All dates are shown as dd-mm-yyyy.
+
+## The screen at a glance
+
+- **Blue bar:** Google Sheet (a read-only copy of everything) and Log out.
+- **Tabs:** Home · Vans · Services · Washes · Fuel · Reports.
+- **Two buttons beside the tabs:** **Log wash** and **+ Log service**, the two things you do most.
+- Every form opens as a pop-up over the page you're on. Close it with ✕ or Cancel.
+
+## Home
+
+Start here each day.
+
+- **Three numbers:** how many things need doing, how many jobs are in progress, and what's been spent this month (services + fuel card).
+- **Needs doing** lists everything that needs action, most urgent first: services due or overdue, rego/insurance expiring within 60 days, open incidents, jobs waiting for an invoice, vans due a wash, and missing rego/insurance dates. Each line has a button for the next step.
+- **Jobs in progress:** every service not finished yet. Change its status right there.
+
+## Services
+
+### Booking a service
+1. Click **+ Log service**.
+2. Pick the **Van** and **What** (e.g. Scheduled service), the **Date** and **Status = Booked**.
+3. Pick the **Mechanic**. For someone new, choose **+ Add new mechanic…** and type the name.
+4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job.
+5. **Save record**.
+
+### When the work is done
+Change the job's status (on Home, the Services list or the van's page) to **Waiting for invoice** or **Done**. A small box asks for:
+- **Odometer when serviced**: the next service is worked out for you (**km + 10,000**) and the van's odometer is updated.
+- **Cost from the invoice**: keeps the spending figures right.
+- **Mechanic**.
+
+Don't have the figures yet? Click **Just change the status**, and fill them in later by opening the job.
+
+### Statuses
+**Booked** → **At mechanic** → **Waiting for invoice** → **Done**.
+
+### The Services tab
+- **Services:** every service, newest first. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
+- **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; open one to add follow-up notes, and to say what was done when it's resolved.
+- **Mechanics:** the workshops you use, with their phone number, number of jobs, total spent and last job. **See jobs** lists everything a workshop did.
+
+## Vans
+
+- The list is in order of **next service, soonest first**. Overdue vans are at the top.
+- **Next service** shows the km it's due at, with how far away it is underneath.
+- Click a van to open its page:
+  - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
+  - **Fuel:** that van's fill-ups and card charges.
+  - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too.
+  - **Details:** rego, VIN, fuel card, intervals, tyres, rego/insurance expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
+- Links at the top of the Vans list:
+  - **Rego & insurance dates:** pick each van's two dates once; they save straight away. Home then warns 60 days before anything expires.
+  - **Drivers:** add drivers and choose each van's usual driver.
+  - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
+  - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.
+- **+ Add vehicle** is at the top of the Vans list.
+
+## Washes
+
+Vans are washed in-house every 2 weeks.
+- **Due a wash:** press **Washed today** when one is done.
+- **Washed recently:** the last 2 weeks. ✕ removes a wash logged by mistake.
+- Vans that go home with their driver aren't on the wash list (change that in the van's Details → Edit).
+- **Log a past wash** records a wash on an earlier date.
+
+## Fuel
+
+The fuel card is billed once a month by Metro Petroleum (WEX Motorpass). The statement comes with two files: a PDF and a **MPDATA….TXT** file.
+
+### Importing the monthly statement
+1. Fuel tab → **Import statement**.
+2. Choose the **MPDATA….TXT** file (not the PDF).
+3. Check the preview. Each fuel card is matched to its van, the total should match the statement, odd odometer readings are marked, and anything already imported is skipped.
+4. Click **Import**.
+
+Fill-ups, card fees and AdBlue are all imported, so each van's total matches the statement to the cent. Litres, $/L and L/100km count diesel only.
+
+### Reading the Fuel tab
+- It opens on the **latest statement**. Use **‹ ›** for earlier statements, or **All time**.
+- One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups.
+- **Filters ▾** has van, dates, search, and "Every line" for the full list.
+- **Log fill-up** adds one by hand (rarely needed).
+
+## Reports
+
+- **Spending:** maintenance spend by month, by van and by type of work.
+- **Fuel:** fuel use by van (vans using 15% more than the fleet average are highlighted), fuel checks worth asking about (two fill-ups in a day, premium diesel, odometer typos), monthly fuel card spend, and month-by-month trends with price per litre and the cheapest stations.
+- **Budget:** set a monthly budget for fuel and for maintenance, and see each month against it.
+- **Download (Excel / CSV):** everything as a spreadsheet.
+
+The **Vehicle / Date from / Date to** filters at the top change every figure on the page.
+
+## Google Sheet
+
+The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten.
+
+## If the app won't open
+
+1. **Wait 2 minutes and try again.** The app checks itself every 2 minutes and restarts if it has stopped.
+2. Check you're using the right address (see "Opening the app") and, away from the office, that Tailscale is on.
+3. Make sure the office PC (DESKTOP-OB7PD9F) is on and plugged in. Closing the lid shouldn't stop it, but leave it open if you're unsure.
+4. Still not working? Restart the office PC and log in. The app starts by itself.
+
+For the app to come back after a restart **without anyone logging in**, the "Fleet Maintenance keep-alive" task in Task Scheduler must be set to **"Run whether user is logged on or not"** (needs the Windows password once; redo it if the password changes).

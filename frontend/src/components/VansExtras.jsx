@@ -180,7 +180,7 @@ export function TyresView() {
   return (
     <Card
       title="Tyres"
-      description="When each van last had new tyres and when the next set is due. Set each van's tyre interval (how many km a set lasts) to get warnings on Today."
+      description="When each van last had new tyres and when the next set is due. Set each van's tyre interval (how many km a set lasts) to get warnings on Home."
       padded={false}
     >
       <div className="overflow-x-auto">
@@ -259,7 +259,7 @@ export function QrStickers() {
           <Button variant="primary" icon="sheet" onClick={() => window.print()}>Print stickers</Button>
         </div>
         <p className="mt-3 max-w-[80ch] text-xs text-off">
-          Phones can only open it while on the office Wi-Fi, or with Tailscale on the phone. Reports go straight into the Incidents tab, marked "Reported by … using the van's QR sticker".
+          Phones can only open it while on the office Wi-Fi, or with Tailscale on the phone. Reports go straight into Services → Incidents and show on Home, marked "Reported by … using the van's QR sticker".
         </p>
       </Card>
       <div className="print-area grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -281,5 +281,85 @@ export function QrStickers() {
         })}
       </div>
     </div>
+  )
+}
+
+// ── Rego & insurance dates ─────────────────────────────────────────────────
+
+function ExpiryInput({ van, field, label }) {
+  const queryClient = useQueryClient()
+  const { toast } = useActions()
+  const save = useMutation({
+    mutationFn: (value) => patchVehicle(van.id, { [field]: value || null }),
+    onSuccess: (v) => {
+      for (const key of ['vehicles', 'alerts', 'dashboard']) queryClient.invalidateQueries({ queryKey: [key] })
+      toast(v[field] ? `${v.label}: ${label} ${fmtDate(v[field])} saved.` : `${v.label}: ${label} cleared.`)
+    },
+    onError: () => toast(`Could not save the ${label}.`, true),
+  })
+  const value = van[field] || ''
+  const days = value ? Math.round((new Date(value) - new Date(new Date().toDateString())) / 86400000) : null
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="date"
+        defaultValue={value}
+        key={value}
+        disabled={save.isPending}
+        onChange={(e) => e.target.value !== value && e.target.value.length === 10 && save.mutate(e.target.value)}
+        aria-label={`${label} for ${van.label}`}
+        className={inputCls + ' w-[150px]'}
+      />
+      {days === null ? (
+        <span className="text-xs text-off">not entered</span>
+      ) : days < 0 ? (
+        <Pill tone="due">expired {-days} day{days === -1 ? '' : 's'} ago</Pill>
+      ) : days < 60 ? (
+        <Pill tone="warn">in {days} day{days === 1 ? '' : 's'}</Pill>
+      ) : (
+        <Pill tone="ok">OK</Pill>
+      )}
+      {value && <button onClick={() => save.mutate('')} title="Clear" className="text-xs text-off hover:text-due">✕</button>}
+    </div>
+  )
+}
+
+export function RegoDates() {
+  const vans = useVans()
+  const list = sortVans(vans.data ?? [])
+  const missing = list.filter((v) => !v.rego_expiry || !v.insurance_expiry).length
+  return (
+    <Card
+      title="Rego & insurance dates"
+      description="Pick each date once from the papers or the rego/insurance renewal notice. It saves straight away. Home then warns you 60 days before anything expires."
+      padded={false}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <thead>
+            <tr className="border-b border-line bg-[#f8fafc] text-left text-xs text-off">
+              <th className="px-4 py-2 font-medium">Van</th>
+              <th className="px-2 py-2 font-medium">Rego expires</th>
+              <th className="px-2 py-2 font-medium">Insurance expires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((v) => (
+              <tr key={v.id} className="border-b border-[#eef1f5] last:border-0">
+                <td className="px-4 py-2.5">
+                  <a href={href('vans', v.id)} className="font-semibold text-ink no-underline hover:text-primary">{v.label}</a>
+                  <div className="text-xs text-off">{v.subtitle}</div>
+                </td>
+                <td className="px-2 py-2.5"><ExpiryInput van={v} field="rego_expiry" label="rego expiry" /></td>
+                <td className="px-2 py-2.5"><ExpiryInput van={v} field="insurance_expiry" label="insurance expiry" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t border-line px-4 py-2.5 text-xs text-off">
+        {missing ? `${missing} van${missing === 1 ? '' : 's'} still missing a date.` : 'All dates entered. Home will warn you 60 days before each one.'}
+      </p>
+    </Card>
   )
 }

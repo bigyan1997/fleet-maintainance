@@ -23,6 +23,12 @@ def log(user, action, kind, summary, vehicle=None, who_label=None):
     )
 
 
+def status_word(status):
+    from .services import STATUS_WORDS
+
+    return STATUS_WORDS.get(status, status)
+
+
 def service_kind(record):
     from .services import WASH_SERVICE_TYPE
 
@@ -34,7 +40,7 @@ def describe_service(record):
         return f"{record.vehicle} washed {record.date:%d-%m-%Y}"
     cost = f" · ${record.cost}" if record.cost else ""
     by = f" · by {record.mechanic}" if record.mechanic_id else ""
-    return f"{record.service_type} for {record.vehicle} · {record.date:%d-%m-%Y} · {record.status}{by}{cost}"
+    return f"{record.service_type} for {record.vehicle} · {record.date:%d-%m-%Y} · {status_word(record.status)}{by}{cost}"
 
 
 def describe_fuel(record):

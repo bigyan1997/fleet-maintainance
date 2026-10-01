@@ -116,7 +116,7 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
         summary = (
-            f"{record.service_type} for {record.vehicle} moved to {record.status}"
+            f"{record.service_type} for {record.vehicle} moved to {activity.status_word(record.status)}"
             if partial and set(request.data.keys()) == {"status"}
             else activity.describe_service(record)
         )
@@ -247,6 +247,8 @@ class DashboardView(APIView):
         summary = services.dashboard_summary()
         return Response(
             {
+                "monthServices": summary["month_services"],
+                "monthFuel": summary["month_fuel"],
                 "vehicleCount": summary["vehicle_count"],
                 "serviceCount": summary["service_count"],
                 "dueCount": summary["due_count"],

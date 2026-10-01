@@ -113,6 +113,8 @@ export function IncidentsView({ onEdit, onAdd }) {
       {detail && (
         <DetailModal
           title={detail.vehicleLabel}
+          subtitle={detail.vehicleSub}
+          vehicleId={detail.vehicle}
           rows={[
             ['Type', detail.incident_type], ['Date', fmtDate(detail.date)], ['Severity', detail.severity],
             ['Status', detail.status], ['Location', detail.location || '—'], ['Cost', detail.cost ? `$${detail.cost}` : '—'],

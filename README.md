@@ -2,7 +2,9 @@
 
 Vehicle fleet tracker for Achieve Cafe Provisions — vehicles, service history, incidents and fuel logs. Django + DRF backend, Postgres database, React + Vite + Tailwind frontend (plain JavaScript). Built the same way as this business's other internal tool, NPD Tracker v2 — a from-scratch rewrite of a Google-Sheets-backed single-page app, moving to Postgres as the real source of truth with a one-way Sheets mirror for people who still want to glance at a spreadsheet.
 
-**Status: local development only.** Not deployed anywhere yet.
+**Using the app?** See **[USAGE.md](USAGE.md)**: what each screen is for and how to do everyday jobs.
+
+**Status: live on the office PC.** Served by waitress on port 8001 (`run_server.bat`), hidden and kept running by `keep-alive.ps1` (a scheduled task checks every 2 minutes and restarts it if needed). Open it at http://DESKTOP-OB7PD9F:8001 on the office network, or http://bigyan-desktop:8001 over Tailscale. Project history and decisions are in [NOTES.md](NOTES.md).
 
 ## Architecture
 

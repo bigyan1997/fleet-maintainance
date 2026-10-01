@@ -5,11 +5,11 @@ import { fetchVehicles } from '../api/vehicles'
 import { createService, updateService } from '../api/services'
 import { Documents } from './Documents'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
-import { SERVICE_STATUSES } from '../lib/serviceStatus'
+import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
-  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log', 'Van wash',
+  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
 ]
 
 function today() {
@@ -38,6 +38,9 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const mechanicsQuery = useQuery({ queryKey: ['mechanics'], queryFn: fetchMechanics })
   const mechanics = (mechanicsQuery.data ?? []).filter((m) => m.active || m.id === form.mechanic)
   const [newMechanic, setNewMechanic] = useState(null) // text while adding a new one, else null
+  // Issues, work done and a hand-typed next due live under "+ More"; it opens
+  // by itself when the record already has any of them, so nothing is hidden.
+  const [showMore, setShowMore] = useState(() => Boolean(service?.issues || service?.notes))
 
   // "Next due" for a scheduled service = odometer + the van's service
   // interval (usually 10,000 km). It follows the odometer as you type, also
@@ -82,21 +85,21 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
     <div className="p-6">
       <h2 className="mb-4 text-[15px] font-semibold text-ink">{isEdit ? 'Edit service record' : 'Log a service'}</h2>
       <FormRow>
-        <Field label="Vehicle">
+        <Field label="Van">
           <select
             value={form.vehicle}
             onChange={(e) => setWithNextDue('vehicle')(e.target.value ? Number(e.target.value) : '')}
             className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
           >
-            <option value="">Select vehicle…</option>
+            <option value="">Select van…</option>
             {vehicleOptions.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.label} ({v.rego})
+                {v.label} · {v.subtitle}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Service type">
+        <Field label="What">
           <SelectInput value={form.service_type} onChange={setWithNextDue('service_type')} options={SERVICE_TYPES} />
         </Field>
       </FormRow>
@@ -105,11 +108,13 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
           <DateInput value={form.date} onChange={set('date')} />
         </Field>
         <Field label="Status">
-          <SelectInput value={form.status} onChange={set('status')} options={SERVICE_STATUSES} />
+          <select value={form.status} onChange={(e) => set('status')(e.target.value)} className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm">
+            {SERVICE_STATUSES.map((st) => <option key={st} value={st}>{statusWord(st)}</option>)}
+          </select>
         </Field>
       </FormRow>
       <FormRow>
-        <Field label="Mechanic / workshop">
+        <Field label="Mechanic">
           <select
             value={newMechanic !== null ? '__new' : form.mechanic}
             onChange={(e) => {
@@ -127,41 +132,60 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
             <option value="__new">+ Add new mechanic…</option>
           </select>
         </Field>
+        <Field label="Odometer (km)">
+          <NumberInput value={form.odometer} onChange={setWithNextDue('odometer')} placeholder="e.g. 85000" />
+        </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="Cost ($)">
+          <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 250" />
+        </Field>
         {newMechanic !== null ? (
           <Field label="New mechanic's name">
             <TextInput value={newMechanic} onChange={setNewMechanic} placeholder="e.g. Canterbury Toyota" autoFocus />
           </Field>
         ) : (
-          <div className="self-end pb-2 text-xs text-off">Who did (or will do) the work. Manage the list on Services → Mechanics.</div>
+          <div />
         )}
       </FormRow>
-      <div className="mb-3">
-        <Field label="Issues for the mechanic (what's wrong / needs checking)">
-          <textarea
-            value={form.issues}
-            onChange={(e) => set('issues')(e.target.value)}
-            rows={3}
-            placeholder="e.g. Front left headlight out, brakes squealing, tyre pressure warning on"
-            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
-          />
-        </Field>
-      </div>
-      <FormRow>
-        <Field label="Odometer (km)">
-          <NumberInput value={form.odometer} onChange={setWithNextDue('odometer')} placeholder="e.g. 85000" />
-        </Field>
-        <Field label="Cost ($)">
-          <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 250" />
-        </Field>
-      </FormRow>
-      <FormRow>
-        <Field label={nextDueIsAuto ? `Next due — auto: odometer + ${(vehicleOptions.find((v) => v.id === form.vehicle)?.service_interval_km || 10000).toLocaleString()} km` : 'Next due (km or date)'}>
-          <TextInput value={form.next_due} onChange={setNextDue} placeholder="e.g. 95000 or 01-06-2026" />
-        </Field>
-        <Field label="Work done / parts replaced">
-          <TextInput value={form.notes} onChange={set('notes')} />
-        </Field>
-      </FormRow>
+
+      {form.next_due && (
+        <div className="mb-3 rounded-md bg-[#e8f1fb] px-3 py-2 text-[13px] text-primary">
+          {nextDueIsAuto ? (
+            <>Next service will be due at <b>{Number(form.next_due).toLocaleString()} km</b> ({Number(form.odometer).toLocaleString()} + {(vehicleOptions.find((v) => v.id === form.vehicle)?.service_interval_km || 10000).toLocaleString()} km)</>
+          ) : (
+            <>Next due: <b>{/^\d+$/.test(form.next_due) ? `${Number(form.next_due).toLocaleString()} km` : form.next_due}</b> (typed by hand)</>
+          )}
+        </div>
+      )}
+
+      {!showMore ? (
+        <button onClick={() => setShowMore(true)} className="mb-4 text-[13px] font-medium text-primary hover:underline">
+          + More: issues for the mechanic · work done · change next due
+        </button>
+      ) : (
+        <div className="mb-4 rounded-md border border-line bg-[#fafafa] p-3">
+          <div className="mb-3">
+            <Field label="Issues for the mechanic (what's wrong / needs checking)">
+              <textarea
+                value={form.issues}
+                onChange={(e) => set('issues')(e.target.value)}
+                rows={3}
+                placeholder="e.g. Front left headlight out, brakes squealing, tyre pressure warning on"
+                className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+              />
+            </Field>
+          </div>
+          <FormRow>
+            <Field label="Work done / parts replaced">
+              <TextInput value={form.notes} onChange={set('notes')} />
+            </Field>
+            <Field label="Next due (km or date)">
+              <TextInput value={form.next_due} onChange={setNextDue} placeholder="filled in for you from the odometer" />
+            </Field>
+          </FormRow>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button
           onClick={() => mutation.mutate()}

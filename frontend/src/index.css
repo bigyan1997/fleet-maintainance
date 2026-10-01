@@ -43,3 +43,9 @@ body {
   .print-area { position: absolute; inset: 0 auto auto 0; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   aside, header { display: none !important; }
 }
+
+/* No up/down arrows on number boxes (odometer, cost, litres): typing is
+   quicker, and the arrows invite accidental changes. */
+input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

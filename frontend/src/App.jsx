@@ -6,42 +6,44 @@ import { LoginPage } from './components/LoginPage'
 import { TopBar } from './components/TopBar'
 import { Toast } from './components/Toast'
 import { UpdateBanner } from './components/UpdateBanner'
-import { DashboardView } from './components/DashboardView'
+import { HomeView } from './components/HomeView'
 import { FleetView } from './components/FleetView'
 import { VanPage } from './components/VanPage'
 import { HistoryView } from './components/HistoryView'
 import { MechanicsView } from './components/MechanicsView'
-import { AlertsView } from './components/AlertsView'
 import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
 import { FuelView } from './components/FuelView'
 import { FuelImport } from './components/FuelImport'
 import { ReportsView } from './components/ReportsView'
-import { DriversView, QrStickers, TyresView } from './components/VansExtras'
+import { DriversView, QrStickers, RegoDates, TyresView } from './components/VansExtras'
 import { VehicleForm } from './components/VehicleForm'
 import { ServiceForm } from './components/ServiceForm'
 import { IncidentForm } from './components/IncidentForm'
 import { FuelForm } from './components/FuelForm'
 import { WashForm } from './components/WashForm'
+import { FinishJobForm } from './components/FinishJobForm'
 import { Icon, Modal } from './components/ui'
 import { ActionsContext } from './lib/actions'
-import { href, navigate, useRoute } from './lib/router'
+import { href, redirect, useRoute } from './lib/router'
 
 // The tabs across the top. The key is also the web address (#/vans/29 is a
-// van's page, which lives under the Fleet tab).
+// van's page, which lives under the Vans tab).
 const TABS = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'vans', label: 'Fleet' },
+  { key: 'home', label: 'Home' },
+  { key: 'vans', label: 'Vans' },
   { key: 'services', label: 'Services' },
-  { key: 'alerts', label: 'Alerts' },
-  { key: 'washes', label: 'Van washes' },
-  { key: 'incidents', label: 'Incidents' },
+  { key: 'washes', label: 'Washes' },
   { key: 'fuel', label: 'Fuel' },
   { key: 'reports', label: 'Reports' },
 ]
 
+// Old addresses (bookmarks) that moved in the simpler layout.
+const MOVED = { dashboard: ['home'], alerts: ['home'], incidents: ['services', 'incidents'] }
+
 const SERVICE_TABS = [
-  { key: '', label: 'All services' },
+  { key: '', label: 'Services' },
+  { key: 'incidents', label: 'Incidents' },
   { key: 'mechanics', label: 'Mechanics' },
 ]
 
@@ -50,6 +52,7 @@ const FLEET_TABS = [
   { key: 'drivers', label: 'Drivers' },
   { key: 'tyres', label: 'Tyres' },
   { key: 'qr', label: 'QR stickers' },
+  { key: 'dates', label: 'Rego & insurance dates' },
 ]
 
 function useToast() {
@@ -81,6 +84,7 @@ function FormModal({ form, onClose, toast }) {
     incident: <IncidentForm incident={form.record} {...common} />,
     vehicle: <VehicleForm vehicle={form.record} {...common} />,
     wash: <WashForm wash={form.record} {...common} />,
+    finish: <FinishJobForm job={form.record} {...common} />,
   }[form.kind]
   return (
     <Modal onClose={onClose}>
@@ -130,44 +134,44 @@ function MainApp({ username }) {
 
   const actions = useMemo(() => ({ openForm: (kind, record) => setForm({ kind, record }), toast: show }), [show])
   const openForm = actions.openForm
-  const tab = TABS.some((t) => t.key === path[0]) ? path[0] : 'dashboard'
+  const tab = TABS.some((t) => t.key === path[0]) ? path[0] : 'home'
 
   useEffect(() => {
-    if (path.length === 0) navigate('dashboard')
-  }, [path.length])
+    if (path.length === 0) redirect('home')
+    else if (MOVED[path[0]]) redirect(...MOVED[path[0]])
+  }, [path])
 
   let page
-  if (tab === 'dashboard') {
-    page = (
-      <DashboardView
-        onOpenService={(s) => openForm('service', s)}
-        onGoTo={(t) => navigate(t === 'history' ? 'services' : t)}
-        onShowStatus={(status) => navigate('services', status)}
-        onError={(m) => show(m, true)}
-      />
-    )
+  if (tab === 'home') {
+    page = <HomeView />
   } else if (tab === 'vans' && /^\d+$/.test(path[1] ?? '')) {
     page = <VanPage key={path[1]} id={path[1]} />
   } else if (tab === 'vans') {
     const sub = FLEET_TABS.some((t) => t.key === path[1]) ? path[1] : ''
-    page = (
+    page = sub === '' ? (
+      <FleetView onAdd={() => openForm('vehicle')} />
+    ) : (
       <div>
-        <SubTabs items={FLEET_TABS} value={sub} base="vans" />
-        {sub === '' && <FleetView onAdd={() => openForm('vehicle')} />}
+        <a href={href('vans')} className="mb-3 inline-block text-[13px] font-medium text-primary no-underline hover:underline">‹ All vans</a>
         {sub === 'drivers' && <DriversView />}
         {sub === 'tyres' && <TyresView />}
         {sub === 'qr' && <QrStickers />}
+        {sub === 'dates' && <RegoDates />}
       </div>
     )
   } else if (tab === 'services') {
-    // #/services, #/services/Booked (a status), #/services/mechanic/3, #/services/mechanics
+    // #/services, #/services/Booked (a status), #/services/mechanic/3,
+    // #/services/mechanics, #/services/incidents
     const byMechanic = path[1] === 'mechanic' ? path[2] : ''
-    const status = path[1] && path[1] !== 'mechanic' && path[1] !== 'mechanics' ? path[1] : ''
+    const subTab = ['mechanics', 'incidents'].includes(path[1]) ? path[1] : ''
+    const status = path[1] && path[1] !== 'mechanic' && !subTab ? path[1] : ''
     page = (
       <div>
-        <SubTabs items={SERVICE_TABS} value={path[1] === 'mechanics' ? 'mechanics' : ''} base="services" />
-        {path[1] === 'mechanics' ? (
+        <SubTabs items={SERVICE_TABS} value={subTab} base="services" />
+        {subTab === 'mechanics' ? (
           <MechanicsView />
+        ) : subTab === 'incidents' ? (
+          <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />
         ) : (
           <HistoryView
             key={path.join('/')}
@@ -179,9 +183,7 @@ function MainApp({ username }) {
         )}
       </div>
     )
-  } else if (tab === 'alerts') page = <AlertsView />
-  else if (tab === 'washes') page = <WashesView onError={(m) => show(m, true)} />
-  else if (tab === 'incidents') page = <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />
+  } else if (tab === 'washes') page = <WashesView onError={(m) => show(m, true)} />
   else if (tab === 'fuel') page = <FuelView onEdit={(f) => openForm('fuel', f)} onAdd={() => openForm('fuel')} />
   else if (tab === 'reports') page = <ReportsView sub={path[1]} />
 
@@ -191,40 +193,30 @@ function MainApp({ username }) {
         <UpdateBanner />
         <TopBar username={username} links={linksQuery.data} onLogout={() => logoutMutation.mutate()} />
         <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="flex items-center gap-2 text-lg font-semibold text-ink">Fleet Maintenance</h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => openForm('vehicle')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
-                + Add vehicle
-              </button>
-              <button onClick={() => openForm('incident')} className="rounded-md border border-[#fca5a5] bg-white px-3.5 py-1.5 text-[13px] font-medium text-due hover:bg-due-bg">
-                Log incident
-              </button>
+          {/* Tabs and the two everyday buttons share one line. */}
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line">
+            <div className="flex gap-1 overflow-x-auto">
+              {TABS.map((t) => (
+                <a
+                  key={t.key}
+                  href={href(t.key)}
+                  className={
+                    '-mb-px border-b-2 px-3.5 py-2.5 text-[14px] font-medium whitespace-nowrap no-underline ' +
+                    (tab === t.key ? 'border-primary text-primary' : 'border-transparent text-off hover:text-ink')
+                  }
+                >
+                  {t.label}
+                </a>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pb-2">
               <button onClick={() => openForm('wash')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
                 Log wash
-              </button>
-              <button onClick={() => openForm('fuel')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
-                Log fuel
               </button>
               <button onClick={() => openForm('service')} className="rounded-md bg-primary px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-primary-dark">
                 + Log service
               </button>
             </div>
-          </div>
-
-          <div className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
-            {TABS.map((t) => (
-              <a
-                key={t.key}
-                href={href(t.key)}
-                className={
-                  'border-b-2 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap no-underline ' +
-                  (tab === t.key ? 'border-primary text-primary' : 'border-transparent text-off hover:text-ink')
-                }
-              >
-                {t.label}
-              </a>
-            ))}
           </div>
 
           {page}

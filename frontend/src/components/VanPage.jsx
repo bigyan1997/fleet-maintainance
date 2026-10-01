@@ -7,6 +7,7 @@ import { deleteService, fetchServices } from '../api/services'
 import { deleteVehicle, fetchVehicles } from '../api/vehicles'
 import { useActions } from '../lib/actions'
 import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { statusWord } from '../lib/serviceStatus'
 import { href, navigate } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Documents } from './Documents'
@@ -14,7 +15,6 @@ import { ChangeHistory } from './ChangeHistory'
 import { StatusBadge } from './FleetView'
 import { VanDetail } from './FuelByVan'
 import { byNewest, expiryCell, serviceText } from '../lib/fleet'
-import { StatusSelect } from './StatusSelect'
 import { Button, Card, Empty, PageHeader, Pill, Tabs } from './ui'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -75,7 +75,8 @@ export function VanPage({ id }) {
   const vanId = Number(id)
   const { openForm, toast } = useActions()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState('all')
+  const [tab, setTab] = useState('history')
+  const [show, setShow] = useState('All')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
   const [removeTarget, setRemoveTarget] = useState(null)
@@ -131,11 +132,12 @@ export function VanPage({ id }) {
   const svc = v.nextServiceDue
   const tyre = v.nextTyreDue
   const openIncidents = incidentRows.filter((i) => i.status !== 'Resolved')
+  const lastService = serviceRows.find((s) => s.status === 'Invoiced' || s.status === 'Completed, awaiting invoice')
 
   const entries = [
     ...serviceRows.map((s) => ({
       key: `s${s.id}`, kind: 'Service', date: s.date, record: s,
-      title: s.service_type, sub: [s.status, s.mechanicName && `by ${s.mechanicName}`, s.odometer && km(s.odometer), s.issues && `issues: ${s.issues}`].filter(Boolean).join(' · '),
+      title: s.service_type, sub: [statusWord(s.status), s.mechanicName && `by ${s.mechanicName}`, s.odometer && km(s.odometer), s.issues && `issues: ${s.issues}`].filter(Boolean).join(' · '),
       amount: s.cost ? money(s.cost) : null,
     })),
     ...washRows.map((w) => ({ key: `w${w.id}`, kind: 'Wash', date: w.date, record: w, title: 'Washed', sub: fmtAgo(w.date) })),
@@ -161,15 +163,13 @@ export function VanPage({ id }) {
 
   const preset = { vehicle: vanId }
   const tabs = [
-    { key: 'all', label: 'Everything', count: entries.length },
-    { key: 'services', label: 'Services', count: serviceRows.length },
+    { key: 'history', label: 'History', count: entries.length },
     { key: 'fuel', label: 'Fuel', count: fills.length },
-    { key: 'washes', label: 'Washes', count: washRows.length },
-    { key: 'incidents', label: 'Incidents', count: incidentRows.length },
     { key: 'documents', label: 'Documents' },
-    { key: 'changes', label: 'Change history' },
-    { key: 'details', label: 'Van details' },
+    { key: 'details', label: 'Details' },
   ]
+  const KINDS = { Services: 'Service', Fuel: 'Fuel', Washes: 'Wash', Incidents: 'Incident' }
+  const shown = show === 'All' ? entries : entries.filter((e) => e.kind === KINDS[show])
 
   return (
     <div>
@@ -181,33 +181,26 @@ export function VanPage({ id }) {
             <StatusBadge status={v.statusBadge} />
           </span>
         }
-        description={[v.rego || 'No rego', v.driverName ? `driver ${v.driverName}` : 'no regular driver', v.fuel_type, v.fuel_card_number && `fuel card ${v.fuel_card_number}`].filter(Boolean).join(' · ')}
+        description={[v.subtitle || v.rego || 'No rego', v.fuel_type, v.driverName && `driver ${v.driverName}`].filter(Boolean).join(' · ')}
         actions={
           <>
-            <Button icon="washes" onClick={() => openForm('wash', preset)}>Log wash</Button>
-            <Button icon="fuel" onClick={() => openForm('fuel', preset)}>Log fuel</Button>
             <Button icon="incident" onClick={() => openForm('incident', preset)}>Report incident</Button>
-            <Button variant="primary" icon="plus" onClick={() => openForm('service', preset)}>Log service</Button>
+            <Button variant="primary" icon="plus" onClick={() => openForm('service', preset)}>Log service for {v.label}</Button>
           </>
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-2.5 md:grid-cols-4 xl:grid-cols-7">
+      <div className="mb-6 grid grid-cols-2 gap-2.5 md:grid-cols-4">
         <Fact label="Odometer">{v.odometer ? km(v.odometer) : '—'}</Fact>
         <Fact
           label="Next service"
           tone={svc && svc.km_left < 0 ? 'due' : svc && svc.km_left < 2000 ? 'warn' : undefined}
-          sub={svc ? serviceText(svc) + (svc.booked ? ` · booked ${fmtDate(svc.booked.date)}` : '') : 'no service logged'}
+          sub={svc ? (svc.km_left < 0 ? serviceText(svc) : `${svc.km_left.toLocaleString()} km to go`) + (svc.booked ? ` · booked ${fmtDate(svc.booked.date)}` : '') : 'no service logged yet'}
         >
           {svc ? km(svc.due_at) : '—'}
         </Fact>
-        <Fact label="Next tyres" tone={tyre && tyre.km_left < 0 ? 'due' : tyre && tyre.km_left < 2000 ? 'warn' : undefined} sub={tyre ? serviceText(tyre) : 'no tyre interval set'}>
-          {tyre ? km(tyre.due_at) : '—'}
-        </Fact>
-        <Fact label="Rego expires">{v.rego_expiry ? expiryCell(v.rego_expiry) : <span className="text-off">not entered</span>}</Fact>
-        <Fact label="Insurance expires">{v.insurance_expiry ? expiryCell(v.insurance_expiry) : <span className="text-off">not entered</span>}</Fact>
-        <Fact label="Last washed" sub={v.wash_needed ? (v.lastWashed ? fmtAgo(v.lastWashed) : 'every 2 weeks') : 'driver takes it home'}>
-          {!v.wash_needed ? 'No need' : v.lastWashed ? fmtDate(v.lastWashed) : 'Never logged'}
+        <Fact label="Last service" sub={lastService ? [lastService.service_type, lastService.cost && Number(lastService.cost) ? money(lastService.cost) : ''].filter(Boolean).join(' · ') : 'none logged yet'}>
+          {lastService ? fmtDate(lastService.date) : '—'}
         </Fact>
         <Fact
           label="Fuel use"
@@ -222,7 +215,7 @@ export function VanPage({ id }) {
         <div className="mb-5 flex flex-wrap gap-2.5">
           {v.openJob && (
             <button onClick={() => openForm('service', v.openJob)} className="rounded-lg border border-[#bcd5ee] bg-[#eef5fc] px-3.5 py-2 text-left text-[13px] hover:brightness-95">
-              <span className="font-semibold text-primary">Open job:</span> {v.openJob.service_type} · {v.openJob.status} · {fmtDate(v.openJob.date)}
+              <span className="font-semibold text-primary">Open job:</span> {v.openJob.service_type} · {statusWord(v.openJob.status)} · {fmtDate(v.openJob.date)}
             </button>
           )}
           {openIncidents.map((i) => (
@@ -235,50 +228,26 @@ export function VanPage({ id }) {
 
       <Tabs items={tabs} value={tab} onChange={setTab} />
 
-      {tab === 'all' && (
-        <Card title="Everything, newest first" description="Services, fuel fill-ups, washes and incidents for this van in one timeline. Click a line to open it." padded={false}>
-          <Timeline entries={entries} onOpen={openEntry} />
-        </Card>
-      )}
-
-      {tab === 'services' && (
-        <Card title="Services" description="Every service for this van. Change the status right here, or click a row to edit it." padded={false}
-          actions={<Button variant="primary" icon="plus" className="h-8 text-xs" onClick={() => openForm('service', preset)}>Log service</Button>}>
-          {serviceRows.length === 0 ? <Empty>No services logged.</Empty> : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-[13px]">
-                <thead>
-                  <tr className="border-b border-line bg-[#f8fafc] text-left text-xs text-off">
-                    <th className="px-4 py-2 font-medium">Date</th>
-                    <th className="px-2 py-2 font-medium">Type</th>
-                    <th className="px-2 py-2 font-medium">Status</th>
-                    <th className="px-2 py-2 font-medium">Mechanic</th>
-                    <th className="px-2 py-2 text-right font-medium">Odometer</th>
-                    <th className="px-2 py-2 text-right font-medium">Cost</th>
-                    <th className="px-2 py-2 font-medium">Next due</th>
-                    <th className="px-4 py-2 font-medium">Issues / work done</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {serviceRows.map((s) => (
-                    <tr key={s.id} className="cursor-pointer border-b border-[#eef1f5] align-top last:border-0 hover:bg-[#f8fafc]" onClick={() => openForm('service', s)}>
-                      <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{fmtDate(s.date)}</td>
-                      <td className="px-2 py-2.5 font-medium">{s.service_type}</td>
-                      <td className="px-2 py-2.5"><StatusSelect service={s} onError={(m) => toast(m, true)} /></td>
-                      <td className="px-2 py-2.5 whitespace-nowrap">{s.mechanicName || <span className="text-off">—</span>}</td>
-                      <td className="px-2 py-2.5 text-right whitespace-nowrap tabular-nums">{s.odometer ? km(s.odometer) : '—'}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums">{s.cost ? money(s.cost) : '—'}</td>
-                      <td className="px-2 py-2.5 whitespace-nowrap">{s.next_due || '—'}</td>
-                      <td className="max-w-[320px] px-4 py-2.5 text-xs">
-                        {s.issues && <div className="text-warn">⚠ {s.issues}</div>}
-                        {s.notes && <div className="text-off">{s.notes}</div>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {tab === 'history' && (
+        <Card
+          title="History, newest first"
+          description="Services, fuel, washes and incidents for this van. Click a line to open it."
+          padded={false}
+          actions={
+            <div className="flex flex-wrap gap-1">
+              {['All', 'Services', 'Fuel', 'Washes', 'Incidents'].map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setShow(k)}
+                  className={'rounded-md px-2.5 py-1 text-xs font-medium ' + (show === k ? 'bg-primary text-white' : 'bg-white text-off ring-1 ring-line hover:text-ink')}
+                >
+                  {k}
+                </button>
+              ))}
             </div>
-          )}
+          }
+        >
+          <Timeline key={show} entries={shown} onOpen={openEntry} />
         </Card>
       )}
 
@@ -300,55 +269,9 @@ export function VanPage({ id }) {
         )
       )}
 
-      {tab === 'washes' && (
-        <Card title="Washes" description={v.wash_needed ? 'Washed in-house every 2 weeks.' : 'This van goes home with its driver, so it isn’t on the wash cycle.'} padded={false}
-          actions={<Button variant="primary" icon="plus" className="h-8 text-xs" onClick={() => openForm('wash', preset)}>Log wash</Button>}>
-          {washRows.length === 0 ? <Empty>No washes logged.</Empty> : (
-            <ul className="divide-y divide-[#eef1f5]">
-              {washRows.map((w) => (
-                <li key={w.id} className="flex items-center justify-between px-4 py-2.5 text-[13px]">
-                  <span><span className="font-medium tabular-nums">{fmtDate(w.date)}</span> <span className="text-off">· {fmtAgo(w.date)}</span></span>
-                  <Button variant="ghost" icon="trash" className="h-7 px-2 text-xs" onClick={() => setRemoveTarget({ kind: 'wash', id: w.id, label: `the ${fmtDate(w.date)} wash` })}>Remove</Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-
-      {tab === 'incidents' && (
-        <Card title="Incidents" description="Accidents, breakdowns and damage for this van. Click one to see its follow-up notes." padded={false}
-          actions={<Button variant="primary" icon="plus" className="h-8 text-xs" onClick={() => openForm('incident', preset)}>Report incident</Button>}>
-          {incidentRows.length === 0 ? <Empty>No incidents. Good.</Empty> : (
-            <ul className="divide-y divide-[#eef1f5]">
-              {incidentRows.map((i) => (
-                <li key={i.id} className="grid cursor-pointer grid-cols-[92px_1fr_auto] gap-3 px-4 py-2.5 text-[13px] hover:bg-[#f8fafc]" onClick={() => openForm('incident', i)}>
-                  <span className="text-xs text-off tabular-nums">{fmtDate(i.date)}</span>
-                  <span>
-                    <span className="font-medium">{i.incident_type} · {i.severity}</span>
-                    {i.description && <span className="text-off"> · {i.description}</span>}
-                    {i.resolution && <div className="text-xs text-ok">Resolved: {i.resolution}</div>}
-                  </span>
-                  <span className="text-right">
-                    <Pill tone={i.status === 'Resolved' ? 'ok' : i.status === 'Open' ? 'due' : 'warn'}>{i.status}</Pill>
-                    {i.cost && <div className="mt-1 text-xs tabular-nums">{money(i.cost)}</div>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
-
       {tab === 'documents' && (
         <Card title="Documents" description="Rego papers, insurance, invoices and photos for this van, including files attached to its services and incidents." padded={false}>
           <Documents vehicle={vanId} />
-        </Card>
-      )}
-
-      {tab === 'changes' && (
-        <Card title="Change history" description="Every add, change and delete for this van, with who did it." padded={false}>
-          <ChangeHistory vehicle={vanId} />
         </Card>
       )}
 
@@ -371,12 +294,18 @@ export function VanPage({ id }) {
             <DetailRow label="Odometer">{v.odometer ? km(v.odometer) : '—'}</DetailRow>
             <DetailRow label="Service interval">every {km(v.service_interval_km || 10000)}</DetailRow>
             <DetailRow label="Tyre interval">{v.tyre_interval_km ? `every ${km(v.tyre_interval_km)}` : 'not set'}</DetailRow>
-            <DetailRow label="Rego expiry">{v.rego_expiry ? fmtDate(v.rego_expiry) : 'not entered'}</DetailRow>
-            <DetailRow label="Insurance expiry">{v.insurance_expiry ? fmtDate(v.insurance_expiry) : 'not entered'}</DetailRow>
-            <DetailRow label="Washing">{v.wash_needed ? 'Washed in-house every 2 weeks' : 'Not needed (driver takes it home)'}</DetailRow>
+            <DetailRow label="Next new tyres">{tyre ? `${km(tyre.due_at)} (${serviceText(tyre)})` : v.tyre_interval_km ? 'no tyre change logged yet' : 'tyre interval not set'}</DetailRow>
+            <DetailRow label="Rego expiry">{v.rego_expiry ? expiryCell(v.rego_expiry) : 'not entered'}</DetailRow>
+            <DetailRow label="Insurance expiry">{v.insurance_expiry ? expiryCell(v.insurance_expiry) : 'not entered'}</DetailRow>
+            <DetailRow label="Washing">{v.wash_needed ? `Washed in-house every 2 weeks · last ${v.lastWashed ? `${fmtDate(v.lastWashed)} (${fmtAgo(v.lastWashed)})` : 'never logged'}` : 'Not needed (driver takes it home)'}</DetailRow>
             <DetailRow label="Usual driver">{v.driverName || 'No regular driver (set it with Edit details, or Vans → Drivers)'}</DetailRow>
             <DetailRow label="QR sticker page"><a href={`/report/${v.report_token}/`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open the driver page</a> <span className="text-off">· print stickers on Vans → QR stickers</span></DetailRow>
           </div>
+        </Card>
+      )}
+      {tab === 'details' && (
+        <Card className="mt-4" title="Change history" description="Every add, change and delete for this van." padded={false}>
+          <ChangeHistory vehicle={vanId} />
         </Card>
       )}
 

@@ -8,3 +8,14 @@ export const STATUS_STYLES = {
   'Completed, awaiting invoice': 'bg-due-bg text-due border-[#f5b5b5]',
   Invoiced: 'bg-[#f0f0f0] text-off border-line',
 }
+
+// How each status reads on screen. The stored values (and the Google Sheet)
+// keep the original wording.
+export const STATUS_WORDS = {
+  Booked: 'Booked',
+  'In service': 'At mechanic',
+  'Completed, awaiting invoice': 'Waiting for invoice',
+  Invoiced: 'Done',
+}
+
+export const statusWord = (status) => STATUS_WORDS[status] ?? status

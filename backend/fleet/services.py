@@ -31,6 +31,13 @@ EXPIRY_DUE_SOON_DAYS = 60
 # Only work that has actually happened counts towards "last serviced at" —
 # a Booked / In service job hasn't reset the interval yet.
 DONE_SERVICE_STATUSES = ["Completed, awaiting invoice", "Invoiced"]
+# How each status reads on screen; the stored values stay as they are.
+STATUS_WORDS = {
+    "Booked": "Booked",
+    "In service": "At mechanic",
+    "Completed, awaiting invoice": "Waiting for invoice",
+    "Invoiced": "Done",
+}
 # Vans are washed every 2 weeks: due at 14 days since the last wash.
 WASH_CYCLE_DAYS = 14
 # Washes are stored as service records of this type, but live on their own
@@ -394,7 +401,12 @@ def dashboard_summary():
         .exclude(status=SERVICE_STATUS_DONE)
         .order_by("date", "id")
     )
+    month_start = today.replace(day=1)
+    month_services = services_qs.filter(date__gte=month_start, date__lte=today).aggregate(t=Sum("cost"))["t"] or 0
+    month_fuel = FuelLog.objects.filter(date__gte=month_start, date__lte=today).aggregate(t=Sum("cost"))["t"] or 0
     return {
+        "month_services": month_services,
+        "month_fuel": month_fuel,
         "vehicle_count": len(vehicles),
         "service_count": services_qs.count(),
         "due_count": due_count,
@@ -436,7 +448,7 @@ def alerts():
             # A due/overdue item that already has a job open says so, so it
             # doesn't read as forgotten.
             job = due["booked"]
-            return f" · {job['status'].lower()} {job['date'].strftime('%d-%m-%Y')}" if job else ""
+            return f" · {STATUS_WORDS.get(job['status'], job['status']).lower()} {job['date'].strftime('%d-%m-%Y')}" if job else ""
 
         svc = next_service_due(v)
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
@@ -535,6 +547,10 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         for label, k in zip(month_labels, month_keys)
     ]
 
+    def van_label(make, model, year):
+        m = re.match(r"\s*(van\s*\d+)", make or "", re.I)
+        return re.sub(r"\s+", " ", m.group(1)).title() if m else f"{year or ''} {make} {model}".strip()
+
     def top_by_vehicle(qs, limit=10):
         rows = (
             qs.values("vehicle__make", "vehicle__model", "vehicle__year")
@@ -544,7 +560,7 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         )
         return [
             {
-                "label": f"{r['vehicle__year'] or ''} {r['vehicle__make']} {r['vehicle__model']}".strip(),
+                "label": van_label(r["vehicle__make"], r["vehicle__model"], r["vehicle__year"]),
                 "value": float(r["total"]),
             }
             for r in rows
@@ -556,10 +572,10 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         # Combine service + incident cost per vehicle
         combined = {}
         for r in services_qs.values("vehicle__make", "vehicle__model", "vehicle__year").annotate(total=Sum("cost")):
-            label = f"{r['vehicle__year'] or ''} {r['vehicle__make']} {r['vehicle__model']}".strip()
+            label = van_label(r["vehicle__make"], r["vehicle__model"], r["vehicle__year"])
             combined[label] = combined.get(label, 0) + float(r["total"] or 0)
         for r in incidents_qs.values("vehicle__make", "vehicle__model", "vehicle__year").annotate(total=Sum("cost")):
-            label = f"{r['vehicle__year'] or ''} {r['vehicle__make']} {r['vehicle__model']}".strip()
+            label = van_label(r["vehicle__make"], r["vehicle__model"], r["vehicle__year"])
             combined[label] = combined.get(label, 0) + float(r["total"] or 0)
         cost_by_vehicle = sorted(
             [{"label": k, "value": v} for k, v in combined.items() if v > 0],

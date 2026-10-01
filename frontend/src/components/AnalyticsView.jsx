@@ -25,7 +25,8 @@ function money(n) {
   return `$${Number(n).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
 }
 
-export function AnalyticsView() {
+// section: 'spending' (services, repairs, incidents) or 'fuel'.
+export function AnalyticsView({ section = 'spending' }) {
   const [vehicle, setVehicle] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -60,11 +61,16 @@ export function AnalyticsView() {
         <button onClick={clearFilters} className="h-[34px] rounded-md border border-line bg-white px-3 text-xs font-medium hover:bg-[#f5f5f5]">Clear</button>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Metric label="Maintenance spend" value={money(data.totalSpend)} />
+      {section === 'spending' && (<>
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric label={`Maintenance spend — ${rangeLabel}`} value={money(data.totalSpend)} sub="services, repairs and incidents" />
         <Metric label="This month's maintenance" value={money(data.monthSpend)} />
-        <Metric label="Avg. service cost" value={money(data.avgService)} />
+        <Metric label="Average service cost" value={money(data.avgService)} />
         <Metric label="Open incident cost" value={money(data.openIncidentCost)} color="text-due" />
+      </div>
+      </>)}
+      {section === 'fuel' && (
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Metric
           label={`Fuel card total — ${rangeLabel}`}
           value={cents(data.fuelCost)}
@@ -76,7 +82,9 @@ export function AnalyticsView() {
           sub="Diesel only (AdBlue not included)"
         />
       </div>
+      )}
 
+      {section === 'spending' && (<>
       <div className="mb-4 rounded-lg border border-line bg-white p-4">
         <h2 className="mb-3 text-[15px] font-semibold text-ink">Monthly maintenance spend — {rangeLabel}</h2>
         <LineChart rows={data.monthlySpend} />
@@ -96,6 +104,9 @@ export function AnalyticsView() {
         <BarList rows={data.costByType ?? []} />
       </div>
 
+      </>)}
+
+      {section === 'fuel' && (<>
       <FuelUse vans={data.fuelVans ?? []} fleetAvg={data.fuelFleetPer100} />
       <FuelFlags flags={data.fuelFlags ?? []} />
 
@@ -114,6 +125,7 @@ export function AnalyticsView() {
           <BarList rows={data.fuelByVehicle ?? []} />
         )}
       </div>
+      </>)}
     </div>
   )
 }

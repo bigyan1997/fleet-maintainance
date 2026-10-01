@@ -1,3 +1,4 @@
+import re
 import secrets
 
 from django.conf import settings
@@ -112,9 +113,36 @@ class Vehicle(models.Model):
     class Meta:
         ordering = ["make", "model"]
 
+    # Display only: the stored make/model keep their legacy spelling.
+    MODEL_SPELLING = [
+        (re.compile(r"hi-?ace", re.I), "HiAce"),
+        (re.compile(r"\bswlb\b", re.I), "SLWB"),
+        (re.compile(r"i-?load", re.I), "iLoad"),
+    ]
+
+    @property
+    def short_name(self):
+        """ "Van 4" from a make like "Van 4- Toyota"; vans without a number
+        keep their full make + model."""
+        m = re.match(r"\s*(van\s*\d+)", self.make, re.I)
+        if m:
+            return re.sub(r"\s+", " ", m.group(1)).title()
+        return f"{self.make} {self.model}".strip() or f"Vehicle #{self.pk}"
+
+    @property
+    def subtitle(self):
+        """ "Toyota HiAce SLWB · YKG89N": brand, model and plate."""
+        brand = re.sub(r"^\s*van\s*\d+\s*[-:]?\s*", "", self.make, flags=re.I)
+        brand = re.sub(r"\s*\b(19|20)\d\d\b", "", brand).strip()
+        brand = {"Mercedez": "Mercedes-Benz"}.get(brand, brand)
+        model = self.model
+        for pattern, fixed in self.MODEL_SPELLING:
+            model = pattern.sub(fixed, model)
+        plate = re.sub(r"\s*\(.*\)", "", self.rego or "").strip()
+        return " · ".join(p for p in [f"{brand} {model}".strip(), plate] if p)
+
     def __str__(self):
-        label = f"{self.year or ''} {self.make} {self.model}".strip()
-        return label or f"Vehicle #{self.pk}"
+        return self.short_name
 
 
 class Mechanic(models.Model):

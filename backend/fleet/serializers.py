@@ -13,6 +13,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     lastWashed = serializers.SerializerMethodField()
     openJob = serializers.SerializerMethodField()
     driverName = serializers.CharField(source="driver.name", read_only=True, default="")
+    subtitle = serializers.CharField(read_only=True)
 
     class Meta:
         model = Vehicle
@@ -20,7 +21,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "driver", "driverName", "report_token", "label", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
+            "wash_needed", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
         ]
 
         read_only_fields = ["report_token"]
@@ -51,12 +52,13 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 class ServiceRecordSerializer(serializers.ModelSerializer):
     vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    vehicleSub = serializers.CharField(source="vehicle.subtitle", read_only=True)
     mechanicName = serializers.CharField(source="mechanic.name", read_only=True, default="")
 
     class Meta:
         model = ServiceRecord
         fields = [
-            "id", "vehicle", "vehicleLabel", "service_type", "date",
+            "id", "vehicle", "vehicleLabel", "vehicleSub", "service_type", "date",
             "odometer", "cost", "next_due", "issues", "notes", "status", "mechanic", "mechanicName",
         ]
 
@@ -74,6 +76,7 @@ class IncidentUpdateSerializer(serializers.ModelSerializer):
 
 class IncidentSerializer(serializers.ModelSerializer):
     vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    vehicleSub = serializers.CharField(source="vehicle.subtitle", read_only=True)
     updates = IncidentUpdateSerializer(many=True, read_only=True)
     # The whole log as one block of text, for Export / CSV.
     notes = serializers.SerializerMethodField()
@@ -83,7 +86,7 @@ class IncidentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Incident
         fields = [
-            "id", "vehicle", "vehicleLabel", "incident_type", "date",
+            "id", "vehicle", "vehicleLabel", "vehicleSub", "incident_type", "date",
             "severity", "location", "description", "cost", "status", "notes",
             "updates", "new_update", "resolution", "resolved_date",
         ]
@@ -122,13 +125,14 @@ class IncidentSerializer(serializers.ModelSerializer):
 
 class FuelLogSerializer(serializers.ModelSerializer):
     vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    vehicleSub = serializers.CharField(source="vehicle.subtitle", read_only=True)
     pricePerLitre = serializers.SerializerMethodField()
     isFuel = serializers.BooleanField(source="is_fuel", read_only=True)
 
     class Meta:
         model = FuelLog
         fields = [
-            "id", "vehicle", "vehicleLabel", "date", "product", "isFuel", "litres", "cost",
+            "id", "vehicle", "vehicleLabel", "vehicleSub", "date", "product", "isFuel", "litres", "cost",
             "pricePerLitre", "odometer", "invoice_number", "notes",
         ]
 
