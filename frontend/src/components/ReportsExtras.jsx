@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { sydneyYear } from '../lib/formatDate'
 import { useState } from 'react'
 import { fetchBudget, fetchFuelTrends, saveBudget } from '../api/extra'
 import { useActions } from '../lib/actions'
@@ -154,7 +155,8 @@ export function BudgetView() {
   const b = data.budgets
   const form = draft ?? { fuel: b.fuel ?? '', maintenance: b.maintenance ?? '' }
   const months = [...data.months].reverse()
-  const thisYear = data.months.filter((m) => m.month.startsWith(String(new Date().getFullYear())))
+  const year = sydneyYear()
+  const thisYear = data.months.filter((m) => m.month.startsWith(String(year)))
   const ytd = (k) => thisYear.reduce((s, m) => s + m[k], 0)
 
   return (
@@ -180,8 +182,8 @@ export function BudgetView() {
       </Card>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Stat label={`Fuel card spend, ${new Date().getFullYear()} so far`} value={money0(ytd('fuel'))} sub={b.fuel ? `budget ${money0(b.fuel * thisYear.length)} for ${thisYear.length} months` : 'no budget set'} tone={b.fuel && ytd('fuel') > b.fuel * thisYear.length ? 'due' : undefined} />
-        <Stat label={`Maintenance, ${new Date().getFullYear()} so far`} value={money0(ytd('maintenance'))} sub={b.maintenance ? `budget ${money0(b.maintenance * thisYear.length)} for ${thisYear.length} months` : 'no budget set'} tone={b.maintenance && ytd('maintenance') > b.maintenance * thisYear.length ? 'due' : undefined} />
+        <Stat label={`Fuel card spend, ${year} so far`} value={money0(ytd('fuel'))} sub={b.fuel ? `budget ${money0(b.fuel * thisYear.length)} for ${thisYear.length} months` : 'no budget set'} tone={b.fuel && ytd('fuel') > b.fuel * thisYear.length ? 'due' : undefined} />
+        <Stat label={`Maintenance, ${year} so far`} value={money0(ytd('maintenance'))} sub={b.maintenance ? `budget ${money0(b.maintenance * thisYear.length)} for ${thisYear.length} months` : 'no budget set'} tone={b.maintenance && ytd('maintenance') > b.maintenance * thisYear.length ? 'due' : undefined} />
         <Stat label="Fuel budget" value={b.fuel ? money0(b.fuel) : '—'} sub="per month" />
         <Stat label="Maintenance budget" value={b.maintenance ? money0(b.maintenance) : '—'} sub="per month" />
       </div>

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createIncident, updateIncident } from '../api/incidents'
@@ -10,9 +11,8 @@ const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const SEVERITIES = ['Minor', 'Moderate', 'Major']
 const STATUSES = ['Open', 'In progress', 'Resolved']
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Sydney's date, not UTC (UTC is still yesterday before ~10-11 am here).
+const today = todayIso
 
 function blankForm() {
   return {

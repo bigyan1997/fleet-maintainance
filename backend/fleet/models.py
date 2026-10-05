@@ -276,6 +276,7 @@ ATTACHMENT_KIND_CHOICES = [
     ("Registration", "Registration"),
     ("Insurance", "Insurance"),
     ("Photo", "Photo"),
+    ("Issue photo", "Issue photo"),
     ("Other", "Other"),
 ]
 

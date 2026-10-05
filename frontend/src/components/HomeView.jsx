@@ -5,7 +5,7 @@ import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { daysFromToday, fmtAgo, fmtDate, sydneyMonthName, todayIso } from '../lib/formatDate'
 import { href } from '../lib/router'
 import { StatusSelect } from './StatusSelect'
 
@@ -47,15 +47,8 @@ function addMonth(iso) {
   return dt.toISOString().slice(0, 10)
 }
 
-function localToday() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 function daysSince(iso) {
-  const [y, m, d] = iso.split('-').map(Number)
-  const now = new Date()
-  return Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(y, m - 1, d)) / 86400000)
+  return -daysFromToday(iso)
 }
 
 export function HomeView() {
@@ -79,11 +72,11 @@ export function HomeView() {
   const cycle = washes.data?.cycleDays ?? 14
   const dueWashes = (washes.data?.vans ?? []).filter((w) => w.washNeeded && (w.daysSince === null || w.daysSince >= cycle))
 
-  const todayIso = localToday()
+  const today = todayIso()
   const allAlerts = alerts.data ?? []
   // Why a booked job matters, e.g. "service overdue by 1,629 km" (shown on it).
   const reasonFor = Object.fromEntries(allAlerts.filter((a) => a.booked).map((a) => [a.booked.id, alertText(a)]))
-  const missedBooking = (a) => a.booked && a.booked.status === 'Booked' && a.booked.date < todayIso
+  const missedBooking = (a) => a.booked && a.booked.status === 'Booked' && a.booked.date < today
 
   // Everything that needs someone to do something, most urgent first.
   const items = [
@@ -161,7 +154,7 @@ export function HomeView() {
       : []),
   ]
 
-  const monthName = new Date().toLocaleString('en-AU', { month: 'long' })
+  const monthName = sydneyMonthName()
   // e.g. "Van 9 booked for 07-10" (one or two jobs) or "2 booked · 1 at the mechanic".
   const booked = jobs.filter((j) => j.status === 'Booked')
   const atMechanic = jobs.filter((j) => j.status !== 'Booked')

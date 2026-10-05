@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
-import { createMechanic, fetchMechanics } from '../api/extra'
+import { createMechanic, fetchMechanics, uploadAttachment } from '../api/extra'
 import { fetchVehicles } from '../api/vehicles'
 import { createService, updateService } from '../api/services'
 import { Documents } from './Documents'
+import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
 
@@ -12,9 +14,8 @@ const SERVICE_TYPES = [
   'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
 ]
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Sydney's date, not UTC (UTC is still yesterday before ~10-11 am here).
+const today = todayIso
 
 function blankForm() {
   return { vehicle: '', service_type: SERVICE_TYPES[0], date: today(), status: 'Booked', issues: '', odometer: '', cost: '', next_due: '', notes: '', mechanic: '' }
@@ -41,6 +42,8 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   // Issues, work done and a hand-typed next due live under "+ More"; it opens
   // by itself when the record already has any of them, so nothing is hidden.
   const [showMore, setShowMore] = useState(() => Boolean(service?.issues || service?.notes))
+  // Issue photos picked on a new record, uploaded once it's saved.
+  const [pendingPhotos, setPendingPhotos] = useState([])
 
   // "Next due" for a scheduled service = odometer + the van's service
   // interval (usually 10,000 km). It follows the odometer as you type, also
@@ -68,13 +71,17 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
       // A newly typed mechanic is created first (or matched, if the name already exists).
       const mechanic = newMechanic?.trim() ? (await createMechanic({ name: newMechanic.trim() })).id : form.mechanic || null
       const payload = { ...form, mechanic, odometer: form.odometer || null, cost: form.cost || null }
-      return isEdit ? updateService(service.id, payload) : createService(payload)
+      if (isEdit) return updateService(service.id, payload)
+      const saved = await createService(payload)
+      await Promise.all(pendingPhotos.map((file) => uploadAttachment({ file, kind: ISSUE_PHOTO, vehicle: saved.vehicle, service: saved.id })))
+      return saved
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mechanics'] })
       queryClient.invalidateQueries({ queryKey: ['services'] })
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['attachments'] })
       onSaved(isEdit ? 'Record updated.' : 'Record saved.')
       onDone(isEdit)
     },
@@ -161,7 +168,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
 
       {!showMore ? (
         <button onClick={() => setShowMore(true)} className="mb-4 text-[13px] font-medium text-primary hover:underline">
-          + More: issues for the mechanic · work done · change next due
+          + More: issues for the mechanic (with photos) · work done · change next due
         </button>
       ) : (
         <div className="mb-4 rounded-md border border-line bg-[#fafafa] p-3">
@@ -175,6 +182,12 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
                 className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
               />
             </Field>
+            <IssuePhotos
+              service={isEdit ? service.id : null}
+              vehicle={form.vehicle}
+              pending={pendingPhotos}
+              onPendingChange={setPendingPhotos}
+            />
           </div>
           <FormRow>
             <Field label="Work done / parts replaced">

@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createFuelLog, updateFuelLog } from '../api/fuelLogs'
 import { Field, FormRow, NumberInput, DateInput, TextInput } from './FormFields'
 
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Sydney's date, not UTC (UTC is still yesterday before ~10-11 am here).
+const today = todayIso
 
 function blankForm() {
   return { vehicle: '', date: today(), litres: '', cost: '', odometer: '', invoice_number: '', notes: '' }

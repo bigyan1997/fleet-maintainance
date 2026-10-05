@@ -11,7 +11,7 @@ A guide for the people who use the app day to day at Achieve Cafe Provisions. Fo
 
 Sign in with the shared office login. Bookmark one of the addresses above, not one with numbers like `192.168.15.20`: that number can change when the router restarts.
 
-Every page has its own address, so you can bookmark a page or send a link to it, for example `…:8001/vans` or `…:8001/services/incidents`. All dates are shown as dd-mm-yyyy.
+Every page has its own address, so you can bookmark a page or send a link to it, for example `…:8001/vans` or `…:8001/services/incidents`. All dates are shown as dd-mm-yyyy, and all dates and times are Sydney time (including daylight saving), whatever time zone your computer or phone is set to.
 
 ## The screen at a glance
 
@@ -24,7 +24,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 
 Start here each day.
 
-- **Three numbers:** how many things need doing, how many vans are booked in or at the mechanic, and what's been spent this month (services + fuel card).
+- **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card).
 - **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego/insurance expiring within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego/insurance dates. Each line has a button for the next step.
 - **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
 - **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
@@ -35,7 +35,7 @@ Start here each day.
 1. Click **+ Log service**.
 2. Pick the **Van** and **What** (e.g. Scheduled service), the **Date** and **Status = Booked**.
 3. Pick the **Mechanic**. For someone new, choose **+ Add new mechanic…** and type the name.
-4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job.
+4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job. Underneath, **+ Add photo** adds photos of the problem (on a phone it can open the camera); click a photo to see it full size. They also show when you open the job from the Services list.
 5. **Save record**.
 
 ### When the work is done
@@ -50,7 +50,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 **Booked** → **At mechanic** → **Waiting for invoice** → **Done**.
 
 ### The Services tab
-- **Services:** every service, newest first. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
+- **Services:** every service, newest first, with columns Van, What, **Mechanic** (who did it), Status and Cost. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
 - **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; open one to add follow-up notes, and to say what was done when it's resolved.
 - **Mechanics:** the workshops you use, with their phone number, number of jobs, total spent and last job. **See jobs** lists everything a workshop did.
 

@@ -3,15 +3,13 @@ import { useState } from 'react'
 import { createService, deleteService } from '../api/services'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { fmtAgo, fmtDate, todayIso } from '../lib/formatDate'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const SOON_DAYS = 4 // a van shows "due in N days" this close to the end of its cycle
 
-function today() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+// Sydney's date, whatever time zone this device is set to.
+const today = todayIso
 
 // Washes run on a 2-week cycle. Vans due (or never washed) come first, each
 // with one button; recent washes underneath; take-home vans fold away.

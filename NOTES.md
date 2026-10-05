@@ -8,7 +8,23 @@ Achieve Cafe Provisions tracked its vehicle fleet through a single static HTML/J
 
 This project gives it the same upgrade NPD Tracker v2 got: Postgres as the real source of truth, a shared Django login, and a one-way Postgres → Sheets mirror so people can still glance at a spreadsheet.
 
-## Status (2026-09-29)
+## Where things stand (2026-10-01)
+
+Read this first; the dated entries below are the history of how it got here.
+
+- **Live** on the office PC: waitress on port 8001, hidden, kept running by `keep-alive.ps1` (scheduled task every 2 minutes). Office: http://DESKTOP-OB7PD9F:8001 · Tailscale: http://bigyan-desktop:8001. One shared login. How to use it: [USAGE.md](USAGE.md).
+- **Layout**: classic blue bar + tabs Home · Vans · Services · Washes · Fuel · Reports, with only Log wash and + Log service beside them. A SaaS-style redesign (sidebar, Today feed, Jobs board) was tried and rejected by the user; keep changes inside this layout.
+- **Home**: Needs doing (left: only items needing action; booked services leave it unless the booked date passes; invoices only once they're more than 45 days late), Booked & at the mechanic + Waiting for invoices (right; each invoice is expected about a month after the service).
+- **Services**: Booked → At mechanic → Waiting for invoice → Done (stored as Booked / In service / Completed, awaiting invoice / Invoiced). Moving a job to the last two opens a finish box for km, cost and mechanic. Next due = odometer + the van's interval (10,000 km for every van). Mechanics are their own list.
+- **Fuel**: monthly Metro/WEX statement imported from its MPDATA TXT file, fees and AdBlue included, so totals match the statement.
+- **Vans**: page per van (History, Fuel, Documents, Details + change history); rego/insurance dates table; drivers; tyres; QR stickers for drivers.
+- **Time**: everything is Sydney time (Django `TIME_ZONE = 'Australia/Sydney'`; the frontend's `todayIso()` / `fmtDateTime()` in `lib/formatDate.js` use Australia/Sydney whatever the device is set to). Dates show as dd-mm-yyyy.
+- **Removed on request**: weekly summary email, Team page (logins/activity page), any mention of the AI assistant on screen, reading mechanic invoices from photos/PDFs (declined).
+- **Data still to fill in by staff**: insurance expiry dates (none yet), costs on 35 old services, 3 VINs copied between vans in the legacy sheet, the stored van names ("Van 3- Mercedez", "Hi-ACE SWLB"; display is already tidied).
+
+## History
+
+### Status (2026-09-29)
 
 **Legacy data imported and Sheets mirror live.** `python manage.py import_from_sheet` (run once, with `--dry-run` reviewed first) brought in 11 vehicles, 58 service records, 1 incident and 0 fuel logs from the legacy sheet, resolving each row's text label to a real Vehicle FK. It reads slash dates as DD/MM/YYYY like the legacy app did (its `parseDateToTs()` MM/DD branch was dead code), and flags only the genuinely ambiguous ones — day and month both <= 12 *and* the swapped reading isn't in the future. Two service dates were in the future at import time (Van 9 `07/10/2026`, possibly a US-style 10 Jul; Van 1 `30/09/2026`) and several vans share copy-pasted VINs — imported as-is, left for staff to correct in the app.
 
@@ -25,6 +41,10 @@ Also fixed: the Incidents list 500'd on every load (`list_incidents()` didn't ac
 **Always-on server + UI polish** (still 2026-09-29): the app now runs permanently on this PC the same way NPD Tracker does — `run_server.bat` (collectstatic, then waitress on `0.0.0.0:8001`; NPD has 8000) launched at login by a "Fleet Maintenance Server" shortcut in the Windows Startup folder, minimised. Reachable at `http://DESKTOP-OB7PD9F:8001` (preferred — the LAN IP is DHCP-assigned and has already changed once, .17 → .20; add any new IP to `DJANGO_ALLOWED_HOSTS`); `.env` now has `DJANGO_DEBUG=False` and those hosts in `DJANGO_ALLOWED_HOSTS`. **Pending:** an inbound firewall rule for 8001 needs an admin PowerShell (`New-NetFirewallRule -DisplayName "Fleet Maintenance (8001)" -Direction Inbound -Protocol TCP -LocalPort 8001 -Action Allow -Profile Private,Public`) — until then only this PC can reach it. After frontend changes: `npm run build`, then restart the server (stop it; the keep-alive task brings it back, or run it with Start-ScheduledTask). Also: NPD-style click-to-sort headers on the dashboard tables (`lib/useSort.js`; status sorts in workflow order), every displayed/exported/mirrored date is dd-mm-yyyy (`lib/formatDate.js`; ISO stays the underlying value), and service records gained `issues` — what to tell the mechanic when booking, shown under each Jobs-in-progress row — distinct from `notes` (relabelled "Work done / parts replaced").
 
 **2026-09-30 additions:** Alerts only count *finished* services (Completed/Invoiced) towards "last serviced", note when a due item is already booked, use one 60-day expiry window (`EXPIRY_DUE_SOON_DAYS`, shared with the Fleet badge), and have All/Overdue/Upcoming filters. Fleet cards show an open booking next to "Service due" (`services.open_job()`). A scheduled service's "next due" auto-fills as odometer + the van's interval (form live; `_fill_next_due()` server-side). Van washes: stored as ServiceRecords of type `WASH_SERVICE_TYPE` ("Van wash", done in-house, no cost) but kept out of every service view/figure; own tab (`/api/washes/`) with a 2-week cycle (`WASH_CYCLE_DAYS`), recent-washes list, per-van date picker, and `Vehicle.wash_needed` for take-home vans. Searching "van N" matches exactly that van (`van_number_q()`), not Van 10/11.
+
+**Last changes on 2026-10-01**: Home's middle box is "Booked & at the mechanic" and names what's in it ("Van 9 booked for 07-10 · 1 waiting for an invoice"); alerts carry the booked job so Home can leave handled items out of Needs doing; rego/insurance dates save when the box loses focus (a half-typed year used to save as 0002) and the API refuses years outside 2000-2099; tab rows no longer show tiny scroll arrows; number boxes have no up/down arrows; every "today" and clock time on screen is Sydney time (the service, fuel and incident forms used to default to the UTC date, i.e. yesterday before ~10-11 am); the Services list has its own Mechanic column.
+
+**Issue photos** (2026-10-06): the service form's "Issues for the mechanic" has an NPD-style thumbnail strip (`IssuePhotos.jsx`). They are Attachments with kind "Issue photo" (migration 0012), uploaded straight away on a saved service or after the save on a new one; left out of the form's Files list, shown in the Services detail popup and on the van's Documents.
 
 **Fuel statement import** (2026-09-30): Fuel tab -> "Import statement" takes the monthly Metro Petroleum / WEX Motorpass `MPDATA<ddmmyy>.TXT` file (tab-separated; the PDF isn't parsed) — `fleet/fuel_import.py`, `POST /api/fuel-import/` (file only = preview, + `assignments` JSON card->vehicle = import). Cards match a van by `fuel_card_number` (saved on the van at first import), else by the rego on the card / typed at the pump. Every statement line is imported with `FuelLog.product` set (Diesel, Premium diesel, AdBlue, Roadside assist, Card fee…), so each van's total matches the statement to the cent; non-fuel lines count towards cost only, never litres / fill-ups / L/100km (`models.fuel_only_q()` / `FuelLog.is_fuel`; hand-logged rows have a blank product and count as fuel). Cost is incl. GST; docket number goes in `invoice_number`. Odometer readings that break the van's upward run or jump >1500 km/day are not used (kept in the note). Duplicates = same van + date + litres, so re-uploading a statement adds nothing. One Sheets push at the end. Sample files live in `samples/` (gitignored — card numbers).
 
@@ -66,8 +86,9 @@ Also fixed: the Incidents list 500'd on every load (`list_incidents()` didn't ac
 
 ## Not yet done
 
-- Not deployed anywhere yet — no `DEPLOYMENT_NOTES.md`, no live server, no auto-deploy.
-- No automated tests written yet (`backend/fleet/tests.py` and `backend/accounts/tests.py` are still the empty stubs from `startapp`/copied from NPD).
+- No automated tests yet (`backend/fleet/tests.py` and `backend/accounts/tests.py` are empty stubs). Changes are checked against the real data inside rolled-back transactions and with a headless-browser read-only tour.
+- Surviving a reboot with nobody logged in needs one manual step: tick "Run whether user is logged on or not" on the "Fleet Maintenance keep-alive" scheduled task (needs the Windows password).
+- No auto-deploy: after a change, build the frontend (`npx vite build`), run migrations, stop the server and let the keep-alive task start it (or `Start-ScheduledTask 'Fleet Maintenance keep-alive'`).
 
 ## Infra
 

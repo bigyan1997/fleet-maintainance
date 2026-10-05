@@ -5,7 +5,7 @@ import { createDriver, deleteDriver, fetchDrivers, patchVehicle, updateDriver } 
 import { fetchServices } from '../api/services'
 import { fetchVehicles } from '../api/vehicles'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { daysFromToday, fmtAgo, fmtDate } from '../lib/formatDate'
 import { href } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button, Card, Empty, Pill } from './ui'
@@ -310,7 +310,7 @@ function ExpiryInput({ van, field, label }) {
     toast(`${van.label}: that ${label} doesn't look right. Check the year.`, true)
     setDraft(value)
   }
-  const days = value ? Math.round((new Date(value) - new Date(new Date().toDateString())) / 86400000) : null
+  const days = value ? daysFromToday(value) : null
   return (
     <div className="flex flex-wrap items-center gap-2">
       <input

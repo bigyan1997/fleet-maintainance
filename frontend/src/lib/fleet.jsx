@@ -1,4 +1,4 @@
-import { fmtAgo, fmtDate } from './formatDate'
+import { daysFromToday, fmtAgo, fmtDate } from './formatDate'
 
 // Shared by the Vans list, van pages and fuel views.
 
@@ -22,7 +22,7 @@ export function washText(v) {
 
 export function expiryCell(date) {
   if (!date) return <span className="text-off">—</span>
-  const days = Math.round((new Date(date) - new Date(new Date().toDateString())) / 86400000)
+  const days = daysFromToday(date)
   const colour = days < 0 ? 'text-due font-medium' : days < 60 ? 'text-warn font-medium' : ''
   return <span className={colour}>{fmtDate(date)}</span>
 }

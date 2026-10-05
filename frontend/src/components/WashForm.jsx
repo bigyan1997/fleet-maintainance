@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
 import { createService } from '../api/services'
 import { fetchVehicles } from '../api/vehicles'
 import { DateInput, Field, FormRow } from './FormFields'
 
-function today() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+// Sydney's date, whatever time zone this device is set to.
+const today = todayIso
 
 // Log a van wash. Washes are service records of type "Van wash", saved as
 // Invoiced straight away (done in-house, nothing to wait for) — same as the

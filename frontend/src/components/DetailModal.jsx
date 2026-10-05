@@ -1,7 +1,7 @@
 import { href } from '../lib/router'
 
 // subtitle: the van's make, model and plate; vehicleId adds a link to its page.
-export function DetailModal({ title, subtitle, vehicleId, rows, onClose, onEdit }) {
+export function DetailModal({ title, subtitle, vehicleId, rows, extra, onClose, onEdit }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,.45)] px-5" onClick={onClose}>
       <div className="w-full max-w-[560px] rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
@@ -27,6 +27,7 @@ export function DetailModal({ title, subtitle, vehicleId, rows, onClose, onEdit 
             </div>
           ))}
         </div>
+        {extra}
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
             Close
