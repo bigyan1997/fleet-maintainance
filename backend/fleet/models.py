@@ -177,6 +177,8 @@ class ServiceRecord(models.Model):
     notes = models.TextField(blank=True)
     status = models.CharField(max_length=32, choices=SERVICE_STATUS_CHOICES, default="Booked", db_index=True)
     mechanic = models.ForeignKey(Mechanic, on_delete=models.SET_NULL, null=True, blank=True, related_name="services")
+    # Google Drive folder holding photos of the issues (see drive.py).
+    drive_folder_id = models.CharField(max_length=128, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -198,6 +200,8 @@ class Incident(models.Model):
     # Running notes while Open / In progress live in IncidentUpdate (a dated log).
     resolution = models.TextField(blank=True)  # what was done — required once Resolved
     resolved_date = models.DateField(null=True, blank=True)
+    # Google Drive folder holding photos of the damage (see drive.py).
+    drive_folder_id = models.CharField(max_length=128, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -270,6 +274,10 @@ class FuelLog(models.Model):
         return None
 
 
+# Photos of what's wrong with a van (a service's issues, an incident's
+# damage). Kept in Google Drive when it's set up; see drive.py.
+ISSUE_PHOTO = "Issue photo"
+
 ATTACHMENT_KIND_CHOICES = [
     ("Invoice", "Invoice"),
     ("Quote", "Quote"),
@@ -289,7 +297,7 @@ class Attachment(models.Model):
     """A file kept with a van, a service or an incident: the mechanic's
     invoice, rego papers, a photo of the damage."""
 
-    file = models.FileField(upload_to=attachment_path)
+    file = models.FileField(upload_to=attachment_path, blank=True)  # empty when kept in Google Drive
     original_name = models.CharField(max_length=255)
     content_type = models.CharField(max_length=100, blank=True)
     size = models.PositiveIntegerField(default=0)
@@ -299,6 +307,8 @@ class Attachment(models.Model):
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    drive_file_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    drive_modified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]

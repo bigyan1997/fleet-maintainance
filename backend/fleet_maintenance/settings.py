@@ -20,6 +20,15 @@ ALLOWED_HOSTS += config('DJANGO_EXTRA_HOSTS', default='', cast=Csv())
 # sheet from the legacy fleet app's, to avoid the two apps' writes colliding.
 FLEET_SHEETS_KEYFILE = config('FLEET_SHEETS_KEYFILE', default='secrets/service-account.json')
 FLEET_SHEET_ID = config('FLEET_SHEET_ID', default='')
+# Issue/damage photos in Google Drive (fleet/drive.py). The token is written
+# once by `manage.py drive_authorize`; without it photos stay on disk.
+FLEET_DRIVE_CLIENT_SECRETS = config('FLEET_DRIVE_CLIENT_SECRETS', default='secrets/drive-oauth-client.json')
+FLEET_DRIVE_TOKEN_FILE = config('FLEET_DRIVE_TOKEN_FILE', default='secrets/drive-token.json')
+FLEET_DRIVE_ROOT_FOLDER = config('FLEET_DRIVE_ROOT_FOLDER', default='Fleet Maintenance Photos')
+# Issue/damage photos in Google Drive (fleet/drive.py). Without this token
+# file, NPD Tracker v2's one next door is used; with neither, photos stay on disk.
+FLEET_DRIVE_TOKEN_FILE = config('FLEET_DRIVE_TOKEN_FILE', default='secrets/drive-token.json')
+FLEET_DRIVE_ROOT_FOLDER = config('FLEET_DRIVE_ROOT_FOLDER', default='Fleet Maintenance Photos')
 FLEET_SHEET_TAB = config('FLEET_SHEET_TAB', default='Fleet')
 
 # One-time import source: the legacy fleet app's existing Google Sheet

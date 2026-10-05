@@ -4,6 +4,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { deleteIncident, fetchIncidents } from '../api/incidents'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
+import { IssuePhotoStrip } from './IssuePhotos'
 import { IncidentLog } from './IncidentLog'
 import { fmtDate } from '../lib/formatDate'
 
@@ -124,6 +125,7 @@ export function IncidentsView({ onEdit, onAdd }) {
               ? [['Resolution', detail.resolution || '—'], ['Resolved date', fmtDate(detail.resolved_date) || '—']]
               : []),
           ]}
+          extra={<IssuePhotoStrip incident={detail.id} label="Photos of the damage" />}
           onClose={() => setDetail(null)}
           onEdit={() => { onEdit(detail); setDetail(null) }}
         />

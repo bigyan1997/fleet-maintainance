@@ -1,21 +1,24 @@
 """API for the Phase 2/3 features: drivers, documents, activity log,
 budgets and fuel trends."""
 
+import logging
 import mimetypes
 from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import activity, services
-from .models import ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, Vehicle, fuel_only_q
+from . import activity, drive, services
+from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, Vehicle, fuel_only_q
 from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverSerializer, MechanicSerializer
+
+logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ALLOWED_UPLOAD_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
@@ -114,6 +117,11 @@ class MechanicViewSet(viewsets.ViewSet):
 
 class AttachmentViewSet(viewsets.ViewSet):
     def list(self, request):
+        # Opening a job's photos pulls in what's changed in its Drive folder.
+        for key, model in (("service", ServiceRecord), ("incident", Incident)):
+            job = model.objects.select_related("vehicle").filter(pk=request.query_params.get(key) or 0).first()
+            if job:
+                drive.sync_job(job)
         qs = Attachment.objects.select_related("vehicle", "service", "incident", "uploaded_by")
         for key in ("vehicle", "service", "incident"):
             if request.query_params.get(key):
@@ -140,17 +148,27 @@ class AttachmentViewSet(viewsets.ViewSet):
         if not vehicle:
             return Response({"detail": "Say which van this file belongs to."}, status=status.HTTP_400_BAD_REQUEST)
 
-        att = Attachment.objects.create(
-            file=upload,
-            original_name=upload.name[:255],
-            content_type=upload.content_type or mimetypes.guess_type(upload.name)[0] or "",
-            size=upload.size,
-            kind=request.data.get("kind") or "Other",
-            vehicle=vehicle,
-            service=service,
-            incident=incident,
-            uploaded_by=request.user,
+        kind = request.data.get("kind") or "Other"
+        content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
+        fields = dict(
+            original_name=upload.name[:255], content_type=content_type, size=upload.size, kind=kind,
+            vehicle=vehicle, service=service, incident=incident, uploaded_by=request.user,
         )
+        att = None
+        job = service or incident
+        if kind == ISSUE_PHOTO and job and drive.enabled():
+            try:
+                client = drive.DriveClient()
+                meta = client.upload(drive.ensure_folder(client, job), upload.name, upload.read(), content_type)
+                att = Attachment.objects.create(
+                    **fields, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
+                )
+            except Exception:
+                # Never lose the photo: keep it on this PC instead.
+                logger.exception("Drive upload failed; keeping %s on disk", upload.name)
+                upload.seek(0)
+        if att is None:
+            att = Attachment.objects.create(file=upload, **fields)
         where = f" ({AttachmentSerializer(att).data['linkedTo']})" if (service or incident) else ""
         activity.log(request.user, "Added", "Document", f"{att.kind}: {att.original_name} for {vehicle}{where}", vehicle)
         return Response(AttachmentSerializer(att).data, status=status.HTTP_201_CREATED)
@@ -160,7 +178,14 @@ class AttachmentViewSet(viewsets.ViewSet):
         if not att:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
         activity.log(request.user, "Deleted", "Document", f"{att.kind}: {att.original_name} for {att.vehicle}", att.vehicle)
-        att.file.delete(save=False)
+        if att.drive_file_id:
+            try:
+                drive.DriveClient().trash(att.drive_file_id)
+            except Exception:
+                logger.exception("Drive trash failed for %s", att.drive_file_id)
+                return Response({"detail": "Couldn't remove it from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
+        elif att.file:
+            att.file.delete(save=False)
         att.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -171,9 +196,18 @@ class AttachmentFileView(APIView):
 
     def get(self, request, pk):
         att = Attachment.objects.filter(pk=pk).first()
-        if not att or not att.file:
+        if not att or not (att.file or att.drive_file_id):
             raise Http404
         inline = request.query_params.get("download") != "1"
+        if att.drive_file_id:
+            thumb = request.query_params.get("thumb") == "1"
+            data, content_type = drive.thumbnail(att) if thumb else drive.full(att)
+            response = HttpResponse(data, content_type=content_type)
+            if thumb:
+                response["Cache-Control"] = "private, max-age=86400"
+            if not inline:
+                response["Content-Disposition"] = f'attachment; filename="{att.original_name}"'
+            return response
         return FileResponse(att.file.open("rb"), as_attachment=not inline, filename=att.original_name, content_type=att.content_type or None)
 
 

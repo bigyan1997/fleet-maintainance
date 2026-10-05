@@ -3,7 +3,9 @@ import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createIncident, updateIncident } from '../api/incidents'
+import { uploadAttachment } from '../api/extra'
 import { Documents } from './Documents'
+import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { IncidentLog } from './IncidentLog'
 
@@ -35,13 +37,19 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+  // Damage photos picked on a new incident, uploaded once it's saved.
+  const [pendingPhotos, setPendingPhotos] = useState([])
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload = { ...form, cost: form.cost || null, resolved_date: form.resolved_date || null }
-      return isEdit ? updateIncident(incident.id, payload) : createIncident(payload)
+      if (isEdit) return updateIncident(incident.id, payload)
+      const saved = await createIncident(payload)
+      await Promise.all(pendingPhotos.map((file) => uploadAttachment({ file, kind: ISSUE_PHOTO, vehicle: saved.vehicle, incident: saved.id })))
+      return saved
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attachments'] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       onSaved(isEdit ? 'Incident updated.' : 'Incident logged.')
@@ -98,6 +106,13 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
         <Field label="Description">
           <TextInput value={form.description} onChange={set('description')} placeholder="What happened" />
         </Field>
+        <IssuePhotos
+          incident={isEdit ? incident.id : null}
+          vehicle={form.vehicle}
+          label="Photos of the damage"
+          pending={pendingPhotos}
+          onPendingChange={setPendingPhotos}
+        />
       </div>
       <div className="mb-4 border-t border-line pt-4">
         <div className="mb-2 text-[13px] font-semibold text-ink">Updates</div>
@@ -149,7 +164,7 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
       {isEdit && (
         <div className="mt-6 border-t border-line pt-5">
           <h3 className="mb-1 text-[14px] font-semibold text-ink">Files</h3>
-          <p className="mb-3 text-xs text-off">Photos, quotes and paperwork for this incident.</p>
+          <p className="mb-3 text-xs text-off">Quotes and paperwork for this incident.</p>
           <Documents incident={incident.id} vehicle={incident.vehicle} compact />
         </div>
       )}

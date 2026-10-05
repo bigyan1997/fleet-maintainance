@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from . import services
+from . import drive
 from .models import ActivityLog, Attachment, Driver, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
@@ -168,12 +169,14 @@ class AttachmentSerializer(serializers.ModelSerializer):
     uploadedBy = serializers.SerializerMethodField()
     url = serializers.SerializerMethodField()
     linkedTo = serializers.SerializerMethodField()
+    thumb = serializers.SerializerMethodField()
+    driveFolderUrl = serializers.SerializerMethodField()
 
     class Meta:
         model = Attachment
         fields = [
             "id", "original_name", "content_type", "size", "kind", "vehicle", "vehicleLabel",
-            "service", "incident", "uploadedBy", "created_at", "url", "linkedTo",
+            "service", "incident", "uploadedBy", "created_at", "url", "linkedTo", "thumb", "driveFolderUrl",
         ]
 
     def get_uploadedBy(self, obj):
@@ -181,6 +184,14 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
     def get_url(self, obj):
         return f"/api/attachments/{obj.pk}/file/"
+
+    def get_thumb(self, obj):
+        # Drive photos have a small cached preview; local files are shown as they are.
+        return f"/api/attachments/{obj.pk}/file/?thumb=1" if obj.drive_file_id else self.get_url(obj)
+
+    def get_driveFolderUrl(self, obj):
+        job = obj.service or obj.incident
+        return drive.folder_url(job.drive_folder_id) if job and obj.drive_file_id else ""
 
     def get_linkedTo(self, obj):
         if obj.service_id:

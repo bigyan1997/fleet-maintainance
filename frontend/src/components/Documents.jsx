@@ -42,8 +42,8 @@ export function Documents({ vehicle, service, incident, compact = false }) {
     },
   })
 
-  // A service's issue photos already show under "Issues for the mechanic".
-  const rows = (docs.data ?? []).filter((d) => !(service && d.kind === 'Issue photo'))
+  // A job's issue/damage photos already show in its photo strip.
+  const rows = (docs.data ?? []).filter((d) => !((service || incident) && d.kind === 'Issue photo'))
   return (
     <div className={compact ? '' : 'p-4'}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
