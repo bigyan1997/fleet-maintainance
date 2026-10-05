@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { createIncident, updateIncident } from '../api/incidents'
 import { uploadAttachment } from '../api/extra'
-import { Documents } from './Documents'
 import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { IncidentLog } from './IncidentLog'
@@ -161,13 +160,6 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
           Cancel
         </button>
       </div>
-      {isEdit && (
-        <div className="mt-6 border-t border-line pt-5">
-          <h3 className="mb-1 text-[14px] font-semibold text-ink">Files</h3>
-          <p className="mb-3 text-xs text-off">Quotes and paperwork for this incident.</p>
-          <Documents incident={incident.id} vehicle={incident.vehicle} compact />
-        </div>
-      )}
     </div>
   )
 }
