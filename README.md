@@ -9,7 +9,8 @@ Vehicle fleet tracker for Achieve Cafe Provisions — vehicles, service history,
 ## Architecture
 
 - **`backend/`** — Django project. Fleet data lives in **Postgres**, not Google Sheets. A background sync pushes every change to a Google Sheet as a read-only mirror, but the Sheet is not the source of truth — Postgres is.
-- **`frontend/`** — React + Vite + Tailwind SPA, plain JavaScript (no TypeScript). In production it would be built and served by Django directly, same as NPD Tracker.
+- **`frontend/`** — React + Vite + Tailwind SPA, plain JavaScript (no TypeScript), built and served by Django (whitenoise), same as NPD Tracker.
+- **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Other documents are stored on the server's disk (`backend/media/`).
 
 ## One-time setup
 

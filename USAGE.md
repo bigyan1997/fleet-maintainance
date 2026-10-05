@@ -4,14 +4,16 @@ A guide for the people who use the app day to day at Achieve Cafe Provisions. Fo
 
 ## Opening the app
 
-| Where you are | Open this |
+The app runs on the **orders PC**, next to NPD Tracker. Open it with Tailscale on your laptop or phone:
+
+| Open this | |
 |---|---|
-| At the office (on the Wi-Fi) | **http://DESKTOP-OB7PD9F:8001** |
-| Anywhere else, with Tailscale on your laptop or phone | **http://bigyan-desktop:8001** |
+| **http://100.66.249.69:8002** | the orders PC's Tailscale address |
+| **http://orders-hostcomputer:8002** | the same, by name |
 
-Sign in with the shared office login. Bookmark one of the addresses above, not one with numbers like `192.168.15.20`: that number can change when the router restarts.
+Sign in with the shared office login. After an update, press **Ctrl + F5** once so the browser loads the new version.
 
-Every page has its own address, so you can bookmark a page or send a link to it, for example `…:8001/vans` or `…:8001/services/incidents`. All dates are shown as dd-mm-yyyy, and all dates and times are Sydney time (including daylight saving), whatever time zone your computer or phone is set to.
+Every page has its own address, so you can bookmark a page or send a link to it, for example `…:8002/vans` or `…:8002/services/incidents`. All dates are shown as dd-mm-yyyy, and all dates and times are Sydney time (including daylight saving), whatever time zone your computer or phone is set to.
 
 ## The screen at a glance
 
@@ -51,7 +53,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 
 ### The Services tab
 - **Services:** every service, newest first, with columns Van, What, **Mechanic** (who did it), Status and Cost. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
-- **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; open one to add follow-up notes, and to say what was done when it's resolved.
+- **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; add **Photos of the damage** under the description (kept in Google Drive in **Fleet Maintenance Photos › Incidents › van**, named by the incident's date); open one to add follow-up notes, and to say what was done when it's resolved.
 - **Mechanics:** the workshops you use, with their phone number, number of jobs, total spent and last job. **See jobs** lists everything a workshop did.
 
 ## Vans
@@ -111,9 +113,9 @@ The **Google Sheet** button opens a copy of all the data that updates by itself 
 
 ## If the app won't open
 
-1. **Wait 2 minutes and try again.** The app checks itself every 2 minutes and restarts if it has stopped.
-2. Check you're using the right address (see "Opening the app") and, away from the office, that Tailscale is on.
-3. Make sure the office PC (DESKTOP-OB7PD9F) is on and plugged in. Closing the lid shouldn't stop it, but leave it open if you're unsure.
-4. Still not working? Restart the office PC and log in. The app starts by itself.
+1. **Wait 5 minutes and try again.** The app checks itself every 5 minutes and restarts if it has stopped.
+2. Check you're using the right address (see "Opening the app") and that Tailscale is on.
+3. Make sure the orders PC is on and plugged in.
+4. Still not working? Restart the orders PC and log in. The app starts by itself.
 
-For the app to come back after a restart **without anyone logging in**, the "Fleet Maintenance keep-alive" task in Task Scheduler must be set to **"Run whether user is logged on or not"** (needs the Windows password once; redo it if the password changes).
+For the app to come back after a restart **without anyone logging in**, the "Fleet Maintenance keep-alive" task in Task Scheduler on the orders PC must be set to **"Run whether user is logged on or not"** (needs the Windows password once; redo it if the password changes).

@@ -8,14 +8,15 @@ Achieve Cafe Provisions tracked its vehicle fleet through a single static HTML/J
 
 This project gives it the same upgrade NPD Tracker v2 got: Postgres as the real source of truth, a shared Django login, and a one-way Postgres → Sheets mirror so people can still glance at a spreadsheet.
 
-## Where things stand (2026-10-01)
+## Where things stand (2026-10-06)
 
 Read this first; the dated entries below are the history of how it got here.
 
-- **Live** on the office PC: waitress on port 8001, hidden, kept running by `keep-alive.ps1` (scheduled task every 2 minutes). Office: http://DESKTOP-OB7PD9F:8001 · Tailscale: http://bigyan-desktop:8001. One shared login. How to use it: [USAGE.md](USAGE.md).
+- **Live** on the **orders PC** (next to NPD Tracker v2, which has 8001): waitress on port 8002, kept running by `keep-alive.ps1`, and **auto-deployed** from `main` by `auto_deploy.ps1` every 5 minutes (pip/npm install, tests, frontend build, migrate, restart; rolls back on failure). So a change reaches users only after a push, 5-10 minutes later. Tailscale: http://100.66.249.69:8002 or http://orders-hostcomputer:8002. One shared login. How to use it: [USAGE.md](USAGE.md). The old office-PC setup (DESKTOP-OB7PD9F:8001) described in the history is the development PC now.
+- **Photos**: issue photos on services and damage photos on incidents, kept in Google Drive under `Fleet Maintenance Photos/Services|Incidents/<van>/`, named by the job's date (see "Issue photos in Google Drive" below).
 - **Layout**: classic blue bar + tabs Home · Vans · Services · Washes · Fuel · Reports, with only Log wash and + Log service beside them. A SaaS-style redesign (sidebar, Today feed, Jobs board) was tried and rejected by the user; keep changes inside this layout.
 - **Home**: Needs doing (left: only items needing action; booked services leave it unless the booked date passes; invoices only once they're more than 45 days late), Booked & at the mechanic + Waiting for invoices (right; each invoice is expected about a month after the service).
-- **Services**: Booked → At mechanic → Waiting for invoice → Done (stored as Booked / In service / Completed, awaiting invoice / Invoiced). Moving a job to the last two opens a finish box for km, cost and mechanic. Next due = odometer + the van's interval (10,000 km for every van). Mechanics are their own list.
+- **Services**: Booked → At mechanic → Waiting for invoice → Done (stored as Booked / In service / Completed, awaiting invoice / Invoiced). Moving a job to the last two opens a finish box for km, cost and mechanic. Next due = odometer + the van's interval (10,000 km for every van). Mechanics are their own list, with their own column in the Services list.
 - **Fuel**: monthly Metro/WEX statement imported from its MPDATA TXT file, fees and AdBlue included, so totals match the statement.
 - **Vans**: page per van (History, Fuel, Documents, Details + change history); rego/insurance dates table; drivers; tyres; QR stickers for drivers.
 - **Time**: everything is Sydney time (Django `TIME_ZONE = 'Australia/Sydney'`; the frontend's `todayIso()` / `fmtDateTime()` in `lib/formatDate.js` use Australia/Sydney whatever the device is set to). Dates show as dd-mm-yyyy.
@@ -86,12 +87,14 @@ Also fixed: the Incidents list 500'd on every load (`list_incidents()` didn't ac
 
 ## Not yet done
 
-- No automated tests yet (`backend/fleet/tests.py` and `backend/accounts/tests.py` are empty stubs). Changes are checked against the real data inside rolled-back transactions and with a headless-browser read-only tour.
-- Surviving a reboot with nobody logged in needs one manual step: tick "Run whether user is logged on or not" on the "Fleet Maintenance keep-alive" scheduled task (needs the Windows password).
-- No auto-deploy: after a change, build the frontend (`npx vite build`), run migrations, stop the server and let the keep-alive task start it (or `Start-ScheduledTask 'Fleet Maintenance keep-alive'`).
+- **Drive photos on the orders PC**: the Google sign-in was done on the development PC (2026-10-06, as achievecafeprovisions@gmail.com). `backend/secrets/drive-token.json` still has to be copied to the orders PC's `fleet-maintenance/backend/secrets/`; until then photos are saved on the orders PC's disk (and don't move to Drive later).
+- **OAuth consent screen** (Google Cloud project fleet-maintenance-500122): if it's still in "Testing", publish it ("In production"), or Google expires the Drive sign-in after 7 days.
+- Tests cover only the issue photos so far (`backend/fleet/tests.py`, 4 tests with a fake Drive; the orders PC runs them before every deploy). Other changes are checked against the real data inside rolled-back transactions and with a headless-browser read-only tour.
+- Surviving a reboot with nobody logged in: tick "Run whether user is logged on or not" on the orders PC's "Fleet Maintenance keep-alive" scheduled task (needs the Windows password), if not done already.
 
 ## Infra
 
-- **Local dev**: Django on `127.0.0.1:8011`, Vite on port `5174` (proxying `/api` only — no `/media`, since this app has no file uploads). `start-dev.bat`/`stop-dev.bat` run both hidden in the background, same pattern as NPD Tracker.
+- **Local dev**: Django on `127.0.0.1:8011`, Vite on port `5174` (proxying `/api` only; uploaded files are streamed through `/api/attachments/<id>/file/`, never from `/media`). `start-dev.bat`/`stop-dev.bat` run both hidden in the background, same pattern as NPD Tracker.
 - **Postgres**: local instance (same Windows Postgres service NPD Tracker uses), database `fleet_management`, role `fleet_maintenance`. Connection details in `backend/.env` (gitignored).
 - **GitHub**: `bigyan1997/fleet-maintainance` (public repo, same no-AI-attribution policy as NPD Tracker).
+- **Google**: service account (Sheets mirror) key `backend/secrets/service-account.json`; Drive photos use an OAuth "Desktop app" client `backend/secrets/drive-oauth-client.json` + the token `backend/secrets/drive-token.json` written by `drive_sign_in.bat` (`manage.py drive_authorize`). All gitignored; each server needs its own copy. Settings: `FLEET_DRIVE_TOKEN_FILE`, `FLEET_DRIVE_CLIENT_SECRETS`, `FLEET_DRIVE_ROOT_FOLDER` (default "Fleet Maintenance Photos").
