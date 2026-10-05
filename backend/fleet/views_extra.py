@@ -159,9 +159,11 @@ class AttachmentViewSet(viewsets.ViewSet):
         if kind == ISSUE_PHOTO and job and drive.enabled():
             try:
                 client = drive.DriveClient()
-                meta = client.upload(drive.ensure_folder(client, job), upload.name, upload.read(), content_type)
+                folder = drive.ensure_folder(client, job)
+                name = drive.photo_name(client, folder, job, upload.name)
+                meta = client.upload(folder, name, upload.read(), content_type)
                 att = Attachment.objects.create(
-                    **fields, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
+                    **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
                 )
             except Exception:
                 # Never lose the photo: keep it on this PC instead.

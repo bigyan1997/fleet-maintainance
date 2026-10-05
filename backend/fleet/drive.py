@@ -3,18 +3,21 @@ Issue photos (services) and damage photos (incidents) kept in Google Drive,
 the same way NPD Tracker keeps its product photos:
 
     Fleet Maintenance Photos/
-        <Van>/
-            <dd-mm-yyyy> <service type>/
-            <dd-mm-yyyy> Incident - <type>/
+        Incidents/
+            <Van>/
+                06-10-2026.jpg, 06-10-2026 (2).jpg   (named by the incident's date)
+        Services/
+            <Van>/
+                07-10-2026.jpg                       (named by the service's date)
 
 The Drive is the achievecafeprovisions@gmail.com account's. A personal
 account can't take files from a service account (no storage quota), so the
 app acts as that account through an OAuth refresh token, written once by
 `manage.py drive_authorize` (FLEET_DRIVE_TOKEN_FILE).
 
-Drive is the source of truth: photos added to a job's folder in the Drive
-app show up in Fleet the next time the job is opened, and ones deleted there
-disappear. Without a token (dev, tests) photos are stored on local disk like
+Drive is the source of truth: a photo dropped into a van's folder in the
+Drive app, named with a job's date, shows up on that job the next time it's
+opened, and photos deleted in Drive disappear from the app. Without a token (dev, tests) photos are stored on local disk like
 any other attachment.
 """
 
@@ -165,30 +168,46 @@ class DriveClient:
 # ── Job folders ────────────────────────────────────────────────────────────
 
 
-def folder_name(job):
-    when = f"{job.date:%d-%m-%Y}"
-    if hasattr(job, "incident_type"):
-        return f"{when} Incident - {job.incident_type}"
-    return f"{when} {job.service_type}"
+def section_name(job):
+    return "Incidents" if hasattr(job, "incident_type") else "Services"
+
+
+def date_name(job):
+    return f"{job.date:%d-%m-%Y}"
 
 
 def ensure_folder(client, job):
-    """The job's Drive folder, created (or re-created, if someone deleted it
-    in Drive) on first use. Stored on the job as drive_folder_id."""
+    """The van's folder under Incidents/ or Services/, created (or re-created,
+    if someone deleted it in Drive) on first use. Stored on the job as
+    drive_folder_id."""
     with _folder_lock:
         job.refresh_from_db(fields=["drive_folder_id"])
         if job.drive_folder_id and client.folder_is_live(job.drive_folder_id):
             return job.drive_folder_id
-        van = client.get_or_create_folder(str(job.vehicle), client.root_folder_id())
-        folder_id = client.create_folder(folder_name(job), van)
+        section = client.get_or_create_folder(section_name(job), client.root_folder_id())
+        folder_id = client.get_or_create_folder(str(job.vehicle), section)
         type(job).objects.filter(pk=job.pk).update(drive_folder_id=folder_id)
         job.drive_folder_id = folder_id
         return folder_id
 
 
+def photo_name(client, folder_id, job, original_name):
+    """The job's date plus the original extension: 06-10-2026.jpg, then
+    06-10-2026 (2).jpg and so on for more photos that day."""
+    ext = ("." + original_name.rsplit(".", 1)[-1].lower()) if "." in original_name else ""
+    taken = {f["name"].lower() for f in client.list_images(folder_id)}
+    base, n = date_name(job), 1
+    name = f"{base}{ext}"
+    while name.lower() in taken:
+        n += 1
+        name = f"{base} ({n}){ext}"
+    return name
+
+
 def sync_job(job):
-    """Bring a job's photo list in line with its Drive folder: add photos
-    dropped in through Drive, drop ones deleted there. Best-effort."""
+    """Bring a job's photo list in line with its van folder: photos deleted in
+    Drive go; photos dropped in through Drive and named with the job's date
+    are added to it. Best-effort."""
     from .models import ISSUE_PHOTO, Attachment
 
     if not (job.drive_folder_id and enabled()):
@@ -199,21 +218,20 @@ def sync_job(job):
         logger.exception("Drive sync failed for %s %s", type(job).__name__, job.pk)
         return
     link = {"service": job} if hasattr(job, "service_type") else {"incident": job}
+    known = dict(Attachment.objects.filter(drive_file_id__in=[f["id"] for f in files]).values_list("drive_file_id", "pk"))
     seen = set()
     for meta in files:
+        fields = {
+            "original_name": meta["name"][:255],
+            "content_type": meta.get("mimeType", ""),
+            "size": int(meta.get("size") or 0),
+            "drive_modified_at": parse_time(meta.get("modifiedTime")),
+        }
+        if meta["id"] in known:
+            Attachment.objects.filter(pk=known[meta["id"]], **link).update(**fields)
+        elif meta["name"].startswith(date_name(job)):
+            Attachment.objects.create(**link, **fields, vehicle=job.vehicle, kind=ISSUE_PHOTO, drive_file_id=meta["id"])
         seen.add(meta["id"])
-        Attachment.objects.update_or_create(
-            drive_file_id=meta["id"],
-            defaults={
-                **link,
-                "vehicle": job.vehicle,
-                "kind": ISSUE_PHOTO,
-                "original_name": meta["name"][:255],
-                "content_type": meta.get("mimeType", ""),
-                "size": int(meta.get("size") or 0),
-                "drive_modified_at": parse_time(meta.get("modifiedTime")),
-            },
-        )
     Attachment.objects.filter(**link, drive_file_id__isnull=False).exclude(drive_file_id__in=seen).delete()
 
 

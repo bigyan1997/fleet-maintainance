@@ -35,7 +35,7 @@ Start here each day.
 1. Click **+ Log service**.
 2. Pick the **Van** and **What** (e.g. Scheduled service), the **Date** and **Status = Booked**.
 3. Pick the **Mechanic**. For someone new, choose **+ Add new mechanic…** and type the name.
-4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job. Underneath, **+ Add photo** adds photos of the problem (on a phone it can open the camera); click a photo to see it full size. They're kept in Google Drive in **Fleet Maintenance Photos › van › job** (**Open in Google Drive ↗**), and photos you drop into that folder in Drive show up in the app too. Incidents have the same thing for **Photos of the damage**.
+4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job. Underneath, **+ Add photo** adds photos of the problem (on a phone it can open the camera); click a photo to see it full size. They're kept in Google Drive in **Fleet Maintenance Photos › Services › van** (incidents: **› Incidents › van**), named by the job's date, e.g. 06-10-2026.jpg (**Open in Google Drive ↗**). A photo you drop into that folder in Drive, named with the job's date, shows up on that job too. Incidents have the same thing for **Photos of the damage**.
 5. **Save record**.
 
 ### When the work is done
