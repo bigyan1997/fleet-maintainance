@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { deleteTollStatement, fetchTolls, uploadTollStatement } from '../api/extra'
+import { deleteTollStatement, fetchTolls, setTollDone, uploadTollStatement } from '../api/extra'
+import { fetchLinks } from '../api/links'
 import { useActions } from '../lib/actions'
 import { fmtDate } from '../lib/formatDate'
 import { href } from '../lib/router'
@@ -9,13 +10,13 @@ import { ConfirmDialog } from './ConfirmDialog'
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const errorText = (err) => err?.response?.data?.detail || 'Something went wrong reading that file.'
 const period = (s) => `${fmtDate(s.periodStart)} to ${fmtDate(s.periodEnd)}`
-const TONES = { due: 'bg-due-bg text-due', warn: 'bg-warn-bg text-warn', info: 'bg-[#e8f1fb] text-primary' }
 
 // Upload the monthly E-Toll statement PDF, check the totals per van, import.
 function TollImport({ onClose, onImported }) {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const queryClient = useQueryClient()
+  const links = useQuery({ queryKey: ['links'], queryFn: fetchLinks, staleTime: Infinity })
   const previewMutation = useMutation({ mutationFn: (f) => uploadTollStatement(f), onSuccess: setPreview })
   const importMutation = useMutation({
     mutationFn: () => uploadTollStatement(file, true),
@@ -35,7 +36,10 @@ function TollImport({ onClose, onImported }) {
       <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col rounded-xl bg-white" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-line px-6 py-4">
           <h3 className="text-base font-semibold text-ink">Import toll statement</h3>
-          <p className="mt-1 text-[13px] text-off">Upload the monthly <b>E-Toll Statement / Tax Invoice</b> PDF, exactly as it's emailed.</p>
+          <p className="mt-1 text-[13px] text-off">
+            Upload the monthly <b>E-Toll Statement / Tax Invoice</b> PDF, exactly as it's emailed.{' '}
+            {links.data?.drive ? 'The PDF is kept in Google Drive (Tolls folder).' : links.data?.drive === false ? "Google Drive isn't connected on this server yet, so the PDF is kept on the server for now." : ''}
+          </p>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <input
@@ -118,66 +122,54 @@ function Tile({ label, value, sub, tone }) {
   )
 }
 
-// One van's trips, newest first; fee lines sit under the trip they belong to.
-// A flagged trip's whole row is coloured: red for a weekend or a possible
-// double charge, yellow for after 12 pm or a tag that wasn't read.
-function Trips({ rows }) {
-  const tag = 'ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium'
-  const tone = (r) => (r.weekend || r.double ? 'bg-due-bg' : r.late || (r.byPlate && !r.isFee) ? 'bg-warn-bg' : '')
-  return (
-    <table className="w-full border-separate border-spacing-y-0.5 text-xs">
-      <thead>
-        <tr className="text-left text-off">
-          <th className="py-1 pr-3 pl-2 font-medium">Date</th>
-          <th className="py-1 pr-3 font-medium">Time</th>
-          <th className="py-1 pr-3 font-medium">Toll road</th>
-          <th className="py-1 pr-3 font-medium">Where</th>
-          <th className="py-1 pr-2 text-right font-medium">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} className={`${tone(r)} ${r.isFee ? 'text-due' : ''}`}>
-            <td className="rounded-l py-1 pr-3 pl-2 whitespace-nowrap">{r.day} {fmtDate(r.date)}</td>
-            <td className="py-1 pr-3">{r.time}</td>
-            <td className="py-1 pr-3">{r.road}</td>
-            <td className="py-1 pr-3">
-              {r.detail}
-              {r.weekend && <span className={`${tag} bg-due text-white`}>weekend</span>}
-              {r.double && <span className={`${tag} bg-due text-white`}>possible double charge</span>}
-              {r.late && <span className={`${tag} bg-warn text-white`}>after 12 pm</span>}
-              {r.byPlate && !r.isFee && <span className={`${tag} bg-warn text-white`}>tag not read</span>}
-            </td>
-            <td className="rounded-r py-1 pr-2 text-right tabular-nums">{money(r.amount)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-const VIEWS = [
-  { key: 'vans', label: 'By van' },
-  { key: 'doubles', label: 'Double charges' },
-  { key: 'odd', label: 'Odd times' },
-  { key: 'runs', label: 'Regular runs' },
-  { key: 'daily', label: 'Day by day' },
-  { key: 'compare', label: 'Month to month' },
-]
 const box = 'overflow-x-auto rounded-lg border border-line bg-white'
 const th = 'px-3 py-2.5 font-medium'
 const td = 'px-3 py-2.5'
 const num = 'px-3 py-2.5 text-right tabular-nums whitespace-nowrap'
 const head = 'border-b border-line text-left text-xs text-off'
 const nothing = 'px-4 py-8 text-center text-[13px] text-off'
+const CHIP = 'rounded px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap'
+const RED = `${CHIP} bg-due-bg text-due`
+const GREY = `${CHIP} bg-[#eef1f5] text-[#4b5563]`
 
-// The same toll point charged twice within a few minutes.
-function Doubles({ rows }) {
+// "23:45" -> "11:45 pm"
+const clock = (t) => {
+  const [h, m] = t.split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
+}
+const shortDate = (iso) => fmtDate(iso).slice(0, 5)
+
+// A trip's row is coloured when it's flagged: red for a weekend or a possible
+// double charge, yellow for after 12 pm or a tag that wasn't read.
+function TripList({ rows }) {
+  const tone = (r) => (r.weekend || r.double ? 'bg-due-bg' : r.late || (r.byPlate && !r.isFee) ? 'bg-warn-bg' : '')
+  const tag = 'ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium text-white'
+  return (
+    <div className="text-[12.5px]">
+      {rows.map((r, i) => (
+        <div key={i} className={`mt-0.5 flex gap-3 rounded px-2.5 py-1 ${tone(r)} ${r.isFee ? 'text-due' : ''}`}>
+          <span className="w-[64px] shrink-0 text-off">{clock(r.time)}</span>
+          <span className="min-w-0 flex-1">
+            {r.road} · {r.detail}
+            {r.weekend && <span className={`${tag} bg-due`}>weekend</span>}
+            {r.double && <span className={`${tag} bg-due`}>possible double charge</span>}
+            {r.late && <span className={`${tag} bg-warn`}>after 12 pm</span>}
+            {r.byPlate && !r.isFee && <span className={`${tag} bg-warn`}>tag not read</span>}
+          </span>
+          <span className="tabular-nums">{money(r.amount)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// The same van charged at the same toll point twice within a few minutes.
+function Doubles({ rows, onShow }) {
   if (!rows.length) return <div className={`${box} ${nothing}`}>No double charges found on this statement.</div>
   return (
     <div className={box}>
       <p className="px-4 pt-3 pb-1 text-[13px] text-off">
-        The same van charged at the same toll point again within 15 minutes. Check these against the PDF, then dispute them with E-Toll (13 18 65) within 90 days of the statement.
+        The same van charged at the same toll point again within 15 minutes. Check these against the PDF, then dispute them with E-Toll (13 18 65) within 90 days of the statement. Click one to see the van's trips.
       </p>
       <table className="w-full min-w-[620px] border-collapse text-[13px]">
         <thead>
@@ -188,11 +180,11 @@ function Doubles({ rows }) {
         </thead>
         <tbody>
           {rows.map((d, i) => (
-            <tr key={i} className="border-b border-[#f0f0f0] last:border-0">
-              <td className={`${td} font-medium`}>{d.label}</td>
+            <tr key={i} onClick={() => onShow(d.vehicle, 'double')} className="cursor-pointer border-b border-[#f0f0f0] last:border-0 hover:bg-[#f0f5fb]">
+              <td className={`${td} font-medium text-primary`}>{d.label}</td>
               <td className={`${td} whitespace-nowrap`}>{fmtDate(d.date)}</td>
               <td className={td}>{d.road}<div className="text-xs text-off">{d.detail}</div></td>
-              <td className={td}>{d.times.join(' and ')}</td>
+              <td className={td}>{d.times.map(clock).join(' and ')}</td>
               <td className={num}>{money(d.amount)}</td>
               <td className={`${num} font-semibold text-due`}>{money(d.extra)}</td>
             </tr>
@@ -203,10 +195,17 @@ function Doubles({ rows }) {
   )
 }
 
-// Trips at or after 12 pm, or on a Saturday or Sunday.
+// Trips at or after 12 pm, or on a Saturday or Sunday, van by van.
 function OddTimes({ vans }) {
   const [open, setOpen] = useState(null)
-  if (!vans.length) return <div className={`${box} ${nothing}`}>No trips after 12 pm or on a weekend.</div>
+  const rows = vans
+    .map((v) => {
+      const flagged = v.rows.filter((r) => !r.isFee && (r.weekend || r.late))
+      return { ...v, flagged, flaggedCost: flagged.reduce((s, r) => s + Number(r.amount), 0) }
+    })
+    .filter((v) => v.flagged.length)
+    .sort((a, b) => b.weekend - a.weekend || b.flagged.length - a.flagged.length)
+  if (!rows.length) return <div className={`${box} ${nothing}`}>No trips after 12 pm or on a weekend.</div>
   return (
     <div className={box}>
       <p className="px-4 pt-3 pb-1 text-[13px] text-off">Trips at or after <b>12 pm</b>, or on a <b>Saturday or Sunday</b>. Click a van to see them.</p>
@@ -218,33 +217,27 @@ function OddTimes({ vans }) {
           </tr>
         </thead>
         <tbody>
-          {vans.map((v) => [
+          {rows.map((v) => [
             <tr key={v.vehicle} onClick={() => setOpen(open === v.vehicle ? null : v.vehicle)} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb]">
               <td className={`${td} font-medium text-primary`}>{v.label}</td>
               <td className={`${num} ${v.weekend ? 'font-semibold text-due' : 'text-off'}`}>{v.weekend || '—'}</td>
               <td className={`${num} ${v.late ? '' : 'text-off'}`}>{v.late || '—'}</td>
-              <td className={num}>{v.trips}</td>
-              <td className={`${num} font-medium`}>{money(v.total)}</td>
+              <td className={num}>{v.flagged.length}</td>
+              <td className={`${num} font-medium`}>{money(v.flaggedCost)}</td>
             </tr>,
             open === v.vehicle && (
               <tr key={`${v.vehicle}-rows`} className="border-b border-[#f0f0f0] bg-[#fafafa]">
                 <td colSpan={5} className="px-4 py-2">
-                  <table className="w-full text-xs">
-                    <tbody>
-                      {v.rows.map((r, i) => (
-                        <tr key={i}>
-                          <td className="py-1 pr-3 whitespace-nowrap">{r.day} {fmtDate(r.date)}</td>
-                          <td className="py-1 pr-3">{r.time}</td>
-                          <td className="py-1 pr-3">{r.road}: {r.detail}</td>
-                          <td className="py-1 pr-3 whitespace-nowrap">
-                            {r.weekend && <span className="mr-1 rounded bg-due-bg px-1.5 py-0.5 text-[11px] font-medium text-due">weekend</span>}
-                            {r.late && <span className="rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">after 12 pm</span>}
-                          </td>
-                          <td className="py-1 text-right tabular-nums">{money(r.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {v.flagged.map((r, i) => (
+                    <div key={i} className="text-[12.5px]">
+                      <div className={`mt-0.5 flex gap-3 rounded px-2.5 py-1 ${r.weekend ? 'bg-due-bg' : 'bg-warn-bg'}`}>
+                        <span className="w-[130px] shrink-0 text-off">{r.day} {fmtDate(r.date)}</span>
+                        <span className="w-[64px] shrink-0 text-off">{clock(r.time)}</span>
+                        <span className="min-w-0 flex-1">{r.road} · {r.detail}</span>
+                        <span className="tabular-nums">{money(r.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </td>
               </tr>
             ),
@@ -255,55 +248,237 @@ function OddTimes({ vans }) {
   )
 }
 
-// What each van's usual day looks like, and what stands out.
+// Each van's usual run: what a usual day costs, the toll points it uses most, its dearest days.
 function Runs({ runs }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {runs.map((r) => (
         <div key={r.vehicle} className="rounded-lg border border-line bg-white p-4 text-[13px]">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-[14px] font-semibold text-ink">{r.label}</span>
             <span className="text-off">{r.days} days on toll roads · usual day <b className="text-ink">{money(r.usualCost)}</b> · {money(r.total)} in all</span>
           </div>
-          {r.common ? (
-            <div className="mt-3 rounded-md bg-[#f5f8fc] px-3 py-2">
-              <div className="mb-1 font-medium">Regular run: the same tolls on {r.common.days} days, {money(r.common.cost)} a day</div>
-              <ol className="text-xs text-off">
-                {r.common.stops.map((s, i) => <li key={i}>{s.time} · {s.road}: {s.detail} · {money(s.amount)}</li>)}
-              </ol>
-            </div>
-          ) : (
-            <div className="mt-3 rounded-md bg-[#fafafa] px-3 py-2 text-xs text-off">No two days are quite the same for this van, so there's no single regular run.</div>
-          )}
-          <div className="mt-3 mb-1 font-medium">Toll points it uses most</div>
-          <ul className="text-xs text-off">
-            {r.points.map((p, i) => <li key={i}>{p.road}: {p.detail} · {p.days} day{p.days === 1 ? '' : 's'} · {money(p.total)}</li>)}
-          </ul>
+          <RunCard r={r} />
           <div className="mt-3 mb-1 font-medium">Dearest days</div>
           <div className="text-xs text-off">{r.dearest.map((d) => `${fmtDate(d.date)} ${money(d.total)} (${d.trips} trips)`).join(' · ')}</div>
-          {r.oneOffs.length > 0 && (
-            <details className="mt-3">
-              <summary className="cursor-pointer font-medium text-primary">{r.oneOffs.length} one-off trip{r.oneOffs.length === 1 ? '' : 's'} (toll points used on one day only)</summary>
-              <ul className="mt-1 text-xs text-off">
-                {r.oneOffs.map((o, i) => <li key={i}>{fmtDate(o.date)} {o.time} · {o.road}: {o.detail} · {money(o.amount)}</li>)}
-              </ul>
-            </details>
-          )}
         </div>
       ))}
     </div>
   )
 }
 
-// One bar per day, then every van's tolls for every day. Click a square
+// What needs someone to do something, most important first.
+function Todo({ items, onShow, onTick }) {
+  const [showDone, setShowDone] = useState(false)
+  const open = items.filter((i) => !i.done)
+  const done = items.filter((i) => i.done)
+  const dot = { due: 'bg-due-bg text-due', warn: 'bg-warn-bg text-warn' }
+  return (
+    <div className="mb-4 rounded-lg border border-line bg-white">
+      <div className="px-4 pt-3 pb-1">
+        <span className="text-[15px] font-semibold text-ink">To do</span>
+        {open.length > 0 && <span className="ml-1.5 rounded-full bg-due-bg px-2 py-0.5 text-xs font-medium text-due">{open.length}</span>}
+        <span className="ml-2 text-xs text-off">only things that need you to do something, most important first</span>
+      </div>
+      {open.length === 0 ? (
+        <div className="px-4 py-5 text-center text-[13px] text-ok">Nothing to do on this statement. ✓</div>
+      ) : (
+        open.map((it, i) => (
+          <div key={it.key} className="flex flex-wrap items-center gap-3 border-t border-[#f0f2f5] px-4 py-3">
+            <span className={`grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[13px] font-bold ${dot[it.tone]}`}>{i + 1}</span>
+            <div className="min-w-[240px] flex-1">
+              <div className="text-[14px] font-semibold text-ink">{it.title}</div>
+              <div className="text-xs text-off">{it.text}</div>
+            </div>
+            <button onClick={() => onShow(it.vehicle, it.filter)} className="rounded-md border border-line bg-white px-3 py-1 text-[13px] font-medium hover:bg-[#f5f5f5]">Show trips</button>
+            <button onClick={() => onTick(it.key, true)} className="rounded-md border border-line bg-white px-3 py-1 text-[13px] font-medium hover:bg-ok-bg hover:text-ok">✓ Done</button>
+          </div>
+        ))
+      )}
+      {done.length > 0 && (
+        <div className="border-t border-[#f0f2f5] px-4 py-2 text-xs">
+          <button onClick={() => setShowDone(!showDone)} className="font-medium text-primary hover:underline">{showDone ? '▾' : '▸'} Done ({done.length})</button>
+          {showDone && done.map((it) => (
+            <div key={it.key} className="mt-1 flex items-center gap-3 text-off">
+              <span className="flex-1 line-through">{it.title}</span>
+              <button onClick={() => onTick(it.key, false)} className="font-medium text-primary hover:underline">Undo</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// One van, as a row: its figures and what's wrong, in words.
+function VanTable({ data, onOpen }) {
+  return (
+    <div className={box}>
+      <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">Vans <span className="text-xs font-normal text-off">· click a van to see its trips</span></div>
+      <table className="w-full min-w-[640px] border-collapse text-[13px]">
+        <thead>
+          <tr className={head}>
+            <th className={th}>Van</th>
+            <th className={`${th} text-right`}>Tolls</th>
+            <th className={`${th} text-right`}>Trips</th>
+            <th className={`${th} text-right`}>Usual day</th>
+            <th className={th}>What's flagged</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.vans.map((v) => (
+            <tr key={v.vehicle} onClick={() => onOpen(v.vehicle, 'all')} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb]">
+              <td className={td}>
+                <span className="font-medium text-primary">{v.label}</span>
+                <div className="text-xs text-off">{v.sub}</div>
+              </td>
+              <td className={`${num} font-semibold`}>{money(v.total)}</td>
+              <td className={num}>{v.trips}</td>
+              <td className={num}>{money(v.usual)}</td>
+              <td className="px-3 py-2.5">
+                <div className="flex flex-wrap gap-1">
+                  {Number(v.fees) > 0 && <span className={RED}>tag not working · {money(v.fees)} fees</span>}
+                  {Number(v.doubleExtra) > 0 && <span className={RED}>charged twice? {money(v.doubleExtra)}</span>}
+                  {v.weekend > 0 && <span className={RED}>{v.weekend} weekend</span>}
+                  {v.heavyDays > 0 && <span className={RED}>{v.heavyDays} heavy day{v.heavyDays === 1 ? '' : 's'}</span>}
+                  {v.shift && <span className={GREY}>new run from {shortDate(v.shift.date)}</span>}
+                  {v.late > 0 && <span className={GREY}>{v.late} after 12 pm</span>}
+                </div>
+              </td>
+            </tr>
+          ))}
+          <tr className="bg-[#f5f8fc] font-semibold">
+            <td className={td}>All vans</td>
+            <td className={num}>{money(data.total)}</td>
+            <td className={num}>{data.trips}</td>
+            <td colSpan={2} />
+          </tr>
+        </tbody>
+      </table>
+      <p className="px-4 py-2 text-xs text-off">
+        {data.quiet.length > 0 && <>No toll trips this statement: {data.quiet.join(', ')}. </>}
+        {Number(data.otherTotal) > 0 && <>The statement's total is {money(data.statementTotal)}; the other {money(data.otherTotal)} is for vehicles that aren't fleet vans, left out here.</>}
+      </p>
+    </div>
+  )
+}
+
+// A van's usual run and the toll points it uses most.
+function RunCard({ r }) {
+  return (
+    <div className="text-[13px]">
+      {r.common ? (
+        <div className="rounded-md bg-[#f5f8fc] px-3 py-2">
+          <div className="mb-1 font-medium">Regular run: the same tolls on {r.common.days} days, {money(r.common.cost)} a day</div>
+          <ol className="text-xs text-off">
+            {r.common.stops.map((s, i) => <li key={i}>{clock(s.time)} · {s.road}: {s.detail} · {money(s.amount)}</li>)}
+          </ol>
+        </div>
+      ) : (
+        <div className="rounded-md bg-[#fafafa] px-3 py-2 text-xs text-off">No two days are quite the same for this van, so there's no single regular run.</div>
+      )}
+      <div className="mt-3 mb-1 font-medium">Toll points it uses most</div>
+      <ul className="text-xs text-off">
+        {r.points.map((p, i) => <li key={i}>{p.road}: {p.detail} · {p.days} day{p.days === 1 ? '' : 's'} · {money(p.total)}</li>)}
+      </ul>
+      {r.oneOffs.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer font-medium text-primary">{r.oneOffs.length} one-off trip{r.oneOffs.length === 1 ? '' : 's'} (toll points used on one day only)</summary>
+          <ul className="mt-1 text-xs text-off">
+            {r.oneOffs.map((o, i) => <li key={i}>{fmtDate(o.date)} {clock(o.time)} · {o.road}: {o.detail} · {money(o.amount)}</li>)}
+          </ul>
+        </details>
+      )}
+    </div>
+  )
+}
+
+const FILTERS = [
+  { key: 'all', label: 'All trips' },
+  { key: 'weekend', label: 'Weekend' },
+  { key: 'late', label: 'After 12 pm' },
+  { key: 'heavy', label: 'Heavy days' },
+  { key: 'double', label: 'Double charges' },
+  { key: 'tag', label: 'Tag not read' },
+]
+
+// One van: its trips grouped by day, with filters for what's flagged.
+function VanDetail({ van, cells, run, filter, setFilter, onBack }) {
+  const heavyDates = new Set(Object.entries(cells).filter(([, c]) => c.heavy).map(([d]) => d))
+  const counts = { all: van.rows.length, weekend: van.weekend, late: van.late, heavy: van.heavyDays, double: van.doubles, tag: van.plateTrips }
+  const match = {
+    all: () => true, weekend: (r) => r.weekend, late: (r) => r.late, heavy: (r) => heavyDates.has(r.date),
+    double: (r) => r.double, tag: (r) => r.byPlate,
+  }[filter] ?? (() => true)
+  const groups = []
+  for (const r of van.rows.filter(match)) {
+    const last = groups[groups.length - 1]
+    if (last && last.date === r.date) last.rows.push(r)
+    else groups.push({ date: r.date, day: r.day, rows: [r] })
+  }
+  return (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <button onClick={onBack} className="mb-2 text-[13px] font-medium text-primary hover:underline">‹ All vans</button>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-[17px] font-semibold text-ink">{van.label}</span>
+        <span className="text-xs text-off">{van.sub}</span>
+        <a href={href('vans', van.vehicle)} className="text-xs font-medium text-primary no-underline hover:underline">Van page →</a>
+        <span className="ml-auto text-xs text-off">
+          {money(van.total)} · {van.trips} trips · {Object.keys(cells).length} days on toll roads · usual day {money(van.usual)}
+        </span>
+      </div>
+      {van.shift && (
+        <p className="mt-2 rounded-md bg-[#eef1f5] px-3 py-1.5 text-xs text-[#4b5563]">
+          This van's usual day went up from {fmtDate(van.shift.date)}: about {money(van.shift.before)} before, about {money(van.shift.after)} since. Its days are judged against each part, not the whole month.
+        </p>
+      )}
+      <div className="mt-3 mb-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-off">Show:</span>
+        {FILTERS.filter((f) => f.key === 'all' || filter === f.key || counts[f.key] > 0).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={'rounded-md px-2.5 py-1 text-[13px] font-medium ' + (filter === f.key ? 'bg-primary text-white' : 'bg-white text-off ring-1 ring-line hover:text-ink')}
+          >
+            {f.label}{f.key !== 'all' && <span className="ml-1 opacity-80">{counts[f.key]}</span>}
+          </button>
+        ))}
+      </div>
+
+      {groups.length === 0 && <div className={nothing}>No trips match.</div>}
+      {groups.map((g) => {
+        const cell = cells[g.date]
+        const weekend = g.day === 'Sat' || g.day === 'Sun'
+        return (
+          <div key={g.date} className="mb-1">
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-[#f5f8fc] px-2.5 py-1.5 text-[13px] font-semibold">
+              <span>{g.day} {fmtDate(g.date)}</span>
+              {weekend && <span className={RED}>weekend</span>}
+              {cell?.heavy && <span className={RED}>heavy day · {cell.times}× its usual</span>}
+              <span className="ml-auto">{money(g.rows.reduce((s, r) => s + Number(r.amount), 0))} · {g.rows.filter((r) => !r.isFee).length} trip{g.rows.filter((r) => !r.isFee).length === 1 ? '' : 's'}</span>
+            </div>
+            <TripList rows={g.rows} />
+          </div>
+        )
+      })}
+
+      {run && (
+        <details className="mt-4 border-t border-line pt-3">
+          <summary className="cursor-pointer text-[13px] font-medium text-primary">Its usual run and most-used toll points</summary>
+          <div className="mt-2"><RunCard r={run} /></div>
+        </details>
+      )}
+    </div>
+  )
+}
+
+// Heavy days, then every van's tolls for every day. Click a square
 // for that van's trips that day, or a date for every van that day.
 function Daily({ data }) {
   const { daily: days, earlier, grid, heavy, vans } = data
   const [sel, setSel] = useState(null) // { date, vehicle? }
   const [allHeavy, setAllHeavy] = useState(false)
-  const max = Math.max(...days.map((d) => Number(d.total)), 1)
   const cellMax = Math.max(...grid.flatMap((v) => Object.values(v.cells).map((c) => Number(c.total))), 1)
-  const busiest = [...days].sort((a, b) => Number(b.total) - Number(a.total)).slice(0, 3)
   const pick = (date, vehicle) => setSel(sel && sel.date === date && sel.vehicle === vehicle ? null : { date, vehicle })
   const tripsOn = (v, date) => (vans.find((x) => x.vehicle === v)?.rows ?? []).filter((r) => r.date === date)
   const dayName = (date) => days.find((d) => d.date === date)
@@ -311,27 +486,6 @@ function Daily({ data }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-line bg-white p-4">
-        <div className="mb-3 text-[13px] text-off">
-          Dearest days: {busiest.map((d) => `${fmtDate(d.date)} ${money(d.total)}`).join(' · ')}. Grey columns are weekends; a red bar is tolls on a weekend.
-        </div>
-        <div className="overflow-x-auto">
-          <div className="flex h-[160px] min-w-[620px] items-end gap-1">
-            {days.map((d) => (
-              <div key={d.date} onClick={() => pick(d.date)} title={`${fmtDate(d.date)}: ${money(d.total)}, ${d.trips} trips`} className={`flex h-full flex-1 cursor-pointer flex-col justify-end rounded-t ${d.weekend ? 'bg-[#f1f3f6]' : ''}`}>
-                <div className={`rounded-t ${d.weekend ? 'bg-due' : 'bg-primary'}`} style={{ height: `${(Number(d.total) / max) * 100}%` }} />
-              </div>
-            ))}
-          </div>
-          <div className="flex min-w-[620px] gap-1 pt-1 text-[10px] text-off">
-            {days.map((d) => <div key={d.date} className="flex-1 text-center">{d.date.slice(8)}</div>)}
-          </div>
-        </div>
-        {earlier.trips > 0 && (
-          <p className="mt-3 text-xs text-off">Not on the chart: {earlier.trips} trips from before this period that were billed late ({money(earlier.total)}).</p>
-        )}
-      </div>
-
       <div className="rounded-lg border border-line bg-white p-4">
         <div className="mb-1 text-[14px] font-semibold text-ink">Heavy days {heavy.length > 0 && <span className="ml-1 rounded-full bg-due-bg px-2 py-0.5 text-xs text-due">{heavy.length}</span>}</div>
         <p className="mb-2 text-xs text-off">Days where a van's tolls were at least 1.5 times its usual day, and $10 or more above it. Biggest first; click one to see the trips.</p>
@@ -412,8 +566,11 @@ function Daily({ data }) {
         {sel && sel.vehicle && (
           <div className="mt-4 rounded-md bg-[#fafafa] p-3">
             <div className="mb-1 text-[13px] font-semibold">{grid.find((v) => v.vehicle === sel.vehicle)?.label} on {weekday(sel.date)} {fmtDate(sel.date)}</div>
-            <Trips rows={tripsOn(sel.vehicle, sel.date)} />
+            <TripList rows={tripsOn(sel.vehicle, sel.date)} />
           </div>
+        )}
+        {earlier.trips > 0 && (
+          <p className="mt-3 text-xs text-off">Not in the grid: {earlier.trips} trips from before this period that were billed late ({money(earlier.total)}).</p>
         )}
         {sel && !sel.vehicle && (
           <div className="mt-4 rounded-md bg-[#fafafa] p-3">
@@ -479,11 +636,20 @@ function Compare({ compare }) {
   )
 }
 
+const VIEWS = [
+  { key: 'vans', label: 'Vans' },
+  { key: 'doubles', label: 'Double charges' },
+  { key: 'odd', label: 'Odd times' },
+  { key: 'runs', label: 'Regular runs' },
+  { key: 'days', label: 'Days' },
+  { key: 'compare', label: 'Compare months' },
+]
+
 export function TollsView() {
   const [view, setView] = useState('vans')
   const [chosen, setChosen] = useState('')
   const [importing, setImporting] = useState(false)
-  const [open, setOpen] = useState(null)
+  const [open, setOpen] = useState(null) // { id, filter } of the van being looked at
   const [removing, setRemoving] = useState(false)
   const queryClient = useQueryClient()
   const { toast } = useActions()
@@ -496,6 +662,10 @@ export function TollsView() {
       queryClient.invalidateQueries({ queryKey: ['tolls'] })
       toast('Toll statement removed.')
     },
+  })
+  const tick = useMutation({
+    mutationFn: ({ key, done }) => setTollDone(tolls.data.current.statement.id, key, done),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tolls'] }),
   })
 
   const statements = tolls.data?.statements ?? []
@@ -528,8 +698,15 @@ export function TollsView() {
     )
   }
 
-  const top = data.vans[0]
-  const max = Math.max(...data.vans.map((v) => Number(v.total)), 1)
+  const getBack = Number(data.claim) + Number(data.fees)
+  const oddCount = data.vans.reduce((n, v) => n + v.rows.filter((r) => !r.isFee && (r.weekend || r.late)).length, 0)
+  const change = data.compare ? Number(data.compare.now) - Number(data.compare.before) : null
+  const openVan = open && data.vans.find((v) => v.vehicle === open.id)
+  const showTrips = (id, filter) => {
+    setView('vans')
+    setOpen({ id, filter: filter ?? 'all' })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -544,29 +721,36 @@ export function TollsView() {
         <div className="ml-auto">{importButton}</div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Tolls for the vans" value={money(data.total)} sub={`${money(data.perDay)} a day`} />
-        <Tile label="Trips" value={data.trips.toLocaleString()} sub={`${money(Number(data.total) / Math.max(data.trips, 1))} a trip on average`} />
-        <Tile label="Fees for tags not read" value={money(data.fees)} sub={Number(data.fees) ? 'avoidable: see below' : 'none'} tone={Number(data.fees) ? 'due' : undefined} />
-        {top && <Tile label="Biggest van" value={top.label} sub={`${money(top.total)} · ${top.trips} trips`} />}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Tile label="Tolls this statement" value={money(data.total)} sub={`${data.trips} trips · about ${money(data.perDay)} a day`} />
+        {change === null ? (
+          <Tile label="Compared with last statement" value="first one" sub="shows ▲ or ▼ from next month" />
+        ) : (
+          <Tile
+            label="Compared with last statement"
+            value={`${change > 0 ? '▲' : change < 0 ? '▼' : ''} ${money(Math.abs(change))}`}
+            sub={`${change > 0 ? 'more' : 'less'} than ${money(data.compare.before)}${Number(data.compare.before) ? ` (${Math.round((Math.abs(change) / Number(data.compare.before)) * 100)}%)` : ''}`}
+            tone={change > 0 ? 'due' : undefined}
+          />
+        )}
+        <Tile
+          label="Money you can get back or stop losing"
+          value={money(getBack)}
+          sub={`${money(data.claim)} to claim · ${money(data.fees)} in tag fees`}
+          tone={getBack > 0 ? 'due' : undefined}
+        />
       </div>
+      {data.checks.map((c) => <p key={c} className="mb-3 rounded-md bg-warn-bg px-3 py-2 text-[13px] text-warn">Check: {c}</p>)}
 
-      <div className="mb-4 rounded-lg border border-line bg-white p-4">
-        <div className="mb-2 text-[14px] font-semibold text-ink">Worth checking</div>
-        <ul className="space-y-1.5">
-          {data.insights.map((n, i) => (
-            <li key={i} className={`rounded-md px-3 py-2 text-[13px] ${TONES[n.tone] ?? TONES.info}`}>{n.text}</li>
-          ))}
-        </ul>
-      </div>
+      <Todo items={data.todo} onShow={showTrips} onTick={(key, done) => tick.mutate({ key, done })} />
 
-      <div className="mb-4 flex flex-wrap gap-1">
+      <div className="mb-3 flex flex-wrap gap-1">
         {VIEWS.map((v) => {
-          const count = v.key === 'doubles' ? data.doubles.length : v.key === 'odd' ? data.odd.reduce((n, o) => n + o.trips, 0) : 0
+          const count = v.key === 'doubles' ? data.doubles.length : v.key === 'odd' ? oddCount : 0
           return (
             <button
               key={v.key}
-              onClick={() => setView(v.key)}
+              onClick={() => { setView(v.key); setOpen(null) }}
               className={'rounded-md px-3 py-1.5 text-[13px] font-medium ' + (view === v.key ? 'bg-primary text-white' : 'bg-white text-off ring-1 ring-line hover:text-ink')}
             >
               {v.label}{count > 0 && <span className={'ml-1.5 rounded-full px-1.5 text-[11px] ' + (view === v.key ? 'bg-white/25' : 'bg-due-bg text-due')}>{count}</span>}
@@ -575,94 +759,46 @@ export function TollsView() {
         })}
       </div>
 
-      {view === 'doubles' && <Doubles rows={data.doubles} />}
-      {view === 'odd' && <OddTimes vans={data.odd} />}
+      {view === 'doubles' && <Doubles rows={data.doubles} onShow={showTrips} />}
+      {view === 'odd' && <OddTimes vans={data.vans} />}
       {view === 'runs' && <Runs runs={data.runs} />}
-      {view === 'daily' && <Daily data={data} />}
+      {view === 'days' && <Daily data={data} />}
       {view === 'compare' && <Compare compare={data.compare} />}
-
-      {view === 'vans' && (
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By van <span className="text-xs font-normal text-off">· click a van to see its trips</span></div>
-          <table className="w-full min-w-[560px] border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-line text-left text-xs text-off">
-                <th className={th}>Van</th>
-                <th className={`${th} text-right`}>Trips</th>
-                <th className={`${th} text-right`}>Tolls</th>
-                <th className={`${th} text-right`}>Fees</th>
-                <th className={`${th} text-right`}>Total</th>
-                <th className={th} />
-              </tr>
-            </thead>
-            <tbody>
-              {data.vans.map((v) => [
-                <tr key={v.vehicle} onClick={() => setOpen(open === v.vehicle ? null : v.vehicle)} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb]">
-                  <td className="px-3 py-2.5">
-                    <a href={href('vans', v.vehicle)} onClick={(e) => e.stopPropagation()} className="font-medium text-primary no-underline hover:underline">{v.label}</a>
-                    <div className="text-xs text-off">{v.sub}</div>
-                  </td>
-                  <td className={num}>
-                    {v.trips}
-                    {v.weekend > 0 && <div className="text-xs font-medium text-due">{v.weekend} weekend</div>}
-                    {v.doubles > 0 && <div className="text-xs font-medium text-due">possible double charge</div>}
-                    {v.late > 0 && <div className="text-xs text-warn">{v.late} after 12 pm</div>}
-                    {v.plateTrips > 0 && <div className="text-xs text-warn">{v.plateTrips} tag not read</div>}
-                  </td>
-                  <td className={num}>{money(v.tolls)}</td>
-                  <td className={`${num} ${Number(v.fees) ? 'font-medium text-due' : 'text-off'}`}>{Number(v.fees) ? money(v.fees) : '—'}</td>
-                  <td className={`${num} font-semibold`}>{money(v.total)}</td>
-                  <td className="w-[110px] px-3 py-2.5">
-                    <div className="h-2 rounded bg-[#eef1f5]"><div className="h-2 rounded bg-primary" style={{ width: `${(Number(v.total) / max) * 100}%` }} /></div>
-                  </td>
-                </tr>,
-                open === v.vehicle && (
-                  <tr key={`${v.vehicle}-trips`} className="border-b border-[#f0f0f0] bg-[#fafafa]">
-                    <td colSpan={6} className="px-4 py-2"><Trips rows={v.rows} /></td>
-                  </tr>
-                ),
-              ])}
-              <tr className="bg-[#f5f8fc] font-semibold">
-                <td className="px-3 py-2.5">All vans</td>
-                <td className={num}>{data.trips}</td>
-                <td className={num}>{money(Number(data.total) - Number(data.fees))}</td>
-                <td className={num}>{Number(data.fees) ? money(data.fees) : '—'}</td>
-                <td className={num}>{money(data.total)}</td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
-          {Number(data.otherTotal) > 0 && (
-            <p className="px-4 py-2 text-xs text-off">
-              The statement's total is {money(data.statementTotal)}: the other {money(data.otherTotal)} is for vehicles that aren't fleet vans, left out here.
-            </p>
-          )}
-        </div>
-
-        <div className="overflow-x-auto rounded-lg border border-line bg-white">
-          <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By toll road</div>
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-line text-left text-xs text-off">
-                <th className={th}>Toll road</th>
-                <th className={`${th} text-right`}>Trips</th>
-                <th className={`${th} text-right`}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.roads.map((r) => (
-                <tr key={r.road} className="border-b border-[#f0f0f0] last:border-0">
-                  <td className="px-3 py-2.5">{r.road}</td>
-                  <td className={num}>{r.trips}</td>
-                  <td className={`${num} font-medium`}>{money(r.total)}</td>
+      {view === 'vans' && (openVan ? (
+        <VanDetail
+          van={openVan}
+          cells={data.grid.find((g) => g.vehicle === openVan.vehicle)?.cells ?? {}}
+          run={data.runs.find((r) => r.vehicle === openVan.vehicle)}
+          filter={open.filter}
+          setFilter={(f) => setOpen({ id: open.id, filter: f })}
+          onBack={() => setOpen(null)}
+        />
+      ) : (
+        <div className="space-y-4">
+          <VanTable data={data} onOpen={showTrips} />
+          <div className={box}>
+            <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By toll road</div>
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className={head}>
+                  <th className={th}>Toll road</th>
+                  <th className={`${th} text-right`}>Trips</th>
+                  <th className={`${th} text-right`}>Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.roads.map((r) => (
+                  <tr key={r.road} className="border-b border-[#f0f0f0] last:border-0">
+                    <td className={td}>{r.road}</td>
+                    <td className={num}>{r.trips}</td>
+                    <td className={`${num} font-medium`}>{money(r.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-      )}
+      ))}
 
       {importPopup}
       {removing && (

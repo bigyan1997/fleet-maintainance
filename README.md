@@ -4,14 +4,14 @@ Vehicle fleet tracker for Achieve Cafe Provisions — vehicles, service history,
 
 **Using the app?** See **[USAGE.md](USAGE.md)**: what each screen is for and how to do everyday jobs.
 
-**Status: live on the orders PC, next to NPD Tracker v2 (which has port 8001).** Served by waitress on port 8002 (`run_server.bat`), kept running by `keep-alive.ps1` (scheduled task every 5 minutes) and auto-deployed from `main` by `auto_deploy.ps1` (every 5 minutes; tests, builds, migrates, restarts, rolls back on failure) — same setup as NPD Tracker v2. Open it at http://orders-hostcomputer:8002 over Tailscale. Project history and decisions are in [NOTES.md](NOTES.md).
+**Status: live on the orders PC, next to NPD Tracker v2 (which has port 8001).** Served by waitress on port 8002 (`run_server.bat`), kept running by `keep-alive.ps1` (scheduled task every 5 minutes) and auto-deployed from `main` by `auto_deploy.ps1` (every 5 minutes; tests, builds, migrates, restarts, rolls back on failure) — same setup as NPD Tracker v2. Open it at http://orders-hostcomputer:8002 over Tailscale. Project history and decisions are in [NOTES.md](NOTES.md); notes for Claude Code are in [CLAUDE.md](CLAUDE.md) and `docs/claude-memory/`.
 
 ## Architecture
 
 - **`backend/`** — Django project. Fleet data lives in **Postgres**, not Google Sheets. A background sync pushes every change to a Google Sheet as a read-only mirror, but the Sheet is not the source of truth — Postgres is.
 - **`frontend/`** — React + Vite + Tailwind SPA, plain JavaScript (no TypeScript), built and served by Django (whitenoise), same as NPD Tracker.
 - **Statement imports** — the monthly fuel card statement (`fleet/fuel_import.py`, MPDATA TXT file) and the monthly E-Toll statement (`fleet/toll_import.py`, PDF read with `pypdf`).
-- **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Other documents are stored on the server's disk (`backend/media/`).
+- **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Toll statement PDFs and the documents attached to vans, services and incidents go to Google Drive too (`Tolls/`, `Documents/<van>/`). Without a Drive token (or if Drive fails) files are kept on the server's disk (`backend/media/`) and move to Drive by themselves once it is connected.
 
 ## One-time setup
 

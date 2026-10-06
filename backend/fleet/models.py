@@ -329,7 +329,10 @@ class TollStatement(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2)  # "Total toll charges" on the statement
     # Part of `total` that belongs to vehicles that aren't fleet vans (left out).
     other_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    file = models.FileField(upload_to=toll_statement_path, blank=True)
+    file = models.FileField(upload_to=toll_statement_path, blank=True)  # empty when kept in Google Drive
+    drive_file_id = models.CharField(max_length=128, blank=True, default="")
+    # Keys of the "To do" items that have been ticked off for this statement.
+    done = models.JSONField(default=list, blank=True)
     imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     imported_at = models.DateTimeField(auto_now_add=True)
 

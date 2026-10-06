@@ -44,3 +44,4 @@ export async function uploadTollStatement(file, confirm = false) {
   if (confirm) form.append('confirm', '1')
   return (await api.post('/toll-import/', form)).data
 }
+export const setTollDone = async (id, key, done) => (await api.post(`/tolls/${id}/done/`, { key, done })).data

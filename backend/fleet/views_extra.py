@@ -117,6 +117,7 @@ class MechanicViewSet(viewsets.ViewSet):
 
 class AttachmentViewSet(viewsets.ViewSet):
     def list(self, request):
+        drive.move_local_files()  # anything saved on this server's disk earlier goes to Drive now
         # Opening a job's photos pulls in what's changed in its Drive folder.
         for key, model in (("service", ServiceRecord), ("incident", Incident)):
             job = model.objects.select_related("vehicle").filter(pk=request.query_params.get(key) or 0).first()
@@ -155,13 +156,12 @@ class AttachmentViewSet(viewsets.ViewSet):
             vehicle=vehicle, service=service, incident=incident, uploaded_by=request.user,
         )
         att = None
-        job = service or incident
-        if kind == ISSUE_PHOTO and job and drive.enabled():
+        if drive.enabled():
             try:
-                client = drive.DriveClient()
-                folder = drive.ensure_folder(client, job)
-                name = drive.photo_name(client, folder, job, upload.name)
-                meta = client.upload(folder, name, upload.read(), content_type)
+                meta, name = drive.upload_for(
+                    drive.DriveClient(), vehicle=vehicle, job=service or incident, kind=kind,
+                    filename=upload.name, content=upload.read(), content_type=content_type,
+                )
                 att = Attachment.objects.create(
                     **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
                 )
@@ -243,6 +243,7 @@ class TollsView(APIView):
     (?statement=<id>, else the latest)."""
 
     def get(self, request):
+        drive.move_local_files()
         statements = list(TollStatement.objects.all())
         chosen = next((s for s in statements if str(s.pk) == request.query_params.get("statement")), statements[0] if statements else None)
         return Response({
@@ -260,18 +261,47 @@ class TollStatementView(APIView):
         if not statement:
             return Response({"detail": "Statement not found."}, status=status.HTTP_404_NOT_FOUND)
         activity.log(request.user, "Deleted", "Tolls", f"Toll statement to {statement.period_end:%d-%m-%Y}")
-        if statement.file:
+        if statement.drive_file_id:
+            try:
+                drive.DriveClient().trash(statement.drive_file_id)
+            except Exception:
+                logger.exception("Drive trash failed for toll statement %s", statement.pk)
+                return Response({"detail": "Couldn't remove it from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
+        elif statement.file:
             statement.file.delete(save=False)
         statement.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class TollTodoView(APIView):
+    """Tick a "To do" item off (or put it back): {key, done}."""
+
+    def post(self, request, pk):
+        statement = TollStatement.objects.filter(pk=pk).first()
+        if not statement:
+            return Response({"detail": "Statement not found."}, status=status.HTTP_404_NOT_FOUND)
+        key = str(request.data.get("key") or "")[:200]
+        if not key:
+            return Response({"detail": "Which item?"}, status=status.HTTP_400_BAD_REQUEST)
+        done = [k for k in (statement.done or []) if k != key]
+        if request.data.get("done") in (True, "true", "1", 1):
+            done.append(key)
+        statement.done = done
+        statement.save(update_fields=["done"])
+        return Response({"done": done})
+
+
 class TollStatementFileView(APIView):
     def get(self, request, pk):
         statement = TollStatement.objects.filter(pk=pk).first()
-        if not statement or not statement.file:
+        if not statement or not (statement.file or statement.drive_file_id):
             raise Http404
-        return FileResponse(statement.file.open("rb"), filename=f"E-Toll statement to {statement.period_end:%d-%m-%Y}.pdf", content_type="application/pdf")
+        name = drive.toll_pdf_name(statement)
+        if statement.drive_file_id:
+            response = HttpResponse(drive.DriveClient().download(statement.drive_file_id), content_type="application/pdf")
+            response["Content-Disposition"] = f'inline; filename="{name}"'
+            return response
+        return FileResponse(statement.file.open("rb"), filename=name, content_type="application/pdf")
 
 
 # ── Activity ───────────────────────────────────────────────────────────────

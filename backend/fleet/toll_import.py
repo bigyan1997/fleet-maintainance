@@ -18,6 +18,7 @@ can't be counted twice.
 """
 
 import io
+import logging
 import re
 from collections import defaultdict
 from datetime import datetime, time, timedelta
@@ -27,7 +28,10 @@ from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.db import transaction
 
+from . import drive
 from .models import TollStatement, TollTrip, Vehicle
+
+logger = logging.getLogger(__name__)
 
 
 class ImportFileError(Exception):
@@ -227,6 +231,11 @@ def import_statement(raw, file_name, user=None):
     other_total = sum((t["amount"] for t in parsed["trips"] if not t["vehicle"]), Decimal(0))
     old = TollStatement.objects.filter(invoice_number=s["invoice"]).first()
     if old:
+        if old.drive_file_id:
+            try:
+                drive.DriveClient().trash(old.drive_file_id)
+            except Exception:
+                logger.exception("Drive trash failed for the replaced toll statement %s", old.pk)
         if old.file:
             old.file.delete(save=False)
         old.delete()
@@ -234,7 +243,17 @@ def import_statement(raw, file_name, user=None):
         invoice_number=s["invoice"], account_number=s["account"], period_start=s["period_start"],
         period_end=s["period_end"], issue_date=s["issue_date"], total=s["total"], other_total=other_total, imported_by=user,
     )
-    statement.file.save(f"etoll-{s['period_end']:%Y-%m-%d}.pdf", ContentFile(raw), save=True)
+    stored = False
+    if drive.enabled():
+        try:
+            client = drive.DriveClient()
+            meta = client.upload(drive.ensure_path(client, "Tolls"), drive.toll_pdf_name(statement), raw, "application/pdf")
+            TollStatement.objects.filter(pk=statement.pk).update(drive_file_id=meta["id"])
+            stored = True
+        except Exception:
+            logger.exception("Drive upload failed; keeping the toll PDF on disk")
+    if not stored:  # no Drive (or it failed): keep it on this server; it moves to Drive later
+        statement.file.save(f"etoll-{s['period_end']:%Y-%m-%d}.pdf", ContentFile(raw), save=True)
     TollTrip.objects.bulk_create(
         TollTrip(
             statement=statement, vehicle=t["vehicle"], source=t["source"], tag_number=t["tag"], plate=t["plate"],
@@ -296,25 +315,6 @@ def double_charges(trips):
                 })
             group = [t] if t else []
     return sorted(found, key=lambda d: (d["date"], d["label"]), reverse=True)
-
-
-def odd_time_trips(trips):
-    """Per van: trips at or after LATE_FROM, or on a Saturday or Sunday."""
-    vans = {}
-    for t in trips:
-        late, weekend = t.time >= LATE_FROM, t.date.weekday() >= 5
-        if t.is_fee or not (late or weekend):
-            continue
-        v = vans.setdefault(t.vehicle_id, {"vehicle": t.vehicle_id, "label": str(t.vehicle), "trips": 0, "total": Decimal(0),
-                                           "late": 0, "weekend": 0, "weekendTotal": Decimal(0), "rows": []})
-        v["trips"] += 1
-        v["total"] += t.amount
-        v["late"] += late
-        v["weekend"] += weekend
-        v["weekendTotal"] += t.amount if weekend else 0
-        v["rows"].append({"date": t.date, "day": t.date.strftime("%a"), "time": t.time.strftime("%H:%M"), "road": t.road,
-                          "detail": t.detail, "amount": t.amount, "late": late, "weekend": weekend})
-    return sorted(vans.values(), key=lambda v: (-v["weekend"], -v["trips"]))
 
 
 def regular_runs(trips):
@@ -393,6 +393,40 @@ HEAVY_DAY_RATIO = 1.5
 HEAVY_DAY_DOLLARS = 10
 
 
+# A van whose usual day jumps and stays up (a new route) is judged against
+# each part of the month, so the whole second half isn't marked heavy.
+SHIFT_RATIO = 1.8
+SHIFT_DOLLARS = 15
+SHIFT_MIN_DAYS = 6
+# ...and nearly every day after it must be at the new level.
+SHIFT_STEADY = 0.9
+
+
+def _median(values):
+    return Decimal(str(median(values))).quantize(Decimal("0.01"))
+
+
+def find_shift(costs):
+    """costs: [(date, Decimal)] by date. The date the usual day changed, with
+    the usual day before and after, or None."""
+    best = None
+    for k in range(SHIFT_MIN_DAYS, len(costs) - SHIFT_MIN_DAYS + 1):
+        before, after = _median([c for _, c in costs[:k]]), _median([c for _, c in costs[k:]])
+        middle = (before + after) / 2
+        steady = sum(1 for _, c in costs[k:] if c >= middle) >= len(costs[k:]) * SHIFT_STEADY
+        if after >= before * Decimal(str(SHIFT_RATIO)) and after - before >= SHIFT_DOLLARS and steady:
+            if best is None or after - before > best["after"] - best["before"]:
+                best = {"k": k, "before": before, "after": after}
+    if not best:
+        return None
+    # The change starts on the first day that is at the new level, not on a
+    # quiet day that happens to sit next to it.
+    k, middle = best["k"], (best["before"] + best["after"]) / 2
+    while k < len(costs) - SHIFT_MIN_DAYS and costs[k][1] < middle:
+        k += 1
+    return {"date": costs[k][0], "before": _median([c for _, c in costs[:k]]), "after": _median([c for _, c in costs[k:]])}
+
+
 def van_days(trips):
     """Each van's tolls for each day, with its usual (median) day and the
     days that cost a lot more than that."""
@@ -405,15 +439,19 @@ def van_days(trips):
         cell["trips"] += not t.is_fee
     vans, heavy = [], []
     for pk, days in per.items():
-        usual = Decimal(str(median(c["total"] for c in days.values()))).quantize(Decimal("0.01"))
+        costs = sorted((d, c["total"]) for d, c in days.items())
+        shift = find_shift(costs)
+        usual_now = shift["after"] if shift else _median([c for _, c in costs])
         cells = {}
         for day, c in days.items():
-            is_heavy = len(days) >= 3 and c["total"] >= usual * Decimal(str(HEAVY_DAY_RATIO)) and c["total"] - usual >= HEAVY_DAY_DOLLARS
-            cells[day.isoformat()] = {**c, "heavy": is_heavy}
+            usual = shift["before"] if shift and day < shift["date"] else usual_now
+            is_heavy = len(days) >= 3 and usual > 0 and c["total"] >= usual * Decimal(str(HEAVY_DAY_RATIO)) and c["total"] - usual >= HEAVY_DAY_DOLLARS
+            times = round(float(c["total"] / usual), 1) if usual else None
+            cells[day.isoformat()] = {**c, "heavy": is_heavy, "usual": usual, "times": times}
             if is_heavy:
                 heavy.append({"vehicle": pk, "label": labels[pk], "date": day, "day": day.strftime("%a"), "total": c["total"],
-                              "trips": c["trips"], "usual": usual, "times": round(float(c["total"] / usual), 1)})
-        vans.append({"vehicle": pk, "label": labels[pk], "usual": usual, "days": len(days),
+                              "trips": c["trips"], "usual": usual, "times": times})
+        vans.append({"vehicle": pk, "label": labels[pk], "usual": usual_now, "days": len(days), "shift": shift,
                      "total": sum((c["total"] for c in days.values()), Decimal(0)),
                      "heavyDays": sum(1 for c in cells.values() if c["heavy"]), "cells": cells})
     return sorted(vans, key=lambda v: -v["total"]), sorted(heavy, key=lambda h: -(h["total"] - h["usual"]))
@@ -444,6 +482,70 @@ def month_to_month(statement, van_rows):
         "rows": sorted(rows, key=lambda r: -r["change"]),
         "now": sum(now.values(), Decimal(0)), "before": sum(before.values(), Decimal(0)),
     }
+
+
+# E-Toll takes disputes for this long after the statement.
+DISPUTE_DAYS = 90
+# A tag costing at least this much in fees is urgent (red), else yellow.
+TAG_FEES_URGENT = 10
+
+
+def _clock(hhmm):
+    """"23:45" -> "11:45 pm"."""
+    h, m = (int(x) for x in hhmm.split(":"))
+    return f"{h % 12 or 12}:{m:02d} {'am' if h < 12 else 'pm'}"
+
+
+def _and(parts):
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
+def todo_items(statement, van_rows, doubles):
+    """What needs someone to do something, most important first. Each item
+    has a stable key, so ticking it off is remembered."""
+    deadline = (statement.issue_date or statement.period_end) + timedelta(days=DISPUTE_DAYS)
+    items = []
+    for v in van_rows:
+        if v["fees"]:
+            n = v["plateTrips"]
+            items.append({
+                "key": f"tag:{v['vehicle']}", "tone": "due" if v["fees"] >= TAG_FEES_URGENT else "warn",
+                "vehicle": v["vehicle"], "filter": "tag", "amount": v["fees"],
+                "title": f"Fix {v['label']}'s toll tag",
+                "text": f"{n} trip{'s were' if n != 1 else ' was'} charged by number plate, costing {_dollars(v['fees'])} in fees. The tag is missing, flat or not beeping.",
+            })
+    for d in doubles:
+        items.append({
+            "key": f"double:{d['vehicle']}:{d['date']}:{d['road']}:{d['detail']}", "tone": "due",
+            "vehicle": d["vehicle"], "filter": "double", "amount": d["extra"],
+            "title": f"Claim back {_dollars(d['extra'])} for {d['label']}",
+            "text": (
+                f"Charged {len(d['times'])} times at {d['road']}, {d['detail']} on {d['date']:%d-%m}, at "
+                f"{' and '.join(_clock(t) for t in d['times'])}. Ring E-Toll on 13 18 65 before {deadline:%d-%m-%Y}."
+            ),
+        })
+    for v in van_rows:
+        wk = [r for r in v["rows"] if r["weekend"]]
+        if wk:
+            names = {r["day"] for r in wk}
+            what = "Sundays" if names == {"Sun"} else "Saturdays" if names == {"Sat"} else "weekends"
+            dates = sorted({r["date"] for r in wk})
+            times = sorted(r["time"] for r in wk)
+            items.append({
+                "key": f"weekend:{v['vehicle']}", "tone": "warn", "vehicle": v["vehicle"], "filter": "weekend",
+                "amount": sum((r["amount"] for r in wk), Decimal(0)),
+                "title": f"Ask about {v['label']} on {what}",
+                "text": (
+                    f"{len(wk)} trip{'s' if len(wk) != 1 else ''} on {_and([f'{d:%a %d-%m}' for d in dates])}, "
+                    f"between {_clock(times[0])} and {_clock(times[-1])} ({_dollars(sum((r['amount'] for r in wk), Decimal(0)))})."
+                    if times[0] != times[-1] else
+                    f"{len(wk)} trip on {dates[0]:%a %d-%m} at {_clock(times[0])} ({_dollars(wk[0]['amount'])})."
+                ),
+            })
+    done = set(statement.done or [])
+    for item in items:
+        item["done"] = item["key"] in done
+    return sorted(items, key=lambda i: (i["done"], i["tone"] != "due", -i["amount"]))
 
 
 def analysis(statement):
@@ -485,82 +587,36 @@ def analysis(statement):
     trips = sum(v["trips"] for v in van_rows)
     days = (statement.period_end - statement.period_start).days + 1
 
-    odd = odd_time_trips(rows)
     daily, earlier = daily_totals(statement, rows)
     grid, heavy = van_days(rows)
     compare = month_to_month(statement, van_rows)
 
-    insights = []
-    if doubles:
-        claim = sum((d["extra"] for d in doubles), Decimal(0))
-        insights.append({"tone": "due", "text": (
-            f"{len(doubles)} possible double charge{'s' if len(doubles) != 1 else ''}: the same toll point charged again within "
-            f"{DOUBLE_CHARGE_MINUTES} minutes, {_dollars(claim)} in all. See Double charges; disputes are open for 90 days."
-        )})
+    grid_by = {g["vehicle"]: g for g in grid}
     for v in van_rows:
-        if v["fees"]:
-            insights.append({"tone": "due", "text": (
-                f"{v['label']}: {v['plateTrips']} trip{'s' if v['plateTrips'] != 1 else ''} charged by number plate instead of the tag, "
-                f"costing {_dollars(v['fees'])} in video matching fees. Check the tag is in the van and beeping, or order a new one."
-            )})
-    if van_rows and total:
-        top = van_rows[0]
-        insights.append({"tone": "info", "text": (
-            f"{top['label']} is the biggest: {_dollars(top['total'])} over {top['trips']} trips, "
-            f"{round(top['total'] / total * 100)}% of the statement."
-        )})
-    weekend = [v for v in odd if v["weekend"]]
-    if weekend:
-        insights.append({"tone": "due", "text": (
-            f"{sum(v['weekend'] for v in weekend)} trip{'s' if sum(v['weekend'] for v in weekend) != 1 else ''} on a Saturday or Sunday "
-            f"({_dollars(sum((v['weekendTotal'] for v in weekend), Decimal(0)))}): "
-            + ", ".join(f"{v['label']} ({v['weekend']})" for v in weekend) + ". See Odd times."
-        )})
-    late = sorted((v for v in odd if v["late"]), key=lambda v: -v["late"])
-    if late:
-        insights.append({"tone": "warn", "text": (
-            f"{sum(v['late'] for v in late)} trips were at or after 12 pm, most by {late[0]['label']} ({late[0]['late']}). See Odd times."
-        )})
-    if heavy:
-        top = heavy[0]
-        insights.append({"tone": "warn", "text": (
-            f"{len(heavy)} day{'s' if len(heavy) != 1 else ''} where a van spent a lot more on tolls than its usual day. "
-            f"Biggest: {top['label']} on {top['date']:%d-%m-%Y}, {_dollars(top['total'])} against a usual {_dollars(top['usual'])}. See Day by day."
-        )})
-    jumped = [r for r in (compare["rows"] if compare else []) if r["jumped"]]
-    if jumped:
-        insights.append({"tone": "warn", "text": "Up a lot on the statement before: " + ", ".join(
-            f"{r['label']} (+{_dollars(r['change'])})" for r in jumped) + ". See Month to month."})
-    quiet = sorted((str(v) for v in Vehicle.objects.exclude(pk__in=[v["vehicle"] for v in van_rows])), key=lambda n: (len(n), n))
-    if quiet:
-        insights.append({"tone": "info", "text": f"No toll trips this period: {', '.join(quiet)}."})
-    previous = TollStatement.objects.filter(period_end__lt=statement.period_end).order_by("-period_end").first()
-    before = previous.total - previous.other_total if previous else 0
-    if before:
-        change = total - before
-        insights.append({"tone": "info", "text": (
-            f"{_dollars(abs(change))} {'more' if change > 0 else 'less'} than the statement before "
-            f"({_dollars(before)}, {round(abs(change) / before * 100)}% {'up' if change > 0 else 'down'})."
-        )})
-    if total + statement.other_total != statement.total:
-        insights.append({"tone": "warn", "text": (
-            f"Trips add up to {_dollars(total + statement.other_total)}, but the statement says {_dollars(statement.total)}."
-        )})
+        g = grid_by[v["vehicle"]]
+        v["usual"], v["heavyDays"], v["shift"] = g["usual"], g["heavyDays"], g["shift"]
+        v["doubleExtra"] = sum((d["extra"] for d in doubles if d["vehicle"] == v["vehicle"]), Decimal(0))
 
-    insights.sort(key=lambda i: ["due", "warn", "info"].index(i["tone"]))
+    quiet = sorted((str(v) for v in Vehicle.objects.exclude(pk__in=[v["vehicle"] for v in van_rows])), key=lambda n: (len(n), n))
+    checks = []
+    if total + statement.other_total != statement.total:
+        checks.append(f"Trips add up to {_dollars(total + statement.other_total)}, but the statement says {_dollars(statement.total)}.")
+
     return {
         "statement": {
             "id": statement.pk, "invoice": statement.invoice_number, "account": statement.account_number,
             "periodStart": statement.period_start, "periodEnd": statement.period_end, "issueDate": statement.issue_date,
-            "fileUrl": f"/api/tolls/{statement.pk}/file/" if statement.file else "",
+            "fileUrl": f"/api/tolls/{statement.pk}/file/" if (statement.file or statement.drive_file_id) else "",
         },
         "total": total, "trips": trips, "fees": fees, "perDay": round(total / days, 2) if days else None,
+        "claim": sum((d["extra"] for d in doubles), Decimal(0)),
         "statementTotal": statement.total, "otherTotal": statement.other_total,
+        "todo": todo_items(statement, van_rows, doubles),
+        "quiet": quiet,
+        "checks": checks,
         "vans": van_rows,
-        "roads": sorted(({"road": r, **d} for r, d in roads.items()), key=lambda r: -r["total"]),
-        "insights": insights,
         "doubles": doubles,
-        "odd": odd,
+        "roads": sorted(({"road": r, **d} for r, d in roads.items()), key=lambda r: -r["total"]),
         "runs": regular_runs(rows),
         "daily": daily,
         "earlier": earlier,

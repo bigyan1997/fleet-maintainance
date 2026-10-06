@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { deleteAttachment, fetchAttachments, uploadAttachment } from '../api/extra'
+import { fetchLinks } from '../api/links'
 import { useActions } from '../lib/actions'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -32,6 +33,7 @@ export function IssuePhotos({ service, incident, vehicle, label = 'Photos of the
   const { toast } = useActions()
   const [removing, setRemoving] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  const links = useQuery({ queryKey: ['links'], queryFn: fetchLinks, staleTime: Infinity })
   const photos = useQuery({
     queryKey: ['attachments', filters],
     queryFn: () => fetchAttachments(filters),
@@ -110,6 +112,11 @@ export function IssuePhotos({ service, incident, vehicle, label = 'Photos of the
           />
         </label>
       </div>
+      {links.data?.drive === false && (
+        <div className="mt-1 rounded bg-warn-bg px-2 py-1 text-[11px] text-warn">
+          Google Drive isn't connected on this server yet, so photos are saved on the server for now. They move to Drive by themselves once it's connected.
+        </div>
+      )}
       {!job && pending.length > 0 && <div className="mt-1 text-[11px] text-off">Photos are uploaded when you save.</div>}
       {removing && (
         <ConfirmDialog

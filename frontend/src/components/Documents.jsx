@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { deleteAttachment, fetchAttachments, uploadAttachment } from '../api/extra'
+import { fetchLinks } from '../api/links'
 import { useActions } from '../lib/actions'
 import { fmtDate } from '../lib/formatDate'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -24,6 +25,7 @@ export function Documents({ vehicle, service, incident, compact = false }) {
   const [kind, setKind] = useState(service ? 'Invoice' : incident ? 'Photo' : 'Registration')
   const [removing, setRemoving] = useState(null)
   const docs = useQuery({ queryKey: ['attachments', filters], queryFn: () => fetchAttachments(filters) })
+  const links = useQuery({ queryKey: ['links'], queryFn: fetchLinks, staleTime: Infinity })
 
   const upload = useMutation({
     mutationFn: (files) => Promise.all([...files].map((file) => uploadAttachment({ file, kind, vehicle, service, incident }))),
@@ -64,7 +66,10 @@ export function Documents({ vehicle, service, incident, compact = false }) {
         <Button icon="upload" disabled={upload.isPending} onClick={() => input.current?.click()}>
           {upload.isPending ? 'Uploading…' : 'Attach file'}
         </Button>
-        <span className="text-xs text-off">PDF, photo, Word or Excel, up to 20 MB. On a phone you can take a photo.</span>
+        <span className="text-xs text-off">
+          PDF, photo, Word or Excel, up to 20 MB. On a phone you can take a photo.{' '}
+          {links.data?.drive ? 'Saved to Google Drive.' : links.data?.drive === false ? "Google Drive isn't connected on this server yet, so files are kept on the server for now and move to Drive once it is." : ''}
+        </span>
       </div>
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[#c9d3df] px-4 py-6 text-center text-[13px] text-off">

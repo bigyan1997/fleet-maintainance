@@ -15,7 +15,13 @@ account can't take files from a service account (no storage quota), so the
 app acts as that account through an OAuth refresh token, written once by
 `manage.py drive_authorize` (FLEET_DRIVE_TOKEN_FILE).
 
-Drive is the source of truth: a photo dropped into a van's folder in the
+PDFs and other documents go to Drive too:
+
+    Fleet Maintenance Photos/
+        Tolls/            E-Toll statement 29-08-2026 to 28-09-2026.pdf
+        Documents/<Van>/  invoices, quotes, rego papers (original file names)
+
+Drive is the source of truth for photos: a photo dropped into a van's folder in the
 Drive app, named with a job's date, shows up on that job the next time it's
 opened, and photos deleted in Drive disappear from the app. Without a token (dev, tests) photos are stored on local disk like
 any other attachment.
@@ -23,6 +29,7 @@ any other attachment.
 
 import io
 import logging
+import time as _time
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -204,6 +211,83 @@ def photo_name(client, folder_id, job, original_name):
     return name
 
 
+def ensure_path(client, *names):
+    """A folder under the root, e.g. ensure_path(client, "Documents", "Van 9")."""
+    with _folder_lock:
+        folder = client.root_folder_id()
+        for name in names:
+            folder = client.get_or_create_folder(name, folder)
+        return folder
+
+
+def upload_for(client, *, vehicle, job, kind, filename, content, content_type):
+    """Put a file where it belongs in Drive: issue/damage photos in their
+    van's Incidents/Services folder (named by date), everything else in
+    Documents/<van>. Returns (Drive's file info, the name it was given)."""
+    from .models import ISSUE_PHOTO
+
+    if job is not None and kind == ISSUE_PHOTO:
+        folder = ensure_folder(client, job)
+        name = photo_name(client, folder, job, filename)
+    else:
+        folder, name = ensure_path(client, "Documents", str(vehicle)), filename
+    return client.upload(folder, name, content, content_type), name
+
+
+# Files saved on the server's disk while Drive wasn't connected are moved to
+# Drive the first time they're needed after it is (at most this often).
+_MOVE_EVERY_SECONDS = 120
+_last_move = 0.0
+
+
+def move_local_files(limit=10, force=False):
+    """Move files that were saved on the server's disk into Drive. Safe to
+    call often: it does nothing when Drive isn't connected or there is
+    nothing to move. Returns how many files were moved."""
+    global _last_move
+    from .models import Attachment, TollStatement
+
+    if not enabled() or (not force and _time.monotonic() - _last_move < _MOVE_EVERY_SECONDS):
+        return 0
+    _last_move = _time.monotonic()
+    atts = list(Attachment.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("vehicle", "service", "incident")[:limit])
+    tolls = list(TollStatement.objects.filter(drive_file_id="").exclude(file="")[:limit])
+    if not (atts or tolls):
+        return 0
+    moved = 0
+    client = DriveClient()
+    for att in atts:
+        try:
+            with att.file.open("rb") as f:
+                content = f.read()
+            meta, name = upload_for(
+                client, vehicle=att.vehicle, job=att.service or att.incident, kind=att.kind,
+                filename=att.original_name, content=content, content_type=att.content_type,
+            )
+            att.file.delete(save=False)
+            Attachment.objects.filter(pk=att.pk).update(
+                file="", drive_file_id=meta["id"], original_name=name[:255], drive_modified_at=parse_time(meta.get("modifiedTime")),
+            )
+            moved += 1
+        except Exception:
+            logger.exception("Couldn't move %s to Drive", att.original_name)
+    for st in tolls:
+        try:
+            with st.file.open("rb") as f:
+                content = f.read()
+            meta = client.upload(ensure_path(client, "Tolls"), toll_pdf_name(st), content, "application/pdf")
+            st.file.delete(save=False)
+            TollStatement.objects.filter(pk=st.pk).update(file="", drive_file_id=meta["id"])
+            moved += 1
+        except Exception:
+            logger.exception("Couldn't move toll statement %s to Drive", st.pk)
+    return moved
+
+
+def toll_pdf_name(statement):
+    return f"E-Toll statement {statement.period_start:%d-%m-%Y} to {statement.period_end:%d-%m-%Y}.pdf"
+
+
 def sync_job(job):
     """Bring a job's photo list in line with its van folder: photos deleted in
     Drive go; photos dropped in through Drive and named with the job's date
@@ -232,7 +316,7 @@ def sync_job(job):
         elif meta["name"].startswith(date_name(job)):
             Attachment.objects.create(**link, **fields, vehicle=job.vehicle, kind=ISSUE_PHOTO, drive_file_id=meta["id"])
         seen.add(meta["id"])
-    Attachment.objects.filter(**link, drive_file_id__isnull=False).exclude(drive_file_id__in=seen).delete()
+    Attachment.objects.filter(**link, kind=ISSUE_PHOTO, drive_file_id__isnull=False).exclude(drive_file_id__in=seen).delete()
 
 
 # ── Serving ────────────────────────────────────────────────────────────────
@@ -261,9 +345,9 @@ def thumbnail(att):
 
 def full(att, client=None):
     client = client or DriveClient()
-    if att.content_type in BROWSER_SAFE_TYPES:
-        return client.download(att.drive_file_id), att.content_type
-    data = client.thumbnail(att.drive_file_id, 2000)
-    if data is None:
-        return client.download(att.drive_file_id), att.content_type or "application/octet-stream"
-    return data, "image/jpeg"
+    kind = att.content_type or ""
+    if kind.startswith("image/") and kind not in BROWSER_SAFE_TYPES:  # iPhone HEIC and the like: Drive's picture of it
+        data = client.thumbnail(att.drive_file_id, 2000)
+        if data is not None:
+            return data, "image/jpeg"
+    return client.download(att.drive_file_id), kind or "application/octet-stream"

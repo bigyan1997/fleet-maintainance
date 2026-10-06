@@ -17,7 +17,7 @@ class FakeDrive:
     """Stands in for DriveClient: one folder per create_folder, files kept in memory."""
 
     def __init__(self):
-        self.folders, self.files, self.trashed = {}, {}, []
+        self.folders, self.files, self.trashed, self.uploads = {}, {}, [], 0
 
     def root_folder_id(self):
         return "root-folder"
@@ -39,7 +39,8 @@ class FakeDrive:
         return folder_id in self.folders
 
     def upload(self, folder_id, name, content, mime_type):
-        meta = {"id": f"file{len(self.files) + 1}", "name": name, "mimeType": mime_type, "parents": [folder_id],
+        self.uploads += 1
+        meta = {"id": f"file{self.uploads}", "name": name, "mimeType": mime_type, "parents": [folder_id],
                 "size": str(len(content)), "modifiedTime": "2026-10-06T01:00:00Z"}
         self.files[meta["id"]] = (meta, content)
         return meta
@@ -203,12 +204,11 @@ class TollImportTests(TestCase):
                          ("27.39", 4, "1.10", "4.55"))
         self.assertEqual([v["label"] for v in current["vans"]], ["Van 5", "Van 9"])
         self.assertEqual(current["roads"][0]["road"], "WestConnex")
-        texts = " ".join(i["text"] for i in current["insights"])
-        self.assertIn("Van 5: 2 trips charged by number plate", texts)
-        self.assertIn("No toll trips this period: Van 1", texts)
-        self.assertNotIn("Discov", texts)
-        self.assertEqual(current["odd"], [])
-        self.assertEqual(current["doubles"], [])
+        self.assertEqual([(t["title"], t["tone"], t["filter"]) for t in current["todo"]], [("Fix Van 5's toll tag", "warn", "tag")])
+        self.assertIn("2 trips were charged by number plate", current["todo"][0]["text"])
+        self.assertEqual(current["quiet"], ["Van 1"])
+        self.assertNotIn("Discov", str(current))
+        self.assertEqual((str(current["claim"]), str(current["fees"])), ("0", "1.10"))
         self.assertEqual(len(current["daily"]), 31)
         self.assertIsNone(current["compare"])
         self.assertEqual([r["label"] for r in current["runs"]], ["Van 5", "Van 9"])
@@ -236,12 +236,121 @@ class TollImportTests(TestCase):
         trip(3, (12, 0), "River Road")            # at 12 pm: flagged as late
         trip(5, (9, 0)); trip(7, (9, 0))          # Saturday: flagged as weekend; Monday morning: fine
         a = self.toll_import.analysis(st)
-        self.assertEqual([(d["times"], float(d["extra"])) for d in a["doubles"]], [(["11:14", "11:19"], 6.0)])
-        self.assertEqual([(v["late"], v["weekend"], v["trips"]) for v in a["odd"]], [(1, 1, 2)])
-        self.assertEqual(a["insights"][0]["tone"], "due")
+        self.assertEqual([(d["label"], d["times"], float(d["extra"])) for d in a["doubles"]], [("Van 9", ["11:14", "11:19"], 6.0)])
+        self.assertEqual((float(a["claim"]), a["vans"][0]["late"], a["vans"][0]["weekend"], a["vans"][0]["doubles"]), (6.0, 1, 1, 2))
+        # To do: claim the double charge first (red), then ask about the Saturday trip (yellow).
+        self.assertEqual([(t["title"], t["tone"]) for t in a["todo"]],
+                         [("Claim back $6.00 for Van 9", "due"), ("Ask about Van 9 on Saturdays", "warn")])
+        self.assertIn("before 29-12-2026", a["todo"][0]["text"])  # no issue date: 90 days from the period end
         # 3 trips ($18) on the 3rd against a usual $6 day: a heavy day.
         self.assertEqual([(h["label"], str(h["date"]), h["trips"], h["times"]) for h in a["heavy"]], [("Van 9", "2026-09-03", 3, 3.0)])
         self.assertTrue(a["grid"][0]["cells"]["2026-09-03"]["heavy"])
         self.assertFalse(a["grid"][0]["cells"]["2026-09-07"]["heavy"])
         row = next(r for r in services.analytics()["runningCost"] if r["id"] == self.van9.pk)
         self.assertEqual((row["tolls"], row["total"]), (30.0, 30.0))
+
+    def test_ticking_off_a_to_do_item_is_remembered(self):
+        self.post(confirm="1")
+        current = self.api.get("/api/tolls/").data["current"]
+        key = current["todo"][0]["key"]
+        sid = current["statement"]["id"]
+        self.api.post(f"/api/tolls/{sid}/done/", {"key": key, "done": True}, format="json")
+        again = self.api.get("/api/tolls/").data["current"]["todo"]
+        self.assertEqual([t["done"] for t in again], [True])
+        self.api.post(f"/api/tolls/{sid}/done/", {"key": key, "done": False}, format="json")
+        self.assertEqual([t["done"] for t in self.api.get("/api/tolls/").data["current"]["todo"]], [False])
+
+    def test_a_van_whose_run_changed_is_judged_in_two_parts(self):
+        from datetime import time
+
+        from .models import TollStatement, TollTrip
+
+        st = TollStatement.objects.create(invoice_number="2", period_start=date(2026, 9, 1), period_end=date(2026, 9, 30), total=0)
+        for day in range(1, 31):
+            amount = 10 if day < 15 else 50
+            if day in (8, 9, 22):  # one dearer day in each part of the month
+                amount += 30
+            TollTrip.objects.create(statement=st, vehicle=self.van9, source="tag", date=date(2026, 9, day), time=time(8, 0),
+                                    road="WestConnex", detail="Church St", amount=amount)
+        a = self.toll_import.analysis(st)
+        self.assertEqual(str(a["vans"][0]["shift"]["date"]), "2026-09-15")
+        # Days 15-21 cost $50, five times the old usual day, but are not heavy: $50 is the new usual.
+        self.assertEqual(sorted(str(h["date"]) for h in a["heavy"]), ["2026-09-08", "2026-09-09", "2026-09-22"])
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class PdfAndDocumentDriveTests(TestCase):
+    """Toll PDFs and van documents go to Drive too, and files saved on disk
+    earlier move there once Drive is connected."""
+
+    def setUp(self):
+        from . import toll_import
+
+        self.toll_import = toll_import
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.van = Vehicle.objects.create(make="Van 9", model="HiAce", rego="YLS91M")
+        self.service = ServiceRecord.objects.create(vehicle=self.van, service_type="Brake service", date=date(2026, 10, 7))
+        self.fake = FakeDrive()
+        self.on = mock.patch.object(drive, "enabled", return_value=True)
+        self.client_patch = mock.patch.object(drive, "DriveClient", return_value=self.fake)
+
+    def toll_post(self):
+        pdf = SimpleUploadedFile("toll.pdf", b"%PDF-1.4 toll", content_type="application/pdf")
+        with mock.patch.object(self.toll_import, "pdf_text", return_value=TOLL_TEXT):
+            return self.api.post("/api/toll-import/", {"file": pdf, "confirm": "1"}, format="multipart")
+
+    def test_a_document_goes_to_drive_under_documents_and_stays_when_the_job_syncs(self):
+        with self.on, self.client_patch:
+            pdf = SimpleUploadedFile("invoice.pdf", b"%PDF-1.4 invoice", content_type="application/pdf")
+            res = self.api.post("/api/attachments/", {"file": pdf, "kind": "Invoice", "service": self.service.pk}, format="multipart")
+            self.assertEqual(res.status_code, 201)
+            att = Attachment.objects.get()
+            self.assertEqual((att.file.name, att.drive_file_id, att.original_name), ("", "file1", "invoice.pdf"))
+            self.assertEqual(self.fake.path(self.fake.files["file1"][0]["parents"][0]), f"Documents/{self.van}")
+            # A real PDF comes back, not a picture of its first page.
+            got = self.api.get(res.data["url"])
+            self.assertEqual((got.content, got["Content-Type"]), (b"%PDF-1.4 invoice", "application/pdf"))
+            # Opening the job's photos must not drop the invoice just because it isn't in the photo folder.
+            self.service.drive_folder_id = self.fake.create_folder("x", "root-folder")
+            self.service.save()
+            self.api.get("/api/attachments/", {"service": self.service.pk})
+            self.assertEqual(Attachment.objects.count(), 1)
+
+    def test_toll_pdf_goes_to_the_tolls_folder_and_is_served_and_trashed(self):
+        Vehicle.objects.create(make="Van 5", model="HiAce", rego="YNU05R")
+        with self.on, self.client_patch:
+            self.assertEqual(self.toll_post().status_code, 201)
+            st = self.toll_import.TollStatement.objects.get()
+            self.assertEqual((st.file.name, st.drive_file_id), ("", "file1"))
+            meta = self.fake.files["file1"][0]
+            self.assertEqual((self.fake.path(meta["parents"][0]), meta["name"]), ("Tolls", "E-Toll statement 29-08-2026 to 28-09-2026.pdf"))
+            current = self.api.get("/api/tolls/").data["current"]["statement"]
+            self.assertEqual(self.api.get(current["fileUrl"]).content, b"%PDF-1.4 toll")
+            self.assertEqual(self.toll_post().data["replaced"], True)  # re-import replaces: the old PDF goes to the Bin
+            self.assertEqual(self.fake.trashed, ["file1"])
+            sid = self.api.get("/api/tolls/").data["current"]["statement"]["id"]
+            self.assertEqual(self.api.delete(f"/api/tolls/{sid}/").status_code, 204)
+            self.assertEqual(self.fake.trashed, ["file1", "file2"])
+
+    def test_files_saved_on_disk_earlier_move_to_drive_once_it_is_connected(self):
+        with mock.patch.object(drive, "enabled", return_value=False):
+            pdf = SimpleUploadedFile("rego.pdf", b"%PDF-1.4 rego", content_type="application/pdf")
+            self.api.post("/api/attachments/", {"file": pdf, "kind": "Registration", "vehicle": self.van.pk}, format="multipart")
+            photo = SimpleUploadedFile("dent.jpg", JPEG, content_type="image/jpeg")
+            self.api.post("/api/attachments/", {"file": photo, "kind": ISSUE_PHOTO, "service": self.service.pk}, format="multipart")
+            self.toll_post()
+        self.assertEqual(Attachment.objects.exclude(file="").count(), 2)
+        with self.on, self.client_patch:
+            self.assertEqual(drive.move_local_files(force=True), 3)
+            self.assertEqual(Attachment.objects.exclude(file="").count(), 0)
+            names = sorted(a.original_name for a in Attachment.objects.all())
+            self.assertEqual(names, ["07-10-2026.jpg", "rego.pdf"])  # the photo is renamed by the job's date
+            self.assertEqual(self.toll_import.TollStatement.objects.get().file.name, "")
+            self.assertEqual(drive.move_local_files(force=True), 0)  # nothing left to move
+
+    def test_links_say_whether_drive_is_connected(self):
+        with mock.patch.object(drive, "enabled", return_value=False):
+            self.assertIs(self.api.get("/api/links/").data["drive"], False)
+        with self.on:
+            self.assertIs(self.api.get("/api/links/").data["drive"], True)

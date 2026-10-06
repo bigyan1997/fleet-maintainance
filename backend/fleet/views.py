@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 import json
 
-from . import activity, fuel_import, services
+from . import activity, drive, fuel_import, services
 from .models import FuelLog, Incident, ServiceRecord, Vehicle
 from .pagination import FleetPagination
 from .serializers import (
@@ -298,7 +298,7 @@ class QuickLinksView(APIView):
             if settings.FLEET_SHEET_ID
             else None
         )
-        return Response({"sheet": sheet})
+        return Response({"sheet": sheet, "drive": drive.enabled()})
 
 
 class AppVersionView(APIView):

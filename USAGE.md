@@ -63,7 +63,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 - Click a van to open its page:
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
-  - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too.
+  - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**.
   - **Details:** rego, VIN, fuel card, intervals, tyres, rego/insurance expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
   - **Rego & insurance dates:** type or pick each van's two dates once; each saves when you click out of the box (or press Enter). Home then warns 60 days before anything expires.
@@ -113,17 +113,17 @@ Each month, when the **E-Toll Statement / Tax Invoice** PDF arrives by email:
 
 1. Open the **Tolls** tab and click **Import statement**.
 2. Choose the PDF. You'll see the period, the number of trips and a total for each van.
-3. Click **Import**. Importing the same statement twice doesn't double anything; it just replaces it.
+3. Click **Import**. Importing the same statement twice doesn't double anything; it just replaces it. The PDF itself is kept in Google Drive, in the **Tolls** folder.
 
 The page then shows, for that statement:
-- **Tolls for the vans**, the number of **trips**, and **fees for tags not read**.
-- **Worth checking:** for example a van whose trips were charged by number plate instead of its tag. That costs a video matching fee on every trip, and usually means the tag is missing, flat or not beeping.
-- **By van:** click a van to see every trip (date, time, toll road, amount), and **By toll road:** where the money goes. In a van's trip list, flagged trips have the whole row coloured: **red** for a weekend trip or a possible double charge, **yellow** for after 12 pm or a tag that wasn't read.
-- **Double charges:** the same van charged at the same toll point again within 15 minutes. Check it against the PDF, then dispute it with E-Toll (13 18 65) within 90 days.
-- **Odd times:** trips at or after **12 pm**, or on a **Saturday or Sunday**. Click a van to see which.
-- **Regular runs:** for each van, what a usual day costs, the run it repeats, the toll points it uses most, its dearest days and its one-off trips.
-- **Day by day:** a bar for each day of the statement; **Heavy days**, where a van's tolls were at least 1.5 times its usual day (and $10 or more above it); and **Each van, each day**, a grid of every van's tolls for every day with heavy days in red. Click a square to see that van's trips that day, or a date to see every van that day.
-- **Month to month:** each van against the statement before (from the second statement on).
+- **Three boxes:** the total, up or down on the last statement, and **money you can get back or stop losing** (double charges to claim, plus fees for tags that weren't read).
+- **To do:** only things that need you to act, most important first. For example "Fix Van 11's toll tag", "Claim back $6.06 for Van 2" (with the date to ring E-Toll by) or "Ask about Van 8 on Sundays". **Show trips** jumps to the trips behind it, and **✓ Done** ticks it off (it stays ticked; **Done (1)** at the bottom has an **Undo**).
+- **Vans:** each van's tolls, trips and usual day, with what's flagged in words (red: tag not working, charged twice, weekend, heavy days; grey: a new run, trips after 12 pm). Click a van to see its trips **by day**. Use the buttons to show only **Weekend**, **After 12 pm**, **Heavy days**, **Double charges** or **Tag not read**. A flagged trip's whole row is coloured: red for a weekend or a possible double charge, yellow for after 12 pm or a tag not read. The van's page also has its usual run and most-used toll points. Below the table is **By toll road**.
+- **Double charges, Odd times, Regular runs:** buttons with the full lists. *Double charges* are the same van at the same toll point again within 15 minutes (click one to see the van's trips). *Odd times* are trips at or after 12 pm or on a weekend, van by van (click a van to see them). *Regular runs* show each van's usual day, the run it repeats and the toll points it uses most.
+- **Days:** a bar for each day; **Heavy days** (a van's tolls at least 1.5 times its usual day and $10 or more above it); and **Each van, each day**, a grid with heavy days in red. Click a square to see that van's trips that day, or a date to see every van that day. If a van's whole run changes part-way through the month (it says "new run from 14-09"), its days are judged against each part, not the whole month.
+- **Compare months:** each van against the statement before (from the second statement on).
+
+The rules for flags: a **double charge** is the same van at the same toll point again within 15 minutes (disputes are open for 90 days); **after 12 pm** is any trip at or after midday; **weekend** is any trip on a Saturday or Sunday.
 
 Tolls also count in Home's **Spent this month**, and **Reports → Spending** has **Full running cost by van**: maintenance + fuel card + tolls.
 
