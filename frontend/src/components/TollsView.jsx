@@ -295,30 +295,148 @@ function Runs({ runs }) {
   )
 }
 
-// One bar per day of the statement.
-function Daily({ days, earlier }) {
+// One bar per day, then every van's tolls for every day. Click a square
+// for that van's trips that day, or a date for every van that day.
+function Daily({ data }) {
+  const { daily: days, earlier, grid, heavy, vans } = data
+  const [sel, setSel] = useState(null) // { date, vehicle? }
+  const [allHeavy, setAllHeavy] = useState(false)
   const max = Math.max(...days.map((d) => Number(d.total)), 1)
+  const cellMax = Math.max(...grid.flatMap((v) => Object.values(v.cells).map((c) => Number(c.total))), 1)
   const busiest = [...days].sort((a, b) => Number(b.total) - Number(a.total)).slice(0, 3)
+  const pick = (date, vehicle) => setSel(sel && sel.date === date && sel.vehicle === vehicle ? null : { date, vehicle })
+  const tripsOn = (v, date) => (vans.find((x) => x.vehicle === v)?.rows ?? []).filter((r) => r.date === date)
+  const dayName = (date) => days.find((d) => d.date === date)
+  const weekday = (date) => new Date(`${date}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })
+
   return (
-    <div className="rounded-lg border border-line bg-white p-4">
-      <div className="mb-3 text-[13px] text-off">
-        Dearest days: {busiest.map((d) => `${fmtDate(d.date)} ${money(d.total)}`).join(' · ')}. Grey columns are weekends; a red bar is tolls on a weekend.
+    <div className="space-y-4">
+      <div className="rounded-lg border border-line bg-white p-4">
+        <div className="mb-3 text-[13px] text-off">
+          Dearest days: {busiest.map((d) => `${fmtDate(d.date)} ${money(d.total)}`).join(' · ')}. Grey columns are weekends; a red bar is tolls on a weekend.
+        </div>
+        <div className="overflow-x-auto">
+          <div className="flex h-[160px] min-w-[620px] items-end gap-1">
+            {days.map((d) => (
+              <div key={d.date} onClick={() => pick(d.date)} title={`${fmtDate(d.date)}: ${money(d.total)}, ${d.trips} trips`} className={`flex h-full flex-1 cursor-pointer flex-col justify-end rounded-t ${d.weekend ? 'bg-[#f1f3f6]' : ''}`}>
+                <div className={`rounded-t ${d.weekend ? 'bg-due' : 'bg-primary'}`} style={{ height: `${(Number(d.total) / max) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex min-w-[620px] gap-1 pt-1 text-[10px] text-off">
+            {days.map((d) => <div key={d.date} className="flex-1 text-center">{d.date.slice(8)}</div>)}
+          </div>
+        </div>
+        {earlier.trips > 0 && (
+          <p className="mt-3 text-xs text-off">Not on the chart: {earlier.trips} trips from before this period that were billed late ({money(earlier.total)}).</p>
+        )}
       </div>
-      <div className="overflow-x-auto">
-        <div className="flex h-[200px] min-w-[620px] items-end gap-1">
-          {days.map((d) => (
-            <div key={d.date} title={`${fmtDate(d.date)}: ${money(d.total)}, ${d.trips} trips`} className={`flex h-full flex-1 flex-col justify-end rounded-t ${d.weekend ? 'bg-[#f1f3f6]' : ''}`}>
-              <div className={`rounded-t ${d.weekend ? 'bg-due' : 'bg-primary'}`} style={{ height: `${(Number(d.total) / max) * 100}%` }} />
+
+      <div className="rounded-lg border border-line bg-white p-4">
+        <div className="mb-1 text-[14px] font-semibold text-ink">Heavy days {heavy.length > 0 && <span className="ml-1 rounded-full bg-due-bg px-2 py-0.5 text-xs text-due">{heavy.length}</span>}</div>
+        <p className="mb-2 text-xs text-off">Days where a van's tolls were at least 1.5 times its usual day, and $10 or more above it. Biggest first; click one to see the trips.</p>
+        {heavy.length === 0 ? (
+          <div className="py-3 text-center text-[13px] text-off">No van had a day well above its usual.</div>
+        ) : (
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr className={head}>
+                <th className={th}>Van</th><th className={th}>Day</th><th className={`${th} text-right`}>Trips</th>
+                <th className={`${th} text-right`}>Tolls that day</th><th className={`${th} text-right`}>Its usual day</th><th className={`${th} text-right`}>How much more</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(allHeavy ? heavy : heavy.slice(0, 8)).map((h) => (
+                <tr key={`${h.vehicle}-${h.date}`} onClick={() => pick(h.date, h.vehicle)} className="cursor-pointer border-b border-[#f0f0f0] last:border-0 hover:bg-[#f0f5fb]">
+                  <td className={`${td} font-medium text-primary`}>{h.label}</td>
+                  <td className={`${td} whitespace-nowrap`}>{h.day} {fmtDate(h.date)}</td>
+                  <td className={num}>{h.trips}</td>
+                  <td className={`${num} font-semibold text-due`}>{money(h.total)}</td>
+                  <td className={`${num} text-off`}>{money(h.usual)}</td>
+                  <td className={num}>{h.times}× · +{money(Number(h.total) - Number(h.usual))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {heavy.length > 8 && (
+          <button onClick={() => setAllHeavy(!allHeavy)} className="mt-2 text-[13px] font-medium text-primary hover:underline">
+            {allHeavy ? 'Show the top 8 only' : `Show all ${heavy.length}`}
+          </button>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-line bg-white p-4">
+        <div className="mb-1 text-[14px] font-semibold text-ink">Each van, each day</div>
+        <p className="mb-2 text-xs text-off">Dollars of tolls per day. Darker blue = more; <span className="rounded bg-due-bg px-1 font-medium text-due">red</span> = a heavy day for that van. Click a square for the trips, or a date for every van that day.</p>
+        <div className="overflow-x-auto">
+          <table className="border-separate border-spacing-0.5 text-[11px]">
+            <thead>
+              <tr>
+                <th className="sticky left-0 bg-white pr-2 text-left font-medium text-off">Van</th>
+                <th className="px-1 text-right font-medium whitespace-nowrap text-off">Usual day</th>
+                {days.map((d) => (
+                  <th key={d.date} onClick={() => pick(d.date)} title={fmtDate(d.date)} className={`min-w-[30px] cursor-pointer rounded px-0.5 font-medium hover:bg-[#e8f1fb] ${d.weekend ? 'bg-[#f1f3f6] text-off' : 'text-off'} ${sel?.date === d.date ? 'outline outline-2 outline-primary' : ''}`}>
+                    <div>{weekday(d.date)[0]}</div>{d.date.slice(8)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {grid.map((v) => (
+                <tr key={v.vehicle}>
+                  <td className="sticky left-0 bg-white pr-2 text-[12px] font-medium whitespace-nowrap">{v.label}</td>
+                  <td className="px-1 text-right tabular-nums text-off">{money(v.usual)}</td>
+                  {days.map((d) => {
+                    const c = v.cells[d.date]
+                    const chosen = sel?.date === d.date && sel?.vehicle === v.vehicle
+                    if (!c) return <td key={d.date} className={`rounded ${d.weekend ? 'bg-[#f1f3f6]' : 'bg-[#fafafa]'}`} />
+                    return (
+                      <td
+                        key={d.date}
+                        onClick={() => pick(d.date, v.vehicle)}
+                        title={`${v.label}, ${fmtDate(d.date)}: ${money(c.total)}, ${c.trips} trips`}
+                        className={`cursor-pointer rounded px-0.5 py-1 text-center tabular-nums ${c.heavy ? 'bg-due-bg font-semibold text-due' : ''} ${chosen ? 'outline outline-2 outline-primary' : ''}`}
+                        style={c.heavy ? undefined : { backgroundColor: `rgba(24,95,165,${0.08 + 0.5 * (Number(c.total) / cellMax)})` }}
+                      >
+                        {Math.round(Number(c.total))}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {sel && sel.vehicle && (
+          <div className="mt-4 rounded-md bg-[#fafafa] p-3">
+            <div className="mb-1 text-[13px] font-semibold">{grid.find((v) => v.vehicle === sel.vehicle)?.label} on {weekday(sel.date)} {fmtDate(sel.date)}</div>
+            <Trips rows={tripsOn(sel.vehicle, sel.date)} />
+          </div>
+        )}
+        {sel && !sel.vehicle && (
+          <div className="mt-4 rounded-md bg-[#fafafa] p-3">
+            <div className="mb-1 text-[13px] font-semibold">
+              {weekday(sel.date)} {fmtDate(sel.date)}: {money(dayName(sel.date)?.total ?? 0)} · {dayName(sel.date)?.trips ?? 0} trips
             </div>
-          ))}
-        </div>
-        <div className="flex min-w-[620px] gap-1 pt-1 text-[10px] text-off">
-          {days.map((d) => <div key={d.date} className="flex-1 text-center">{d.date.slice(8)}</div>)}
-        </div>
+            <table className="w-full text-xs">
+              <tbody>
+                {grid.filter((v) => v.cells[sel.date]).sort((a, b) => Number(b.cells[sel.date].total) - Number(a.cells[sel.date].total)).map((v) => (
+                  <tr key={v.vehicle} onClick={() => pick(sel.date, v.vehicle)} className="cursor-pointer hover:bg-[#f0f5fb]">
+                    <td className="py-1 pr-3 font-medium text-primary">{v.label}</td>
+                    <td className="py-1 pr-3">{v.cells[sel.date].trips} trips</td>
+                    <td className="py-1 pr-3 text-off">usual day {money(v.usual)}</td>
+                    <td className="py-1 pr-3">{v.cells[sel.date].heavy && <span className="rounded bg-due px-1.5 py-0.5 text-[11px] font-medium text-white">heavy day</span>}</td>
+                    <td className="py-1 text-right font-medium tabular-nums">{money(v.cells[sel.date].total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {grid.every((v) => !v.cells[sel.date]) && <div className="text-xs text-off">No tolls that day.</div>}
+          </div>
+        )}
       </div>
-      {earlier.trips > 0 && (
-        <p className="mt-3 text-xs text-off">Not on the chart: {earlier.trips} trips from before this period that were billed late ({money(earlier.total)}).</p>
-      )}
     </div>
   )
 }
@@ -460,7 +578,7 @@ export function TollsView() {
       {view === 'doubles' && <Doubles rows={data.doubles} />}
       {view === 'odd' && <OddTimes vans={data.odd} />}
       {view === 'runs' && <Runs runs={data.runs} />}
-      {view === 'daily' && <Daily days={data.daily} earlier={data.earlier} />}
+      {view === 'daily' && <Daily data={data} />}
       {view === 'compare' && <Compare compare={data.compare} />}
 
       {view === 'vans' && (

@@ -122,7 +122,7 @@ The page then shows, for that statement:
 - **Double charges:** the same van charged at the same toll point again within 15 minutes. Check it against the PDF, then dispute it with E-Toll (13 18 65) within 90 days.
 - **Odd times:** trips at or after **12 pm**, or on a **Saturday or Sunday**. Click a van to see which.
 - **Regular runs:** for each van, what a usual day costs, the run it repeats, the toll points it uses most, its dearest days and its one-off trips.
-- **Day by day:** a bar for each day of the statement.
+- **Day by day:** a bar for each day of the statement; **Heavy days**, where a van's tolls were at least 1.5 times its usual day (and $10 or more above it); and **Each van, each day**, a grid of every van's tolls for every day with heavy days in red. Click a square to see that van's trips that day, or a date to see every van that day.
 - **Month to month:** each van against the statement before (from the second statement on).
 
 Tolls also count in Home's **Spent this month**, and **Reports → Spending** has **Full running cost by van**: maintenance + fuel card + tolls.

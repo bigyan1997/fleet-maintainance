@@ -387,6 +387,38 @@ def daily_totals(statement, trips):
     return [{"date": d, "weekend": d.weekday() >= 5, **v} for d, v in days.items()], earlier
 
 
+# A van's day counts as heavy when it cost this many times its usual day,
+# and at least this many dollars more.
+HEAVY_DAY_RATIO = 1.5
+HEAVY_DAY_DOLLARS = 10
+
+
+def van_days(trips):
+    """Each van's tolls for each day, with its usual (median) day and the
+    days that cost a lot more than that."""
+    per = defaultdict(lambda: defaultdict(lambda: {"total": Decimal(0), "trips": 0}))
+    labels = {}
+    for t in trips:
+        labels[t.vehicle_id] = str(t.vehicle)
+        cell = per[t.vehicle_id][t.date]
+        cell["total"] += t.amount
+        cell["trips"] += not t.is_fee
+    vans, heavy = [], []
+    for pk, days in per.items():
+        usual = Decimal(str(median(c["total"] for c in days.values()))).quantize(Decimal("0.01"))
+        cells = {}
+        for day, c in days.items():
+            is_heavy = len(days) >= 3 and c["total"] >= usual * Decimal(str(HEAVY_DAY_RATIO)) and c["total"] - usual >= HEAVY_DAY_DOLLARS
+            cells[day.isoformat()] = {**c, "heavy": is_heavy}
+            if is_heavy:
+                heavy.append({"vehicle": pk, "label": labels[pk], "date": day, "day": day.strftime("%a"), "total": c["total"],
+                              "trips": c["trips"], "usual": usual, "times": round(float(c["total"] / usual), 1)})
+        vans.append({"vehicle": pk, "label": labels[pk], "usual": usual, "days": len(days),
+                     "total": sum((c["total"] for c in days.values()), Decimal(0)),
+                     "heavyDays": sum(1 for c in cells.values() if c["heavy"]), "cells": cells})
+    return sorted(vans, key=lambda v: -v["total"]), sorted(heavy, key=lambda h: -(h["total"] - h["usual"]))
+
+
 def month_to_month(statement, van_rows):
     """Each van against the statement before this one."""
     previous = TollStatement.objects.filter(period_end__lt=statement.period_end).order_by("-period_end").first()
@@ -455,6 +487,7 @@ def analysis(statement):
 
     odd = odd_time_trips(rows)
     daily, earlier = daily_totals(statement, rows)
+    grid, heavy = van_days(rows)
     compare = month_to_month(statement, van_rows)
 
     insights = []
@@ -487,6 +520,12 @@ def analysis(statement):
     if late:
         insights.append({"tone": "warn", "text": (
             f"{sum(v['late'] for v in late)} trips were at or after 12 pm, most by {late[0]['label']} ({late[0]['late']}). See Odd times."
+        )})
+    if heavy:
+        top = heavy[0]
+        insights.append({"tone": "warn", "text": (
+            f"{len(heavy)} day{'s' if len(heavy) != 1 else ''} where a van spent a lot more on tolls than its usual day. "
+            f"Biggest: {top['label']} on {top['date']:%d-%m-%Y}, {_dollars(top['total'])} against a usual {_dollars(top['usual'])}. See Day by day."
         )})
     jumped = [r for r in (compare["rows"] if compare else []) if r["jumped"]]
     if jumped:
@@ -525,5 +564,7 @@ def analysis(statement):
         "runs": regular_runs(rows),
         "daily": daily,
         "earlier": earlier,
+        "grid": grid,
+        "heavy": heavy,
         "compare": compare,
     }

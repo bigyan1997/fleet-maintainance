@@ -239,5 +239,9 @@ class TollImportTests(TestCase):
         self.assertEqual([(d["times"], float(d["extra"])) for d in a["doubles"]], [(["11:14", "11:19"], 6.0)])
         self.assertEqual([(v["late"], v["weekend"], v["trips"]) for v in a["odd"]], [(1, 1, 2)])
         self.assertEqual(a["insights"][0]["tone"], "due")
+        # 3 trips ($18) on the 3rd against a usual $6 day: a heavy day.
+        self.assertEqual([(h["label"], str(h["date"]), h["trips"], h["times"]) for h in a["heavy"]], [("Van 9", "2026-09-03", 3, 3.0)])
+        self.assertTrue(a["grid"][0]["cells"]["2026-09-03"]["heavy"])
+        self.assertFalse(a["grid"][0]["cells"]["2026-09-07"]["heavy"])
         row = next(r for r in services.analytics()["runningCost"] if r["id"] == self.van9.pk)
         self.assertEqual((row["tolls"], row["total"]), (30.0, 30.0))
