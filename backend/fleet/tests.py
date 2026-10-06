@@ -127,3 +127,92 @@ class IssuePhotoTests(TestCase):
         att = Attachment.objects.get()
         self.assertTrue(att.file)
         self.assertIsNone(att.drive_file_id)
+
+
+TOLL_TEXT = """
+Statement/Tax Invoice
+28/09/2026 Total toll charges -$31.94
+Account No
+2457457
+Issue Date
+01 Oct 2026
+Statement Period
+29 Aug 2026 - 28 Sep 2026
+Invoice No
+100077951923
+Summary use of toll charges for this period
+Tag Reference LPN State Total Trips Total Tolls $ Total Fees $ ___TOTAL $
+6123405 Van 9  YLS91M 2 9.14 0 9.14
+10780800 CZ78BV  Discov 1 4.55 0 4.55
+YNUO5R NSW 2 17.15 1.10 18.25
+Payments, account fees and adjustments
+26/09/2026 Pre-Paid Account Top-up 300.00
+Detailed statement
+Tag Number: 10780800 Total Trips: 1
+08/09/2026 16:48 SHB and SHT (100) -- Sydney Harbour Bridge (South) 4.55
+Total for Tag 4.55
+Licence Plate No: YNUO5R Total Trips: 2
+21/09/2026 09:46 M5 South West Motorway (105) -- Henry Lawson Drive Car 6.06
+21/09/2026 09:46 M5 South West Motorway (105) -- Video Matching Fee Car 0.55
+Page 3 of 14
+Detailed statement
+Licence Plate No: YNUO5R - continued Total Trips: 2
+15/09/2026 08:28 WestConnex (140) -- KGR (M5W ML) - Princes Hwy Car 11.09
+15/09/2026 08:28 WestConnex (140) -- Video Matching Fee Car 0.55
+Total for Vehicle 18.25
+Tag Number: 6123405 Total Trips: 2
+28/09/2026 09:50 WestConnex (140) -- Silverwater Rd-Homebush Bay Dr 3.78
+25/09/2026 09:43 WestConnex (140) -- Silverwater Rd-Concord/Strath 5.36
+Total for Tag 9.14
+"""
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class TollImportTests(TestCase):
+    def setUp(self):
+        from . import toll_import
+
+        self.toll_import = toll_import
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.van9 = Vehicle.objects.create(make="Van 9", model="HiAce", rego="YLS91M")
+        self.van5 = Vehicle.objects.create(make="Van 5", model="HiAce", rego="YNU05R")
+        Vehicle.objects.create(make="Van 1", model="HiAce", rego="FRL47Y")
+
+    def post(self, **extra):
+        pdf = SimpleUploadedFile("toll.pdf", b"%PDF-fake", content_type="application/pdf")
+        with mock.patch.object(self.toll_import, "pdf_text", return_value=TOLL_TEXT):
+            return self.api.post("/api/toll-import/", {"file": pdf, **extra}, format="multipart")
+
+    def test_preview_matches_vans_and_leaves_other_vehicles_out(self):
+        data = self.post().data
+        self.assertEqual(data["checks"], [])
+        self.assertEqual(str(data["total"]), "27.39")
+        self.assertEqual(str(data["statementTotal"]), "31.94")
+        # The plate YNUO5R (letter O) is Van 5's YNU05R.
+        self.assertEqual([(v["vehicle"], v["trips"], str(v["fees"])) for v in data["vehicles"]],
+                         [(self.van5.pk, 2, "1.10"), (self.van9.pk, 2, "0")])
+        self.assertEqual([v["label"] for v in data["leftOut"]], ["CZ78BV Discov"])
+
+    def test_import_analysis_and_reimport(self):
+        self.assertEqual(self.post(confirm="1").status_code, 201)
+        self.assertEqual(self.post(confirm="1").data["replaced"], True)  # same invoice: replaced, not doubled
+        data = self.api.get("/api/tolls/").data
+        current = data["current"]
+        self.assertEqual((str(current["total"]), current["trips"], str(current["fees"]), str(current["otherTotal"])),
+                         ("27.39", 4, "1.10", "4.55"))
+        self.assertEqual([v["label"] for v in current["vans"]], ["Van 5", "Van 9"])
+        self.assertEqual(current["roads"][0]["road"], "WestConnex")
+        texts = " ".join(i["text"] for i in current["insights"])
+        self.assertIn("Van 5: 2 trips charged by number plate", texts)
+        self.assertIn("No toll trips this period: Van 1", texts)
+        self.assertNotIn("Discov", texts)
+
+        self.assertEqual(self.api.delete(f"/api/tolls/{current['statement']['id']}/").status_code, 204)
+        self.assertIsNone(self.api.get("/api/tolls/").data["current"])
+
+    def test_wrong_file_is_refused(self):
+        pdf = SimpleUploadedFile("other.pdf", b"%PDF-fake", content_type="application/pdf")
+        with mock.patch.object(self.toll_import, "pdf_text", return_value="Some other document"):
+            res = self.api.post("/api/toll-import/", {"file": pdf}, format="multipart")
+        self.assertEqual(res.status_code, 400)

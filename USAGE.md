@@ -107,6 +107,22 @@ Fill-ups, card fees and AdBlue are all imported, so each van's total matches the
 
 The **Vehicle / Date from / Date to** filters at the top change every figure on the page.
 
+## Tolls
+
+Each month, when the **E-Toll Statement / Tax Invoice** PDF arrives by email:
+
+1. Open the **Tolls** tab and click **Import statement**.
+2. Choose the PDF. You'll see the period, the number of trips and a total for each van.
+3. Click **Import**. Importing the same statement twice doesn't double anything; it just replaces it.
+
+The page then shows, for that statement:
+- **Tolls for the vans**, the number of **trips**, and **fees for tags not read**.
+- **Worth checking:** for example a van whose trips were charged by number plate instead of its tag. That costs a video matching fee on every trip, and usually means the tag is missing, flat or not beeping.
+- **By van:** click a van to see every trip (date, time, toll road, amount).
+- **By toll road:** where the money goes.
+
+Only the fleet vans are shown. Other vehicles on the toll account are left out, and a small note says how much of the statement's total they were. Use the **Statement** box to look at an earlier month, and **Open the PDF** to see the original.
+
 ## Google Sheet
 
 The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten.

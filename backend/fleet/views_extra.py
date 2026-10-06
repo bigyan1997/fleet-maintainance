@@ -14,8 +14,8 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import activity, drive, services
-from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, Vehicle, fuel_only_q
+from . import activity, drive, services, toll_import
+from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
 from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverSerializer, MechanicSerializer
 
 logger = logging.getLogger(__name__)
@@ -211,6 +211,67 @@ class AttachmentFileView(APIView):
                 response["Content-Disposition"] = f'attachment; filename="{att.original_name}"'
             return response
         return FileResponse(att.file.open("rb"), as_attachment=not inline, filename=att.original_name, content_type=att.content_type or None)
+
+
+# ── Tolls ──────────────────────────────────────────────────────────────────
+
+
+class TollImportView(APIView):
+    """Monthly E-Toll statement (PDF). POST with just `file` returns a
+    preview; with `confirm` too it imports (replacing the same statement if
+    it was imported before)."""
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "Choose the toll statement PDF to upload."}, status=status.HTTP_400_BAD_REQUEST)
+        if upload.size > MAX_UPLOAD_BYTES:
+            return Response({"detail": "That file is over 20 MB."}, status=status.HTTP_400_BAD_REQUEST)
+        raw = upload.read()
+        try:
+            if not request.data.get("confirm"):
+                return Response(toll_import.preview(raw))
+            result = toll_import.import_statement(raw, upload.name, request.user)
+        except toll_import.ImportFileError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        activity.log(request.user, "Imported", "Tolls", f"Toll statement {upload.name}: {result['trips']} trips, ${result['total']}")
+        return Response(result, status=status.HTTP_201_CREATED)
+
+
+class TollsView(APIView):
+    """The Tolls page: the list of statements and one statement's analysis
+    (?statement=<id>, else the latest)."""
+
+    def get(self, request):
+        statements = list(TollStatement.objects.all())
+        chosen = next((s for s in statements if str(s.pk) == request.query_params.get("statement")), statements[0] if statements else None)
+        return Response({
+            "statements": [
+                {"id": s.pk, "periodStart": s.period_start, "periodEnd": s.period_end, "total": s.total - s.other_total}
+                for s in statements
+            ],
+            "current": toll_import.analysis(chosen) if chosen else None,
+        })
+
+
+class TollStatementView(APIView):
+    def delete(self, request, pk):
+        statement = TollStatement.objects.filter(pk=pk).first()
+        if not statement:
+            return Response({"detail": "Statement not found."}, status=status.HTTP_404_NOT_FOUND)
+        activity.log(request.user, "Deleted", "Tolls", f"Toll statement to {statement.period_end:%d-%m-%Y}")
+        if statement.file:
+            statement.file.delete(save=False)
+        statement.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TollStatementFileView(APIView):
+    def get(self, request, pk):
+        statement = TollStatement.objects.filter(pk=pk).first()
+        if not statement or not statement.file:
+            raise Http404
+        return FileResponse(statement.file.open("rb"), filename=f"E-Toll statement to {statement.period_end:%d-%m-%Y}.pdf", content_type="application/pdf")
 
 
 # ── Activity ───────────────────────────────────────────────────────────────

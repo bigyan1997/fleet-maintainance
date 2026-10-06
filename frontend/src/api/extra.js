@@ -34,3 +34,13 @@ export const fetchMechanics = async () => (await api.get('/mechanics/')).data
 export const createMechanic = async (data) => (await api.post('/mechanics/', data)).data
 export const updateMechanic = async (id, data) => (await api.patch(`/mechanics/${id}/`, data)).data
 export const deleteMechanic = async (id) => api.delete(`/mechanics/${id}/`)
+
+// Tolls (monthly E-Toll statement)
+export const fetchTolls = async (statement) => (await api.get('/tolls/', { params: statement ? { statement } : {} })).data
+export const deleteTollStatement = async (id) => api.delete(`/tolls/${id}/`)
+export async function uploadTollStatement(file, confirm = false) {
+  const form = new FormData()
+  form.append('file', file)
+  if (confirm) form.append('confirm', '1')
+  return (await api.post('/toll-import/', form)).data
+}

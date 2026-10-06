@@ -314,6 +314,50 @@ class Attachment(models.Model):
         ordering = ["-created_at", "-id"]
 
 
+def toll_statement_path(instance, filename):
+    return f"toll_statements/{secrets.token_hex(6)}-{filename}"
+
+
+class TollStatement(models.Model):
+    """One monthly E-Toll statement (see toll_import.py)."""
+
+    invoice_number = models.CharField(max_length=40, unique=True)
+    account_number = models.CharField(max_length=40, blank=True)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    issue_date = models.DateField(null=True, blank=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2)  # "Total toll charges" on the statement
+    # Part of `total` that belongs to vehicles that aren't fleet vans (left out).
+    other_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    file = models.FileField(upload_to=toll_statement_path, blank=True)
+    imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-period_end"]
+
+
+class TollTrip(models.Model):
+    """A line of a toll statement: a trip, or a fee charged with one."""
+
+    statement = models.ForeignKey(TollStatement, on_delete=models.CASCADE, related_name="trips")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="toll_trips")
+    source = models.CharField(max_length=5)  # "tag", or "plate" when the tag wasn't read
+    tag_number = models.CharField(max_length=20, blank=True)
+    plate = models.CharField(max_length=12, blank=True)
+    label = models.CharField(max_length=80, blank=True)  # the tag's name on the account, or the plate
+    date = models.DateField()
+    time = models.TimeField()
+    road = models.CharField(max_length=80)
+    detail = models.CharField(max_length=120)
+    amount = models.DecimalField(max_digits=8, decimal_places=2)
+    is_fee = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-date", "-time"]
+        indexes = [models.Index(fields=["vehicle", "date"])]
+
+
 class ActivityLog(models.Model):
     """Who added, changed or deleted what — one line per change."""
 

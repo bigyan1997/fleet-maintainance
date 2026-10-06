@@ -15,6 +15,7 @@ import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
 import { FuelView } from './components/FuelView'
 import { FuelImport } from './components/FuelImport'
+import { TollsView } from './components/TollsView'
 import { ReportsView } from './components/ReportsView'
 import { DriversView, QrStickers, RegoDates, TyresView } from './components/VansExtras'
 import { VehicleForm } from './components/VehicleForm'
@@ -35,6 +36,7 @@ const TABS = [
   { key: 'services', label: 'Services' },
   { key: 'washes', label: 'Washes' },
   { key: 'fuel', label: 'Fuel' },
+  { key: 'tolls', label: 'Tolls' },
   { key: 'reports', label: 'Reports' },
 ]
 
@@ -185,6 +187,7 @@ function MainApp({ username }) {
     )
   } else if (tab === 'washes') page = <WashesView onError={(m) => show(m, true)} />
   else if (tab === 'fuel') page = <FuelView onEdit={(f) => openForm('fuel', f)} onAdd={() => openForm('fuel')} />
+  else if (tab === 'tolls') page = <TollsView />
   else if (tab === 'reports') page = <ReportsView sub={path[1]} />
 
   return (
