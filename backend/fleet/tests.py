@@ -207,6 +207,11 @@ class TollImportTests(TestCase):
         self.assertIn("Van 5: 2 trips charged by number plate", texts)
         self.assertIn("No toll trips this period: Van 1", texts)
         self.assertNotIn("Discov", texts)
+        self.assertEqual(current["odd"], [])
+        self.assertEqual(current["doubles"], [])
+        self.assertEqual(len(current["daily"]), 31)
+        self.assertIsNone(current["compare"])
+        self.assertEqual([r["label"] for r in current["runs"]], ["Van 5", "Van 9"])
 
         self.assertEqual(self.api.delete(f"/api/tolls/{current['statement']['id']}/").status_code, 204)
         self.assertIsNone(self.api.get("/api/tolls/").data["current"])
@@ -216,3 +221,23 @@ class TollImportTests(TestCase):
         with mock.patch.object(self.toll_import, "pdf_text", return_value="Some other document"):
             res = self.api.post("/api/toll-import/", {"file": pdf}, format="multipart")
         self.assertEqual(res.status_code, 400)
+
+    def test_double_charges_odd_times_and_running_cost(self):
+        from datetime import time
+
+        from . import services
+        from .models import TollStatement, TollTrip
+
+        st = TollStatement.objects.create(invoice_number="1", period_start=date(2026, 9, 1), period_end=date(2026, 9, 30), total=30)
+        def trip(day, at, detail="Hammondville (Main)"):
+            return TollTrip.objects.create(statement=st, vehicle=self.van9, source="tag", date=date(2026, 9, day),
+                                           time=time(*at), road="M5 South West Motorway", detail=detail, amount=6)
+        trip(3, (11, 14)); trip(3, (11, 19))      # Thursday, 5 minutes apart: a double charge
+        trip(3, (12, 0), "River Road")            # at 12 pm: flagged as late
+        trip(5, (9, 0)); trip(7, (9, 0))          # Saturday: flagged as weekend; Monday morning: fine
+        a = self.toll_import.analysis(st)
+        self.assertEqual([(d["times"], float(d["extra"])) for d in a["doubles"]], [(["11:14", "11:19"], 6.0)])
+        self.assertEqual([(v["late"], v["weekend"], v["trips"]) for v in a["odd"]], [(1, 1, 2)])
+        self.assertEqual(a["insights"][0]["tone"], "due")
+        row = next(r for r in services.analytics()["runningCost"] if r["id"] == self.van9.pk)
+        self.assertEqual((row["tolls"], row["total"]), (30.0, 30.0))

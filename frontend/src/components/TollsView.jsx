@@ -149,7 +149,213 @@ function Trips({ rows }) {
   )
 }
 
+const VIEWS = [
+  { key: 'vans', label: 'By van' },
+  { key: 'doubles', label: 'Double charges' },
+  { key: 'odd', label: 'Odd times' },
+  { key: 'runs', label: 'Regular runs' },
+  { key: 'daily', label: 'Day by day' },
+  { key: 'compare', label: 'Month to month' },
+]
+const box = 'overflow-x-auto rounded-lg border border-line bg-white'
+const th = 'px-3 py-2.5 font-medium'
+const td = 'px-3 py-2.5'
+const num = 'px-3 py-2.5 text-right tabular-nums whitespace-nowrap'
+const head = 'border-b border-line text-left text-xs text-off'
+const nothing = 'px-4 py-8 text-center text-[13px] text-off'
+
+// The same toll point charged twice within a few minutes.
+function Doubles({ rows }) {
+  if (!rows.length) return <div className={`${box} ${nothing}`}>No double charges found on this statement.</div>
+  return (
+    <div className={box}>
+      <p className="px-4 pt-3 pb-1 text-[13px] text-off">
+        The same van charged at the same toll point again within 15 minutes. Check these against the PDF, then dispute them with E-Toll (13 18 65) within 90 days of the statement.
+      </p>
+      <table className="w-full min-w-[620px] border-collapse text-[13px]">
+        <thead>
+          <tr className={head}>
+            <th className={th}>Van</th><th className={th}>Date</th><th className={th}>Toll point</th><th className={th}>Charged at</th>
+            <th className={`${th} text-right`}>Each</th><th className={`${th} text-right`}>Could claim back</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((d, i) => (
+            <tr key={i} className="border-b border-[#f0f0f0] last:border-0">
+              <td className={`${td} font-medium`}>{d.label}</td>
+              <td className={`${td} whitespace-nowrap`}>{fmtDate(d.date)}</td>
+              <td className={td}>{d.road}<div className="text-xs text-off">{d.detail}</div></td>
+              <td className={td}>{d.times.join(' and ')}</td>
+              <td className={num}>{money(d.amount)}</td>
+              <td className={`${num} font-semibold text-due`}>{money(d.extra)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// Trips at or after 12 pm, or on a Saturday or Sunday.
+function OddTimes({ vans }) {
+  const [open, setOpen] = useState(null)
+  if (!vans.length) return <div className={`${box} ${nothing}`}>No trips after 12 pm or on a weekend.</div>
+  return (
+    <div className={box}>
+      <p className="px-4 pt-3 pb-1 text-[13px] text-off">Trips at or after <b>12 pm</b>, or on a <b>Saturday or Sunday</b>. Click a van to see them.</p>
+      <table className="w-full min-w-[520px] border-collapse text-[13px]">
+        <thead>
+          <tr className={head}>
+            <th className={th}>Van</th><th className={`${th} text-right`}>Weekend trips</th><th className={`${th} text-right`}>After 12 pm</th>
+            <th className={`${th} text-right`}>Flagged trips</th><th className={`${th} text-right`}>Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vans.map((v) => [
+            <tr key={v.vehicle} onClick={() => setOpen(open === v.vehicle ? null : v.vehicle)} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb]">
+              <td className={`${td} font-medium text-primary`}>{v.label}</td>
+              <td className={`${num} ${v.weekend ? 'font-semibold text-due' : 'text-off'}`}>{v.weekend || '—'}</td>
+              <td className={`${num} ${v.late ? '' : 'text-off'}`}>{v.late || '—'}</td>
+              <td className={num}>{v.trips}</td>
+              <td className={`${num} font-medium`}>{money(v.total)}</td>
+            </tr>,
+            open === v.vehicle && (
+              <tr key={`${v.vehicle}-rows`} className="border-b border-[#f0f0f0] bg-[#fafafa]">
+                <td colSpan={5} className="px-4 py-2">
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {v.rows.map((r, i) => (
+                        <tr key={i}>
+                          <td className="py-1 pr-3 whitespace-nowrap">{r.day} {fmtDate(r.date)}</td>
+                          <td className="py-1 pr-3">{r.time}</td>
+                          <td className="py-1 pr-3">{r.road}: {r.detail}</td>
+                          <td className="py-1 pr-3 whitespace-nowrap">
+                            {r.weekend && <span className="mr-1 rounded bg-due-bg px-1.5 py-0.5 text-[11px] font-medium text-due">weekend</span>}
+                            {r.late && <span className="rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">after 12 pm</span>}
+                          </td>
+                          <td className="py-1 text-right tabular-nums">{money(r.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            ),
+          ])}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// What each van's usual day looks like, and what stands out.
+function Runs({ runs }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {runs.map((r) => (
+        <div key={r.vehicle} className="rounded-lg border border-line bg-white p-4 text-[13px]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-[14px] font-semibold text-ink">{r.label}</span>
+            <span className="text-off">{r.days} days on toll roads · usual day <b className="text-ink">{money(r.usualCost)}</b> · {money(r.total)} in all</span>
+          </div>
+          {r.common ? (
+            <div className="mt-3 rounded-md bg-[#f5f8fc] px-3 py-2">
+              <div className="mb-1 font-medium">Regular run: the same tolls on {r.common.days} days, {money(r.common.cost)} a day</div>
+              <ol className="text-xs text-off">
+                {r.common.stops.map((s, i) => <li key={i}>{s.time} · {s.road}: {s.detail} · {money(s.amount)}</li>)}
+              </ol>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-md bg-[#fafafa] px-3 py-2 text-xs text-off">No two days are quite the same for this van, so there's no single regular run.</div>
+          )}
+          <div className="mt-3 mb-1 font-medium">Toll points it uses most</div>
+          <ul className="text-xs text-off">
+            {r.points.map((p, i) => <li key={i}>{p.road}: {p.detail} · {p.days} day{p.days === 1 ? '' : 's'} · {money(p.total)}</li>)}
+          </ul>
+          <div className="mt-3 mb-1 font-medium">Dearest days</div>
+          <div className="text-xs text-off">{r.dearest.map((d) => `${fmtDate(d.date)} ${money(d.total)} (${d.trips} trips)`).join(' · ')}</div>
+          {r.oneOffs.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer font-medium text-primary">{r.oneOffs.length} one-off trip{r.oneOffs.length === 1 ? '' : 's'} (toll points used on one day only)</summary>
+              <ul className="mt-1 text-xs text-off">
+                {r.oneOffs.map((o, i) => <li key={i}>{fmtDate(o.date)} {o.time} · {o.road}: {o.detail} · {money(o.amount)}</li>)}
+              </ul>
+            </details>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// One bar per day of the statement.
+function Daily({ days, earlier }) {
+  const max = Math.max(...days.map((d) => Number(d.total)), 1)
+  const busiest = [...days].sort((a, b) => Number(b.total) - Number(a.total)).slice(0, 3)
+  return (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <div className="mb-3 text-[13px] text-off">
+        Dearest days: {busiest.map((d) => `${fmtDate(d.date)} ${money(d.total)}`).join(' · ')}. Grey columns are weekends; a red bar is tolls on a weekend.
+      </div>
+      <div className="overflow-x-auto">
+        <div className="flex h-[200px] min-w-[620px] items-end gap-1">
+          {days.map((d) => (
+            <div key={d.date} title={`${fmtDate(d.date)}: ${money(d.total)}, ${d.trips} trips`} className={`flex h-full flex-1 flex-col justify-end rounded-t ${d.weekend ? 'bg-[#f1f3f6]' : ''}`}>
+              <div className={`rounded-t ${d.weekend ? 'bg-due' : 'bg-primary'}`} style={{ height: `${(Number(d.total) / max) * 100}%` }} />
+            </div>
+          ))}
+        </div>
+        <div className="flex min-w-[620px] gap-1 pt-1 text-[10px] text-off">
+          {days.map((d) => <div key={d.date} className="flex-1 text-center">{d.date.slice(8)}</div>)}
+        </div>
+      </div>
+      {earlier.trips > 0 && (
+        <p className="mt-3 text-xs text-off">Not on the chart: {earlier.trips} trips from before this period that were billed late ({money(earlier.total)}).</p>
+      )}
+    </div>
+  )
+}
+
+// Each van against the statement before.
+function Compare({ compare }) {
+  if (!compare) return <div className={`${box} ${nothing}`}>This is the first statement. Import next month's and each van's change will show here.</div>
+  const change = (r) => (
+    <span className={Number(r.change) > 0 ? 'text-due' : Number(r.change) < 0 ? 'text-ok' : 'text-off'}>
+      {Number(r.change) > 0 ? '+' : Number(r.change) < 0 ? '−' : ''}{money(Math.abs(Number(r.change)))}{r.percent != null && ` (${Math.abs(r.percent)}%)`}
+    </span>
+  )
+  return (
+    <div className={box}>
+      <p className="px-4 pt-3 pb-1 text-[13px] text-off">Compared with the statement before ({fmtDate(compare.periodStart)} to {fmtDate(compare.periodEnd)}).</p>
+      <table className="w-full min-w-[480px] border-collapse text-[13px]">
+        <thead>
+          <tr className={head}>
+            <th className={th}>Van</th><th className={`${th} text-right`}>Before</th><th className={`${th} text-right`}>This statement</th><th className={`${th} text-right`}>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {compare.rows.map((r) => (
+            <tr key={r.vehicle} className={`border-b border-[#f0f0f0] ${r.jumped ? 'bg-warn-bg' : ''}`}>
+              <td className={`${td} font-medium`}>{r.label}{r.jumped && <span className="ml-2 text-xs font-medium text-warn">▲ up a lot</span>}</td>
+              <td className={num}>{money(r.before)}</td>
+              <td className={num}>{money(r.now)}</td>
+              <td className={`${num} font-medium`}>{change(r)}</td>
+            </tr>
+          ))}
+          <tr className="bg-[#f5f8fc] font-semibold">
+            <td className={td}>All vans</td>
+            <td className={num}>{money(compare.before)}</td>
+            <td className={num}>{money(compare.now)}</td>
+            <td className={num}>{change({ change: Number(compare.now) - Number(compare.before), percent: Number(compare.before) ? Math.round(((compare.now - compare.before) / compare.before) * 100) : null })}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function TollsView() {
+  const [view, setView] = useState('vans')
   const [chosen, setChosen] = useState('')
   const [importing, setImporting] = useState(false)
   const [open, setOpen] = useState(null)
@@ -199,8 +405,6 @@ export function TollsView() {
 
   const top = data.vans[0]
   const max = Math.max(...data.vans.map((v) => Number(v.total)), 1)
-  const th = 'px-3 py-2.5 font-medium'
-  const num = 'px-3 py-2.5 text-right tabular-nums whitespace-nowrap'
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -231,6 +435,28 @@ export function TollsView() {
         </ul>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-1">
+        {VIEWS.map((v) => {
+          const count = v.key === 'doubles' ? data.doubles.length : v.key === 'odd' ? data.odd.reduce((n, o) => n + o.trips, 0) : 0
+          return (
+            <button
+              key={v.key}
+              onClick={() => setView(v.key)}
+              className={'rounded-md px-3 py-1.5 text-[13px] font-medium ' + (view === v.key ? 'bg-primary text-white' : 'bg-white text-off ring-1 ring-line hover:text-ink')}
+            >
+              {v.label}{count > 0 && <span className={'ml-1.5 rounded-full px-1.5 text-[11px] ' + (view === v.key ? 'bg-white/25' : 'bg-due-bg text-due')}>{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {view === 'doubles' && <Doubles rows={data.doubles} />}
+      {view === 'odd' && <OddTimes vans={data.odd} />}
+      {view === 'runs' && <Runs runs={data.runs} />}
+      {view === 'daily' && <Daily days={data.daily} earlier={data.earlier} />}
+      {view === 'compare' && <Compare compare={data.compare} />}
+
+      {view === 'vans' && (
       <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="overflow-x-auto rounded-lg border border-line bg-white">
           <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">By van <span className="text-xs font-normal text-off">· click a van to see its trips</span></div>
@@ -308,6 +534,7 @@ export function TollsView() {
           </table>
         </div>
       </div>
+      )}
 
       {importPopup}
       {removing && (

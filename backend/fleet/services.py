@@ -5,7 +5,7 @@ from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, Vehicle, fuel_only_q
+from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, TollTrip, Vehicle, fuel_only_q
 
 
 class ValidationError(Exception):
@@ -404,9 +404,11 @@ def dashboard_summary():
     month_start = today.replace(day=1)
     month_services = services_qs.filter(date__gte=month_start, date__lte=today).aggregate(t=Sum("cost"))["t"] or 0
     month_fuel = FuelLog.objects.filter(date__gte=month_start, date__lte=today).aggregate(t=Sum("cost"))["t"] or 0
+    month_tolls = TollTrip.objects.filter(date__gte=month_start, date__lte=today).aggregate(t=Sum("amount"))["t"] or 0
     return {
         "month_services": month_services,
         "month_fuel": month_fuel,
+        "month_tolls": month_tolls,
         "vehicle_count": len(vehicles),
         "service_count": services_qs.count(),
         "due_count": due_count,
@@ -586,6 +588,28 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         )[:10]
         fuel_by_vehicle = top_by_vehicle(fuel_qs)
 
+    # What each van really costs to run: maintenance + fuel card + tolls.
+    tolls_qs = TollTrip.objects.all()
+    if vehicle:
+        tolls_qs = tolls_qs.filter(vehicle_id=vehicle)
+    if date_from:
+        tolls_qs = tolls_qs.filter(date__gte=date_from)
+    if date_to:
+        tolls_qs = tolls_qs.filter(date__lte=date_to)
+    running = {}
+    for key, qs, field in (
+        ("maintenance", services_qs, "cost"), ("maintenance", incidents_qs, "cost"),
+        ("fuel", fuel_qs, "cost"), ("tolls", tolls_qs, "amount"),
+    ):
+        for r in qs.values("vehicle").annotate(total=Sum(field)):
+            row = running.setdefault(r["vehicle"], {"maintenance": 0.0, "fuel": 0.0, "tolls": 0.0})
+            row[key] += float(r["total"] or 0)
+    names = {v.pk: str(v) for v in Vehicle.objects.filter(pk__in=running)}
+    running_cost = sorted(
+        ({"id": pk, "label": names.get(pk, "?"), **row, "total": sum(row.values())} for pk, row in running.items() if sum(row.values()) > 0),
+        key=lambda r: -r["total"],
+    )
+
     cost_by_type = [
         {"label": r["service_type"], "value": float(r["total"])}
         for r in services_qs.values("service_type").annotate(total=Sum("cost")).filter(total__gt=0).order_by(
@@ -607,6 +631,8 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         "costByVehicle": cost_by_vehicle,
         "fuelByVehicle": fuel_by_vehicle,
         "costByType": cost_by_type,
+        "runningCost": running_cost,
+        "tollCost": tolls_qs.aggregate(t=Sum("amount"))["t"] or 0,
         **fuel_insights(fuel_qs),
     }
 

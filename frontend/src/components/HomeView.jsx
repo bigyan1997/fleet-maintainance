@@ -174,8 +174,8 @@ export function HomeView() {
         <Tile label="Booked & at the mechanic" value={jobs.length} note={jobsNote} />
         <Tile
           label={`Spent in ${monthName} so far`}
-          value={money(Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0))}
-          note={`services ${money(d?.monthServices)} + fuel card ${money(d?.monthFuel)}`}
+          value={money(Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0) + Number(d?.monthTolls ?? 0))}
+          note={`services ${money(d?.monthServices)} + fuel card ${money(d?.monthFuel)} + tolls ${money(d?.monthTolls ?? 0)}`}
         />
       </div>
 

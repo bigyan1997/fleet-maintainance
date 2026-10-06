@@ -249,6 +249,7 @@ class DashboardView(APIView):
             {
                 "monthServices": summary["month_services"],
                 "monthFuel": summary["month_fuel"],
+                "monthTolls": summary["month_tolls"],
                 "vehicleCount": summary["vehicle_count"],
                 "serviceCount": summary["service_count"],
                 "dueCount": summary["due_count"],

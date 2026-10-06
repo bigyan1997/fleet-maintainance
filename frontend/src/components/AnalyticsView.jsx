@@ -85,6 +85,8 @@ export function AnalyticsView({ section = 'spending' }) {
       )}
 
       {section === 'spending' && (<>
+      <RunningCost rows={data.runningCost ?? []} rangeLabel={rangeLabel} />
+
       <div className="mb-4 rounded-lg border border-line bg-white p-4">
         <h2 className="mb-3 text-[15px] font-semibold text-ink">Monthly maintenance spend — {rangeLabel}</h2>
         <LineChart rows={data.monthlySpend} />
@@ -126,6 +128,57 @@ export function AnalyticsView({ section = 'spending' }) {
         )}
       </div>
       </>)}
+    </div>
+  )
+}
+
+// What each van really costs to run: maintenance + fuel card + tolls.
+function RunningCost({ rows, rangeLabel }) {
+  const sum = (key) => rows.reduce((s, r) => s + r[key], 0)
+  const cell = 'px-3 py-2 text-right tabular-nums'
+  return (
+    <div className="mb-4 overflow-hidden rounded-lg border border-line bg-white">
+      <div className="px-4 pt-4 pb-3">
+        <h2 className="text-[15px] font-semibold text-ink">Full running cost by van — {rangeLabel}</h2>
+        <p className="mt-0.5 text-xs text-off">Services, repairs and incidents + the fuel card + tolls, from what's been entered and imported.</p>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-4 pb-6 text-center text-sm text-off">Nothing in this range.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-y border-line bg-[#fafafa] text-xs text-off">
+                <th className="px-4 py-2 text-left font-medium">Van</th>
+                <th className="px-3 py-2 text-right font-medium">Maintenance</th>
+                <th className="px-3 py-2 text-right font-medium">Fuel card</th>
+                <th className="px-3 py-2 text-right font-medium">Tolls</th>
+                <th className="px-3 py-2 text-right font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-[#f0f0f0]">
+                  <td className="px-4 py-2 font-medium">{r.label}</td>
+                  <td className={cell}>{cents(r.maintenance)}</td>
+                  <td className={cell}>{cents(r.fuel)}</td>
+                  <td className={cell}>{cents(r.tolls)}</td>
+                  <td className={`${cell} font-semibold`}>{cents(r.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-line bg-[#fafafa] font-semibold">
+                <td className="px-4 py-2">All vans</td>
+                <td className={cell}>{cents(sum('maintenance'))}</td>
+                <td className={cell}>{cents(sum('fuel'))}</td>
+                <td className={cell}>{cents(sum('tolls'))}</td>
+                <td className={cell}>{cents(sum('total'))}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
