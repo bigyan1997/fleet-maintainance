@@ -119,29 +119,36 @@ function Tile({ label, value, sub, tone }) {
 }
 
 // One van's trips, newest first; fee lines sit under the trip they belong to.
+// A flagged trip's whole row is coloured: red for a weekend or a possible
+// double charge, yellow for after 12 pm or a tag that wasn't read.
 function Trips({ rows }) {
+  const tag = 'ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-medium'
+  const tone = (r) => (r.weekend || r.double ? 'bg-due-bg' : r.late || (r.byPlate && !r.isFee) ? 'bg-warn-bg' : '')
   return (
-    <table className="w-full text-xs">
+    <table className="w-full border-separate border-spacing-y-0.5 text-xs">
       <thead>
         <tr className="text-left text-off">
-          <th className="py-1 pr-3 font-medium">Date</th>
+          <th className="py-1 pr-3 pl-2 font-medium">Date</th>
           <th className="py-1 pr-3 font-medium">Time</th>
           <th className="py-1 pr-3 font-medium">Toll road</th>
           <th className="py-1 pr-3 font-medium">Where</th>
-          <th className="py-1 text-right font-medium">Amount</th>
+          <th className="py-1 pr-2 text-right font-medium">Amount</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i} className={r.isFee ? 'text-due' : ''}>
-            <td className="py-1 pr-3 whitespace-nowrap">{fmtDate(r.date)}</td>
+          <tr key={i} className={`${tone(r)} ${r.isFee ? 'text-due' : ''}`}>
+            <td className="rounded-l py-1 pr-3 pl-2 whitespace-nowrap">{r.day} {fmtDate(r.date)}</td>
             <td className="py-1 pr-3">{r.time}</td>
             <td className="py-1 pr-3">{r.road}</td>
             <td className="py-1 pr-3">
               {r.detail}
-              {r.byPlate && !r.isFee && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">tag not read</span>}
+              {r.weekend && <span className={`${tag} bg-due text-white`}>weekend</span>}
+              {r.double && <span className={`${tag} bg-due text-white`}>possible double charge</span>}
+              {r.late && <span className={`${tag} bg-warn text-white`}>after 12 pm</span>}
+              {r.byPlate && !r.isFee && <span className={`${tag} bg-warn text-white`}>tag not read</span>}
             </td>
-            <td className="py-1 text-right tabular-nums">{money(r.amount)}</td>
+            <td className="rounded-r py-1 pr-2 text-right tabular-nums">{money(r.amount)}</td>
           </tr>
         ))}
       </tbody>
@@ -480,6 +487,9 @@ export function TollsView() {
                   </td>
                   <td className={num}>
                     {v.trips}
+                    {v.weekend > 0 && <div className="text-xs font-medium text-due">{v.weekend} weekend</div>}
+                    {v.doubles > 0 && <div className="text-xs font-medium text-due">possible double charge</div>}
+                    {v.late > 0 && <div className="text-xs text-warn">{v.late} after 12 pm</div>}
                     {v.plateTrips > 0 && <div className="text-xs text-warn">{v.plateTrips} tag not read</div>}
                   </td>
                   <td className={num}>{money(v.tolls)}</td>

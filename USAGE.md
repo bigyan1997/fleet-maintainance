@@ -118,7 +118,7 @@ Each month, when the **E-Toll Statement / Tax Invoice** PDF arrives by email:
 The page then shows, for that statement:
 - **Tolls for the vans**, the number of **trips**, and **fees for tags not read**.
 - **Worth checking:** for example a van whose trips were charged by number plate instead of its tag. That costs a video matching fee on every trip, and usually means the tag is missing, flat or not beeping.
-- **By van:** click a van to see every trip (date, time, toll road, amount), and **By toll road:** where the money goes.
+- **By van:** click a van to see every trip (date, time, toll road, amount), and **By toll road:** where the money goes. In a van's trip list, flagged trips have the whole row coloured: **red** for a weekend trip or a possible double charge, **yellow** for after 12 pm or a tag that wasn't read.
 - **Double charges:** the same van charged at the same toll point again within 15 minutes. Check it against the PDF, then dispute it with E-Toll (13 18 65) within 90 days.
 - **Odd times:** trips at or after **12 pm**, or on a **Saturday or Sunday**. Click a van to see which.
 - **Regular runs:** for each van, what a usual day costs, the run it repeats, the toll points it uses most, its dearest days and its one-off trips.

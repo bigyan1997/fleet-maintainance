@@ -292,6 +292,7 @@ def double_charges(trips):
                     "vehicle": first.vehicle_id, "label": str(first.vehicle), "date": first.date, "road": first.road,
                     "detail": first.detail, "times": [g.time.strftime("%H:%M") for g in group],
                     "amount": first.amount, "extra": sum((g.amount for g in group[1:]), Decimal(0)),
+                    "ids": [g.pk for g in group],
                 })
             group = [t] if t else []
     return sorted(found, key=lambda d: (d["date"], d["label"]), reverse=True)
@@ -416,14 +417,25 @@ def month_to_month(statement, van_rows):
 def analysis(statement):
     """Everything the Tolls page shows for one statement."""
     rows = list(statement.trips.select_related("vehicle").order_by("-date", "-time"))
+    doubles = double_charges(rows)
+    double_ids = {pk for d in doubles for pk in d.pop("ids")}
     vans, roads = {}, defaultdict(lambda: {"trips": 0, "total": Decimal(0)})
     for t in rows:
         v = vans.setdefault(t.vehicle_id, {
             "vehicle": t.vehicle_id, "label": str(t.vehicle), "sub": t.vehicle.subtitle,
             "trips": 0, "tolls": Decimal(0), "fees": Decimal(0), "plateTrips": 0, "rows": [],
+            "weekend": 0, "late": 0, "doubles": 0,
         })
-        v["rows"].append({"date": t.date, "time": t.time.strftime("%H:%M"), "road": t.road, "detail": t.detail,
-                          "amount": t.amount, "isFee": t.is_fee, "byPlate": t.source == "plate"})
+        # Why a trip is flagged; its row is highlighted on the van's list.
+        weekend = not t.is_fee and t.date.weekday() >= 5
+        late = not t.is_fee and t.time >= LATE_FROM
+        double = t.pk in double_ids
+        v["weekend"] += weekend
+        v["late"] += late
+        v["doubles"] += double
+        v["rows"].append({"date": t.date, "day": t.date.strftime("%a"), "time": t.time.strftime("%H:%M"), "road": t.road,
+                          "detail": t.detail, "amount": t.amount, "isFee": t.is_fee, "byPlate": t.source == "plate",
+                          "weekend": weekend, "late": late, "double": double})
         if t.is_fee:
             v["fees"] += t.amount
         else:
@@ -441,7 +453,6 @@ def analysis(statement):
     trips = sum(v["trips"] for v in van_rows)
     days = (statement.period_end - statement.period_start).days + 1
 
-    doubles = double_charges(rows)
     odd = odd_time_trips(rows)
     daily, earlier = daily_totals(statement, rows)
     compare = month_to_month(statement, van_rows)
