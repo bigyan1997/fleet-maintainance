@@ -27,7 +27,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 Start here each day.
 
 - **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card).
-- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego/insurance expiring within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego/insurance dates. Each line has a button for the next step.
+- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego expiring within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
 - **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
 - **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
 
@@ -64,9 +64,9 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
   - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**.
-  - **Details:** rego, VIN, fuel card, intervals, tyres, rego/insurance expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
+  - **Details:** rego, VIN, fuel card, intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
-  - **Rego & insurance dates:** type or pick each van's two dates once; each saves when you click out of the box (or press Enter). Home then warns 60 days before anything expires.
+  - **Rego dates:** type or pick each van's rego expiry date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before a rego expires.
   - **Drivers:** add drivers and choose each van's usual driver.
   - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
   - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.

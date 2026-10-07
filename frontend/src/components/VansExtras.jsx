@@ -284,7 +284,7 @@ export function QrStickers() {
   )
 }
 
-// ── Rego & insurance dates ─────────────────────────────────────────────────
+// ── Rego dates ─────────────────────────────────────────────────
 
 function ExpiryInput({ van, field, label }) {
   const queryClient = useQueryClient()
@@ -342,20 +342,19 @@ function ExpiryInput({ van, field, label }) {
 export function RegoDates() {
   const vans = useVans()
   const list = sortVans(vans.data ?? [])
-  const missing = list.filter((v) => !v.rego_expiry || !v.insurance_expiry).length
+  const missing = list.filter((v) => !v.rego_expiry).length
   return (
     <Card
-      title="Rego & insurance dates"
-      description="Type or pick each date once from the papers or renewal notice. It saves when you click out of the box (or press Enter). Home then warns you 60 days before anything expires."
+      title="Rego dates"
+      description="Type or pick each van's rego expiry date once from the papers or renewal notice. It saves when you click out of the box (or press Enter). Home then warns you 60 days before a rego expires."
       padded={false}
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[480px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-line bg-[#f8fafc] text-left text-xs text-off">
               <th className="px-4 py-2 font-medium">Van</th>
               <th className="px-2 py-2 font-medium">Rego expires</th>
-              <th className="px-2 py-2 font-medium">Insurance expires</th>
             </tr>
           </thead>
           <tbody>
@@ -366,7 +365,6 @@ export function RegoDates() {
                   <div className="text-xs text-off">{v.subtitle}</div>
                 </td>
                 <td className="px-2 py-2.5"><ExpiryInput key={`r${v.rego_expiry}`} van={v} field="rego_expiry" label="rego expiry" /></td>
-                <td className="px-2 py-2.5"><ExpiryInput key={`i${v.insurance_expiry}`} van={v} field="insurance_expiry" label="insurance expiry" /></td>
               </tr>
             ))}
           </tbody>

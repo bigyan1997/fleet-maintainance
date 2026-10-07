@@ -19,7 +19,7 @@ function esc(v) {
   return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-const DATE_COLS = new Set(['date', 'rego_expiry', 'insurance_expiry', 'resolved_date'])
+const DATE_COLS = new Set(['date', 'rego_expiry', 'resolved_date'])
 
 function toCSV(rows, cols) {
   const cell = (r, c) => esc(DATE_COLS.has(c) ? fmtDate(r[c]) : r[c])
@@ -49,7 +49,7 @@ export function ExportView() {
         vehicles.map((v) => ({
           Make: v.make, Model: v.model, Year: v.year, Rego: v.rego, VIN: v.vin,
           'Vehicle Number': v.vehicle_number, 'Fuel Card': v.fuel_card_number, 'Fuel Type': v.fuel_type,
-          'Odometer (km)': v.odometer, 'Rego Expiry': fmtDate(v.rego_expiry), 'Insurance Expiry': fmtDate(v.insurance_expiry),
+          'Odometer (km)': v.odometer, 'Rego Expiry': fmtDate(v.rego_expiry),
           'Service Interval (km)': v.service_interval_km, 'Tyre Interval (km)': v.tyre_interval_km,
         })),
       ),
@@ -93,7 +93,7 @@ export function ExportView() {
     if (which === 'vehicles') {
       const vehicles = await fetchVehicles('')
       download(
-        toCSV(vehicles, ['make', 'model', 'year', 'rego', 'vin', 'vehicle_number', 'fuel_card_number', 'fuel_type', 'odometer', 'rego_expiry', 'insurance_expiry', 'service_interval_km', 'tyre_interval_km']),
+        toCSV(vehicles, ['make', 'model', 'year', 'rego', 'vin', 'vehicle_number', 'fuel_card_number', 'fuel_type', 'odometer', 'rego_expiry', 'service_interval_km', 'tyre_interval_km']),
         'fleet-vehicles.csv',
         'text/csv',
       )

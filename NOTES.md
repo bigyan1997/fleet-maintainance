@@ -19,13 +19,15 @@ Read this first; the dated entries below are the history of how it got here.
 - **Services**: Booked → At mechanic → Waiting for invoice → Done (stored as Booked / In service / Completed, awaiting invoice / Invoiced). Moving a job to the last two opens a finish box for km, cost and mechanic. Next due = odometer + the van's interval (10,000 km for every van). Mechanics are their own list, with their own column in the Services list.
 - **Fuel**: monthly Metro/WEX statement imported from its MPDATA TXT file, fees and AdBlue included, so totals match the statement.
 - **Tolls**: monthly E-Toll statement PDF imported on the Tolls tab; fleet vans only. The page has three boxes (total, vs last statement, money to get back), a To do list (fix a tag, claim a double charge, ask about weekend trips; each with Show trips and a remembered Done), and buttons Vans · Double charges · Odd times · Regular runs · Days · Compare months. Flags: double charge = same toll point again within 15 minutes; odd times = any trip at or after 12 pm or on a weekend; heavy day = a van's tolls at least 1.5x its usual day and $10 more (a van whose usual day jumps for good is judged in two parts). Tolls also count in Home's spent this month and in Reports -> Spending (full running cost by van). See "Tolls page redesign", "Toll analysis" and "Toll statement import" below.
-- **Vans**: page per van (History, Fuel, Documents, Details + change history); rego/insurance dates table; drivers; tyres; QR stickers for drivers.
+- **Vans**: page per van (History, Fuel, Documents, Details + change history); rego dates table (insurance expiry dates were removed on 2026-10-07, not needed); drivers; tyres; QR stickers for drivers.
 - **Notes for the next Claude session / computer**: `CLAUDE.md` (loaded automatically by Claude Code) and `docs/claude-memory/` (a cleaned copy of Claude's memory; `install-memory.ps1` puts it where Claude Code looks). A `git pull` brings both.
 - **Time**: everything is Sydney time (Django `TIME_ZONE = 'Australia/Sydney'`; the frontend's `todayIso()` / `fmtDateTime()` in `lib/formatDate.js` use Australia/Sydney whatever the device is set to). Dates show as dd-mm-yyyy.
-- **Removed on request**: weekly summary email, Team page (logins/activity page), any mention of the AI assistant on screen, reading mechanic invoices from photos/PDFs (declined).
-- **Data still to fill in by staff**: insurance expiry dates (none yet), costs on 35 old services, 3 VINs copied between vans in the legacy sheet, the stored van names ("Van 3- Mercedez", "Hi-ACE SWLB"; display is already tidied).
+- **Removed on request**: insurance expiry dates, weekly summary email, Team page (logins/activity page), any mention of the AI assistant on screen, reading mechanic invoices from photos/PDFs (declined).
+- **Data still to fill in by staff**: costs on 35 old services, 3 VINs copied between vans in the legacy sheet, the stored van names ("Van 3- Mercedez", "Hi-ACE SWLB"; display is already tidied).
 
 ## History
+
+**Insurance dates removed** (2026-10-07, "we dont need it"): the insurance expiry date is gone from every screen: Home's missing-dates line and expiry warning, the van status badge, Vans -> Rego dates (was "Rego & insurance dates"; one date per van now), the van's Details, the Add/Edit van form, the Excel/CSV downloads and the Sheet mirror's Vehicles tab. `Vehicle.insurance_expiry` stays in the database and the API (always empty, no migration). "Insurance" is still a document kind and a service type.
 
 ### Status (2026-09-29)
 

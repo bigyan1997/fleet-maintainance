@@ -25,7 +25,7 @@ class HasRelatedRecordsError(Exception):
 # and the inlined tyre-interval block in its vehicle-card renderer) ──────────
 
 DUE_SOON_KM_THRESHOLD = 2000
-# One warning window for rego/insurance expiry, used by the Alerts page and
+# One warning window for rego expiry, used by the Alerts page and
 # the vehicle status badge alike.
 EXPIRY_DUE_SOON_DAYS = 60
 # Only work that has actually happened counts towards "last serviced at" —
@@ -134,7 +134,7 @@ def recent_washes():
 
 
 def vehicle_status_badge(vehicle):
-    """"attention" (rego/insurance expired, or a service/tyre change
+    """"attention" (rego expired, or a service/tyre change
     overdue), "due_soon" (expiry within EXPIRY_DUE_SOON_DAYS, or a
     service/tyre change within DUE_SOON_KM_THRESHOLD), else "ok"."""
     today = timezone.localdate()
@@ -146,9 +146,9 @@ def vehicle_status_badge(vehicle):
         return d is not None and not is_over(d) and (d - today).days < EXPIRY_DUE_SOON_DAYS
 
     km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due]
-    if is_over(vehicle.rego_expiry) or is_over(vehicle.insurance_expiry) or any(k < 0 for k in km_left):
+    if is_over(vehicle.rego_expiry) or any(k < 0 for k in km_left):
         return "attention"
-    if is_soon(vehicle.rego_expiry) or is_soon(vehicle.insurance_expiry) or any(k < DUE_SOON_KM_THRESHOLD for k in km_left):
+    if is_soon(vehicle.rego_expiry) or any(k < DUE_SOON_KM_THRESHOLD for k in km_left):
         return "due_soon"
     return "ok"
 
@@ -387,8 +387,7 @@ def dashboard_summary():
         svc = next_service_due(v)
         overdue_svc = svc is not None and svc["km_left"] < 0
         overdue_rego = v.rego_expiry is not None and v.rego_expiry < today
-        overdue_ins = v.insurance_expiry is not None and v.insurance_expiry < today
-        if overdue_svc or overdue_rego or overdue_ins:
+        if overdue_svc or overdue_rego:
             due_count += 1
     # Washes (done in-house at the warehouse, no cost) have their own Van
     # washes tab, so every service figure here leaves them out.
@@ -445,10 +444,6 @@ def alerts():
             diff = (v.rego_expiry - today).days
             if diff < EXPIRY_DUE_SOON_DAYS:
                 add("Registration expires", v.rego_expiry.strftime("%d-%m-%Y"), diff)
-        if v.insurance_expiry:
-            diff = (v.insurance_expiry - today).days
-            if diff < EXPIRY_DUE_SOON_DAYS:
-                add("Insurance expires", v.insurance_expiry.strftime("%d-%m-%Y"), diff)
         def booked_note(due):
             # A due/overdue item that already has a job open says so, so it
             # doesn't read as forgotten.

@@ -5,7 +5,7 @@ from .models import FuelLog, Incident, ServiceRecord, Vehicle
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "rego", "vin", "odometer", "rego_expiry", "insurance_expiry"]
+    list_display = ["__str__", "rego", "vin", "odometer", "rego_expiry"]
     search_fields = ["make", "model", "rego", "vin", "vehicle_number"]
 
 

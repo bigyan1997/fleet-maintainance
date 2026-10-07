@@ -54,7 +54,7 @@ const FLEET_TABS = [
   { key: 'drivers', label: 'Drivers' },
   { key: 'tyres', label: 'Tyres' },
   { key: 'qr', label: 'QR stickers' },
-  { key: 'dates', label: 'Rego & insurance dates' },
+  { key: 'dates', label: 'Rego dates' },
 ]
 
 function useToast() {

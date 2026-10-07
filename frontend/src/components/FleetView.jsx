@@ -121,7 +121,7 @@ export function FleetView({ onAdd }) {
         />
         <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
           <button onClick={onAdd} className="rounded-md border border-line bg-white px-3 py-1.5 font-medium hover:bg-[#f5f5f5]">+ Add vehicle</button>
-          {[['dates', 'Rego & insurance dates'], ['drivers', 'Drivers'], ['tyres', 'Tyres'], ['qr', 'QR stickers']].map(([key, label]) => (
+          {[['dates', 'Rego dates'], ['drivers', 'Drivers'], ['tyres', 'Tyres'], ['qr', 'QR stickers']].map(([key, label]) => (
             <a key={key} href={href('vans', key)} className="rounded-md px-2.5 py-1.5 font-medium text-primary no-underline hover:bg-[#e8f1fb]">{label}</a>
           ))}
         </div>

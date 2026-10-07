@@ -270,7 +270,7 @@ export function VanPage({ id }) {
       )}
 
       {tab === 'documents' && (
-        <Card title="Documents" description="Rego papers, insurance, invoices and photos for this van, including files attached to its services and incidents." padded={false}>
+        <Card title="Documents" description="Rego papers, invoices and photos for this van, including files attached to its services and incidents." padded={false}>
           <Documents vehicle={vanId} />
         </Card>
       )}
@@ -296,7 +296,6 @@ export function VanPage({ id }) {
             <DetailRow label="Tyre interval">{v.tyre_interval_km ? `every ${km(v.tyre_interval_km)}` : 'not set'}</DetailRow>
             <DetailRow label="Next new tyres">{tyre ? `${km(tyre.due_at)} (${serviceText(tyre)})` : v.tyre_interval_km ? 'no tyre change logged yet' : 'tyre interval not set'}</DetailRow>
             <DetailRow label="Rego expiry">{v.rego_expiry ? expiryCell(v.rego_expiry) : 'not entered'}</DetailRow>
-            <DetailRow label="Insurance expiry">{v.insurance_expiry ? expiryCell(v.insurance_expiry) : 'not entered'}</DetailRow>
             <DetailRow label="Washing">{v.wash_needed ? `Washed in-house every 2 weeks · last ${v.lastWashed ? `${fmtDate(v.lastWashed)} (${fmtAgo(v.lastWashed)})` : 'never logged'}` : 'Not needed (driver takes it home)'}</DetailRow>
             <DetailRow label="Usual driver">{v.driverName || 'No regular driver (set it with Edit details, or Vans → Drivers)'}</DetailRow>
             <DetailRow label="QR sticker page"><a href={`/report/${v.report_token}/`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open the driver page</a> <span className="text-off">· print stickers on Vans → QR stickers</span></DetailRow>

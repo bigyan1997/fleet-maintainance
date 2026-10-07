@@ -26,7 +26,7 @@ function Tile({ label, value, note, tone }) {
   )
 }
 
-// Rego/insurance alerts count days; service/tyre alerts count km.
+// Rego alerts count days; service/tyre alerts count km.
 function alertText(a) {
   const n = Math.abs(a.days_or_km_left).toLocaleString()
   const days = a.title.includes('expires')
@@ -126,18 +126,12 @@ export function HomeView() {
         ),
       })),
     ...((() => {
-      const missing = (vehicles.data ?? []).filter((v) => !v.rego_expiry || !v.insurance_expiry)
+      const missing = (vehicles.data ?? []).filter((v) => !v.rego_expiry)
       return missing.length
         ? [{
             key: 'dates',
             van: missing.length === (vehicles.data ?? []).length ? 'All vans' : `Vans ${missing.map((v) => v.label.replace(/^Van\s*/i, '')).join(', ')}`,
-            text: (() => {
-              const vans = vehicles.data ?? []
-              const noRego = vans.filter((v) => !v.rego_expiry).length
-              const noIns = vans.filter((v) => !v.insurance_expiry).length
-              const parts = [noRego && `rego date missing for ${noRego} van${noRego === 1 ? '' : 's'}`, noIns && `insurance date missing for ${noIns} van${noIns === 1 ? '' : 's'}`].filter(Boolean)
-              return `${parts.join(', ').replace(/^./, (c) => c.toUpperCase())}, so those expiry warnings can't show yet`
-            })(),
+            text: `Rego date missing for ${missing.length} van${missing.length === 1 ? '' : 's'}, so the rego expiry warning can't show yet`,
             pill: ['blue', 'Set up'],
             action: <a href={href('vans', 'dates')} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white no-underline hover:bg-primary-dark">Enter dates</a>,
           }]

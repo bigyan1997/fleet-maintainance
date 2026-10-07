@@ -11,7 +11,7 @@ const FUEL_TYPES = [
 function blankForm() {
   return {
     make: '', model: '', year: '', rego: '', vin: '', vehicle_number: '',
-    fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '', insurance_expiry: '',
+    fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '',
     service_interval_km: '', tyre_interval_km: '', wash_needed: true, driver: '',
   }
 }
@@ -21,7 +21,7 @@ function fromVehicle(v) {
     make: v.make || '', model: v.model || '', year: v.year ?? '', rego: v.rego || '',
     vin: v.vin || '', vehicle_number: v.vehicle_number || '', fuel_card_number: v.fuel_card_number || '',
     fuel_type: v.fuel_type || '', odometer: v.odometer ?? '', rego_expiry: v.rego_expiry || '',
-    insurance_expiry: v.insurance_expiry || '', service_interval_km: v.service_interval_km ?? '',
+    service_interval_km: v.service_interval_km ?? '',
     tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true, driver: v.driver ?? '',
   }
 }
@@ -42,7 +42,6 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         service_interval_km: form.service_interval_km || 10000,
         tyre_interval_km: form.tyre_interval_km || null,
         rego_expiry: form.rego_expiry || null,
-        insurance_expiry: form.insurance_expiry || null,
         driver: form.driver || null,
       }
       return isEdit ? updateVehicle(vehicle.id, payload) : createVehicle(payload)
@@ -122,9 +121,6 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         </Field>
       </FormRow>
       <FormRow>
-        <Field label="Insurance expiry">
-          <DateInput value={form.insurance_expiry} onChange={set('insurance_expiry')} />
-        </Field>
         <Field label="Service interval (km)">
           <NumberInput value={form.service_interval_km} onChange={set('service_interval_km')} placeholder="e.g. 10000" />
         </Field>
