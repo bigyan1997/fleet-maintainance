@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { SortTh } from './SortTh'
 import { fmtAgo, fmtDate } from '../lib/formatDate'
-import { kmColour, serviceText } from '../lib/fleet'
+import { KmAsOf, kmColour, serviceText } from '../lib/fleet'
 import { href, navigate } from '../lib/router'
 import { statusWord } from '../lib/serviceStatus'
 import { useSort } from '../lib/useSort'
@@ -59,7 +59,7 @@ function FleetTable({ rows, onOpen }) {
                   <div className="text-[14px] font-semibold text-ink">{v.label}</div>
                   <div className="text-xs text-off">{v.subtitle}</div>
                 </td>
-                <td className="px-2 py-3 whitespace-nowrap tabular-nums">{v.odometer ? `${v.odometer.toLocaleString()} km` : '—'}</td>
+                <td className="px-2 py-3 whitespace-nowrap tabular-nums">{v.odometer ? `${v.odometer.toLocaleString()} km` : '—'}<KmAsOf van={v} /></td>
                 <td className="px-2 py-3">
                   {svc ? (
                     <>

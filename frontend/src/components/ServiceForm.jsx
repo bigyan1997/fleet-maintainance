@@ -11,7 +11,7 @@ import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
-  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
+  'Brake service', 'Repair / parts', 'Registration', 'Fuel log',
 ]
 
 // Sydney's date, not UTC (UTC is still yesterday before ~10-11 am here).
@@ -107,7 +107,7 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
           </select>
         </Field>
         <Field label="What">
-          <SelectInput value={form.service_type} onChange={setWithNextDue('service_type')} options={SERVICE_TYPES} />
+          <SelectInput value={form.service_type} onChange={setWithNextDue('service_type')} options={form.service_type === 'Insurance' ? [...SERVICE_TYPES, 'Insurance'] : SERVICE_TYPES} />
         </Field>
       </FormRow>
       <FormRow>

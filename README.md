@@ -70,7 +70,7 @@ Open `http://localhost:5174`.
 
 Four entities, all real Postgres tables with a real foreign key to `Vehicle` (the legacy app matched vehicles by a text label, which could silently conflate two vehicles with the same year/make/model):
 
-- **Vehicle** — make, model, year, rego, VIN, vehicle number, fuel card/type, odometer, rego/insurance expiry, service/tyre intervals.
+- **Vehicle** — make, model, year, rego, VIN, vehicle number, fuel card/type, odometer, rego expiry, service/tyre intervals.
 - **ServiceRecord** — a service/repair/registration/etc. logged against a vehicle.
 - **Incident** — an accident/breakdown/damage report.
 - **FuelLog** — a fuel fill-up.
@@ -81,7 +81,7 @@ Business logic (next-service-due, next-tyre-due, the OK/Due soon/Attention statu
 
 - **Vehicles**: add/edit/delete (blocked while it has service/incident/fuel history — same protection NPD Tracker uses for suppliers), searchable card grid with a live status badge and next-service-due indicator.
 - **Service history / Incidents / Fuel log**: filterable, paginated tables with a detail view and inline edit/delete. Logging a service or a fuel fill-up bumps the vehicle's odometer if the new reading is higher.
-- **Alerts**: registration/insurance expiring soon, service or tyre replacement due soon — computed server-side.
+- **Alerts**: registration expiring soon, service or tyre replacement due soon — computed server-side.
 - **Analytics**: spend metrics plus monthly-spend/fuel line charts and cost-by-vehicle/type bar charts — hand-rolled inline SVG, no charting library.
 - **Export**: an Excel workbook (Vehicles/Service History/Incidents/Fuel Log sheets) or individual CSVs.
 - **Shared login**: email + password via Django sessions, same as NPD Tracker.

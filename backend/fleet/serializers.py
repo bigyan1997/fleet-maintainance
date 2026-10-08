@@ -11,6 +11,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     statusBadge = serializers.SerializerMethodField()
     nextServiceDue = serializers.SerializerMethodField()
     nextTyreDue = serializers.SerializerMethodField()
+    odometerAsOf = serializers.SerializerMethodField()
     lastWashed = serializers.SerializerMethodField()
     openJob = serializers.SerializerMethodField()
     driverName = serializers.CharField(source="driver.name", read_only=True, default="")
@@ -22,7 +23,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "lastWashed", "openJob",
+            "wash_needed", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastWashed", "openJob",
         ]
 
         read_only_fields = ["report_token"]
@@ -50,6 +51,12 @@ class VehicleSerializer(serializers.ModelSerializer):
 
     def get_nextTyreDue(self, obj):
         return services.next_tyre_due(obj)
+
+    def get_odometerAsOf(self, obj):
+        # The date of the newest believable km reading (fill-up or finished
+        # service), so a km that is out of date can be flagged.
+        reading = services.latest_reading(obj)
+        return reading[0].isoformat() if reading else None
 
     def get_openJob(self, obj):
         return services.open_job(obj)

@@ -16,3 +16,6 @@ State: statement to 08-09-2026 imported for real (148 rows, all 11 fuel cards sa
 Known quirks: drivers type junk pump refs (12345); Van 6's card header says FWF886 but the van is FWF88G; Van 3 (FYT15L) often has blank odometers and had one 200,009 typo.
 
 **How to apply:** if a new statement fails, compare its TXT layout to the sample first. Test imports inside a rolled-back transaction (see [[live-data-testing]]). See [[open-items]].
+
+Van km (2026-10-09, local, not pushed): at import each van's km becomes its newest believable reading (latest fill-up with km, or the last finished service if newer), even if that lowers a stored estimate (a booked job's typed km is only a guess); fresh reading required to lower. The preview shows Van's km before -> after and warning lines (no km typed, readings ignored, lower than the app, km far behind the newest fill-up). Standing flag: Vans list shows "as of <date>" under each km, amber after 35 days, and Home has a "Km old" line. Next-service reminder = last finished Scheduled service km + interval - van km (unchanged). In the user's local copy, vans 4, 9 and 11 often have no km on the latest fill-up and Van 6 hadn't been filled since 12-08. See [[open-items]].
+

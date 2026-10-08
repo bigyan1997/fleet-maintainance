@@ -7,7 +7,7 @@ import { fmtDate } from '../lib/formatDate'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button, Icon } from './ui'
 
-const KINDS = ['Invoice', 'Quote', 'Registration', 'Insurance', 'Photo', 'Other']
+const KINDS = ['Invoice', 'Quote', 'Registration', 'Photo', 'Other']
 
 function size(bytes) {
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`

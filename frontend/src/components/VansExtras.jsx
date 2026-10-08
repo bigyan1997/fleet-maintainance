@@ -371,7 +371,7 @@ export function RegoDates() {
         </table>
       </div>
       <p className="border-t border-line px-4 py-2.5 text-xs text-off">
-        {missing ? `${missing} van${missing === 1 ? '' : 's'} still missing a date.` : 'All dates entered. Home will warn you 60 days before each one.'}
+        {missing ? `${missing} van${missing === 1 ? '' : 's'} still missing a date.` : 'All dates entered. Home will warn you 60 days before each one expires.'}
       </p>
     </Card>
   )

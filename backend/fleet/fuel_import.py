@@ -15,7 +15,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 
-from . import sheets_sync, signals
+from . import services, sheets_sync, signals
 from .models import FUEL_PRODUCT_WORDS, FuelLog, Vehicle
 
 CARD_RE = re.compile(r"^\d{4} \d{4}$")
@@ -165,6 +165,73 @@ def match_vehicle(card, vehicles):
     return None, None
 
 
+# A van whose km hasn't been updated for this long, while it kept being filled up, is flagged.
+STALE_KM_DAYS = 14
+
+
+def _check_against_van(vehicle, card):
+    """A reading far above the van's last known km (more than MAX_KM_PER_DAY a
+    day since then) can't be right either, so it is marked wrong too and
+    never used."""
+    prev = services.latest_reading(vehicle)
+    for r in sorted((r for r in card["rows"] if r["odometer"] and not r["odometerBad"]), key=lambda r: r["date"]):
+        day = datetime.fromisoformat(r["date"]).date()
+        if prev and day > prev[0] and r["odometer"] - prev[1] > MAX_KM_PER_DAY * max(1, (day - prev[0]).days):
+            r["odometerBad"] = True
+            continue
+        if not prev or r["odometer"] >= prev[1]:
+            prev = (day, r["odometer"])
+
+
+def _fmt(d):
+    return d.strftime("%d-%m-%Y")
+
+
+def _odometer_change(vehicle, card, include_card_rows):
+    """What this statement does to the van's km, and what to warn about.
+
+    The van's km becomes the km on its newest believable reading (fuel
+    fill-ups and services that happened), even if that is lower than what's
+    stored, because the stored figure may be an estimate typed when a job was
+    booked. It only goes down when this statement brought a fresh reading.
+    `include_card_rows` counts the card's readings that aren't saved yet (the
+    preview). `flags` are plain sentences for anything that isn't right."""
+    rows = card["rows"]
+    with_km = [r for r in rows if r["odometer"]]
+    good = [r for r in with_km if not r["odometerBad"]]
+    bad = [r for r in with_km if r["odometerBad"]]
+    fresh = [(datetime.fromisoformat(r["date"]).date(), r["odometer"]) for r in good]
+    reading = services.latest_reading(vehicle, fresh if include_card_rows else ())
+    before = vehicle.odometer
+    if not reading or (reading[1] < before and not fresh):
+        after, used = before, None
+        known = reading[0] if reading else None
+    else:
+        after, used = reading[1], reading[0]
+        known = reading[0]
+    lower = after < before
+
+    flags = []
+    if rows and not with_km:
+        flags.append(["warn", "No km was typed at the pump for any fill-up on this statement, so this van's km couldn't be updated."])
+    elif with_km and not good:
+        flags.append(["red", f"Every km reading on this statement looks wrong ({len(bad)} ignored), so this van's km wasn't updated."])
+    elif bad:
+        flags.append(["warn", f"{len(bad)} km reading{'s' if len(bad) != 1 else ''} on this statement looked wrong and {'were' if len(bad) != 1 else 'was'} ignored."])
+    if lower:
+        flags.append(["warn", f"The statement's newest km ({after:,}) is lower than the km in the app ({before:,}). The app's km looks like an estimate, so it is changed to the statement's."])
+    if rows:
+        newest_fill = max(datetime.fromisoformat(r["date"]).date() for r in rows)
+        if known is None:
+            flags.append(["red", "This van has no km reading anywhere yet, so its next-service countdown can't be worked out."])
+        elif (newest_fill - known).days > STALE_KM_DAYS:
+            flags.append(["warn", f"This van's km is from {_fmt(known)}, but it was last filled up on {_fmt(newest_fill)}, so its next-service countdown may be behind."])
+    return {
+        "before": before, "after": after, "date": used.isoformat() if used and after != before else None,
+        "changed": after != before, "lower": lower, "flags": flags,
+    }
+
+
 def preview(raw):
     data = parse_statement(raw)
     vehicles = list(Vehicle.objects.all())
@@ -173,6 +240,9 @@ def preview(raw):
         card["vehicle"] = vehicle.pk if vehicle else None
         card["matchedBy"] = how
         _mark_duplicates(card)
+        if vehicle:
+            _check_against_van(vehicle, card)
+        card["odometer"] = _odometer_change(vehicle, card, include_card_rows=True) if vehicle else None
     return data
 
 
@@ -210,6 +280,8 @@ def import_statement(raw, assignments):
     vehicles = {v.pk: v for v in Vehicle.objects.all()}
     created = charges = duplicates = 0
     touched_cards = 0
+    odometers = []
+    odometer_flags = []
     signals.suspended = True  # one mirror push at the end, not one per row
     try:
         with transaction.atomic():
@@ -219,6 +291,7 @@ def import_statement(raw, assignments):
                     continue
                 card["vehicle"] = vehicle.pk
                 _mark_duplicates(card)
+                _check_against_van(vehicle, card)
                 for r in card["rows"] + card["charges"]:
                     if r["duplicate"]:
                         duplicates += 1
@@ -235,10 +308,13 @@ def import_statement(raw, assignments):
                     )
                     created += 1
                     charges += r in card["charges"]
-                good = [r["odometer"] for r in card["rows"] if r["odometer"] and not r["odometerBad"]]
                 fields = []
-                if good and max(good) > vehicle.odometer:
-                    vehicle.odometer = max(good)
+                change = _odometer_change(vehicle, card, include_card_rows=False)
+                if change["flags"]:
+                    odometer_flags.append({"vehicle": vehicle.pk, "label": str(vehicle), "flags": change["flags"]})
+                if change["changed"]:
+                    odometers.append({"vehicle": vehicle.pk, "label": str(vehicle), **change})
+                    vehicle.odometer = change["after"]
                     fields.append("odometer")
                 if not vehicle.fuel_card_number:
                     vehicle.fuel_card_number = card["card"]
@@ -250,4 +326,4 @@ def import_statement(raw, assignments):
         signals.suspended = False
     if created and sheets_sync.configured():
         transaction.on_commit(lambda: sheets_sync.push_model("Vehicle"))
-    return {"created": created - charges, "charges": charges, "duplicates": duplicates, "cards": touched_cards}
+    return {"created": created - charges, "charges": charges, "duplicates": duplicates, "cards": touched_cards, "odometers": odometers, "odometerFlags": odometer_flags}

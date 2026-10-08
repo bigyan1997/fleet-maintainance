@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { deleteTollStatement, fetchTolls, setTollDone, uploadTollStatement } from '../api/extra'
 import { fetchLinks } from '../api/links'
 import { useActions } from '../lib/actions'
+import { useSort } from '../lib/useSort'
 import { fmtDate } from '../lib/formatDate'
 import { href } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -311,22 +312,45 @@ function Todo({ items, onShow, onTick }) {
 }
 
 // One van, as a row: its figures and what's wrong, in words.
+// Click a heading to sort by it; click again to flip it.
+const VAN_SORT_TYPES = { vanNumber: 'number', total: 'number', trips: 'number', usual: 'number', flagScore: 'number' }
+
+function SortHead({ label, col, sort, right = false }) {
+  return (
+    <th className={`${th} cursor-pointer select-none hover:text-ink ${right ? 'text-right' : ''}`} onClick={() => sort.onSort(col)}>
+      {label}
+      {sort.sortKey === col && <span className="ml-1">{sort.sortDir === 'asc' ? '▲' : '▼'}</span>}
+    </th>
+  )
+}
+
 function VanTable({ data, onOpen }) {
+  // "What's flagged" sorts by how much is flagged: the red flags count most.
+  const rows = useMemo(
+    () => data.vans.map((v) => ({
+      ...v,
+      vanNumber: Number((v.label.match(/\d+/) ?? [9999])[0]),
+      flagScore:
+        (Number(v.fees) > 0 ? 100 : 0) + (Number(v.doubleExtra) > 0 ? 100 : 0) + (v.weekend > 0 ? 100 : 0) + v.heavyDays * 10 + (v.shift ? 1 : 0) + (v.late > 0 ? 1 : 0),
+    })),
+    [data.vans],
+  )
+  const sort = useSort(rows, VAN_SORT_TYPES)
   return (
     <div className={box}>
       <div className="px-4 pt-3 pb-1 text-[14px] font-semibold text-ink">Vans <span className="text-xs font-normal text-off">· click a van to see its trips</span></div>
       <table className="w-full min-w-[640px] border-collapse text-[13px]">
         <thead>
           <tr className={head}>
-            <th className={th}>Van</th>
-            <th className={`${th} text-right`}>Tolls</th>
-            <th className={`${th} text-right`}>Trips</th>
-            <th className={`${th} text-right`}>Usual day</th>
-            <th className={th}>What's flagged</th>
+            <SortHead label="Van" col="vanNumber" sort={sort} />
+            <SortHead label="Tolls" col="total" sort={sort} right />
+            <SortHead label="Trips" col="trips" sort={sort} right />
+            <SortHead label="Usual day" col="usual" sort={sort} right />
+            <SortHead label="What's flagged" col="flagScore" sort={sort} />
           </tr>
         </thead>
         <tbody>
-          {data.vans.map((v) => (
+          {sort.sorted.map((v) => (
             <tr key={v.vehicle} onClick={() => onOpen(v.vehicle, 'all')} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb]">
               <td className={td}>
                 <span className="font-medium text-primary">{v.label}</span>

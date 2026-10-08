@@ -14,7 +14,7 @@ import { Documents } from './Documents'
 import { ChangeHistory } from './ChangeHistory'
 import { StatusBadge } from './FleetView'
 import { VanDetail } from './FuelByVan'
-import { byNewest, expiryCell, serviceText } from '../lib/fleet'
+import { byNewest, expiryCell, serviceText, KmAsOf } from '../lib/fleet'
 import { Button, Card, Empty, PageHeader, Pill, Tabs } from './ui'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -291,7 +291,7 @@ export function VanPage({ id }) {
             <DetailRow label="VIN"><span className="font-mono text-xs">{v.vin || '—'}</span></DetailRow>
             <DetailRow label="Fuel type">{v.fuel_type || '—'}</DetailRow>
             <DetailRow label="Fuel card">{v.fuel_card_number || '— (filled in by the first statement import)'}</DetailRow>
-            <DetailRow label="Odometer">{v.odometer ? km(v.odometer) : '—'}</DetailRow>
+            <DetailRow label="Odometer">{v.odometer ? km(v.odometer) : '—'}<KmAsOf van={v} /></DetailRow>
             <DetailRow label="Service interval">every {km(v.service_interval_km || 10000)}</DetailRow>
             <DetailRow label="Tyre interval">{v.tyre_interval_km ? `every ${km(v.tyre_interval_km)}` : 'not set'}</DetailRow>
             <DetailRow label="Next new tyres">{tyre ? `${km(tyre.due_at)} (${serviceText(tyre)})` : v.tyre_interval_km ? 'no tyre change logged yet' : 'tyre interval not set'}</DetailRow>

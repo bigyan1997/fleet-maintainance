@@ -13,6 +13,8 @@ On 2026-09-30 I rebuilt the fleet app as a SaaS-style app (dark navy sidebar, To
 
 On 2026-10-01 they also had the Weekly email tab and the Team page removed, and asked that nothing in the app says "Claude". They then approved a picture-first simplicity proposal: tabs Home · Vans · Services · Washes · Fuel · Reports, only Log wash + Log service beside them, short van names, plain status words (Booked · At mechanic · Waiting for invoice · Done), filters folded under "Filters ▾", no number-box arrows, Home with Needs doing (left) and Booked & at the mechanic + Waiting for invoices (right).
 
+On 2026-10-08 a four-tab, plain-words redesign was built and the user rejected it after trying it ("dont like it, change it to the ones we had before"): the seven-tab layout stays. See [[simplify-plan]].
+
 **How to apply:**
 - Add new features inside the existing tabs and pop-ups. Don't introduce new navigation paradigms.
 - Keep the app lean: build what they ask for, not extra pages. Never put "Claude" in any user-facing text.

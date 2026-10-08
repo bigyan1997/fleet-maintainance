@@ -27,7 +27,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 Start here each day.
 
 - **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card).
-- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego expiring within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
+- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego dates running out within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
 - **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
 - **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
 
@@ -59,14 +59,15 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 ## Vans
 
 - The list is in order of **next service, soonest first**. Overdue vans are at the top.
+- Under each van's km it says **as of** the date that km was last confirmed (a fill-up or a finished service). If that is more than 5 weeks ago it turns amber and says "km is N days old", and Home lists the van under **Km old**, because its next service countdown may be wrong.
 - **Next service** shows the km it's due at, with how far away it is underneath.
 - Click a van to open its page:
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
-  - **Documents:** attach rego papers, insurance, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**.
+  - **Documents:** attach rego papers, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**.
   - **Details:** rego, VIN, fuel card, intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
-  - **Rego dates:** type or pick each van's rego expiry date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before a rego expires.
+  - **Rego dates:** type or pick each van's rego date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before one expires. (Insurance isn't tracked.)
   - **Drivers:** add drivers and choose each van's usual driver.
   - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
   - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.
@@ -87,8 +88,10 @@ The fuel card is billed once a month by Metro Petroleum (WEX Motorpass). The sta
 ### Importing the monthly statement
 1. Fuel tab → **Import statement**.
 2. Choose the **MPDATA….TXT** file (not the PDF).
-3. Check the preview. Each fuel card is matched to its van, the total should match the statement, odd odometer readings are marked, and anything already imported is skipped.
+3. Check the preview. Each fuel card is matched to its van, the total should match the statement, odd odometer readings are marked, and anything already imported is skipped. The **Van's km** column shows what each van's km will become (for example 233,741 → 234,512 km, with the date of the fill-up it comes from). A yellow or red line under a van is a **km warning**: for example no km was typed at the pump, a reading looks wrong and is ignored, the statement's km is lower than the app's, or the van's km is a long way behind its latest fill-up. Check those: they decide when the next service shows as due.
 4. Click **Import**.
+
+After you click **Import**, each van's km becomes the km on its **newest believable reading**: the latest fill-up with a sensible km, or the last finished service if that is newer. The next service reminder (last scheduled service km + the van's interval) then counts from it. A km typed in when a job was only booked is a guess, so it is not used as a reading. The result box lists every van whose km changed, and repeats any warnings.
 
 Fill-ups, card fees and AdBlue are all imported, so each van's total matches the statement to the cent. Litres, $/L and L/100km count diesel only.
 
@@ -118,7 +121,7 @@ Each month, when the **E-Toll Statement / Tax Invoice** PDF arrives by email:
 The page then shows, for that statement:
 - **Three boxes:** the total, up or down on the last statement, and **money you can get back or stop losing** (double charges to claim, plus fees for tags that weren't read).
 - **To do:** only things that need you to act, most important first. For example "Fix Van 11's toll tag", "Claim back $6.06 for Van 2" (with the date to ring E-Toll by) or "Ask about Van 8 on Sundays". **Show trips** jumps to the trips behind it, and **✓ Done** ticks it off (it stays ticked; **Done (1)** at the bottom has an **Undo**).
-- **Vans:** each van's tolls, trips and usual day, with what's flagged in words (red: tag not working, charged twice, weekend, heavy days; grey: a new run, trips after 12 pm). Click a van to see its trips **by day**. Use the buttons to show only **Weekend**, **After 12 pm**, **Heavy days**, **Double charges** or **Tag not read**. A flagged trip's whole row is coloured: red for a weekend or a possible double charge, yellow for after 12 pm or a tag not read. The van's page also has its usual run and most-used toll points. Below the table is **By toll road**.
+- **Vans:** each van's tolls, trips and usual day, with what's flagged in words (red: tag not working, charged twice, weekend, heavy days; grey: a new run, trips after 12 pm). Click a heading (**Van, Tolls, Trips, Usual day, What's flagged**) to sort the table by it; click again to flip the order. Click a van to see its trips **by day**. Use the buttons to show only **Weekend**, **After 12 pm**, **Heavy days**, **Double charges** or **Tag not read**. A flagged trip's whole row is coloured: red for a weekend or a possible double charge, yellow for after 12 pm or a tag not read. The van's page also has its usual run and most-used toll points. Below the table is **By toll road**.
 - **Double charges, Odd times, Regular runs:** buttons with the full lists. *Double charges* are the same van at the same toll point again within 15 minutes (click one to see the van's trips). *Odd times* are trips at or after 12 pm or on a weekend, van by van (click a van to see them). *Regular runs* show each van's usual day, the run it repeats and the toll points it uses most.
 - **Days:** a bar for each day; **Heavy days** (a van's tolls at least 1.5 times its usual day and $10 or more above it); and **Each van, each day**, a grid with heavy days in red. Click a square to see that van's trips that day, or a date to see every van that day. If a van's whole run changes part-way through the month (it says "new run from 14-09"), its days are judged against each part, not the whole month.
 - **Compare months:** each van against the statement before (from the second statement on).

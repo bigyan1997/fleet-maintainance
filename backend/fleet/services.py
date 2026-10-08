@@ -1,3 +1,4 @@
+from bisect import bisect_right
 import re
 from datetime import date, timedelta
 
@@ -199,6 +200,43 @@ def delete_vehicle(pk):
             f"{'s' if related != 1 else ''} and can't be deleted while they exist."
         )
     vehicle.delete()
+
+
+def _rising_run(points):
+    """From (date, km) readings in date order, the longest run where km never
+    goes down. Typos (200,009 for 20,009) fall outside it."""
+    tails, tail_idx, prev = [], [], [None] * len(points)
+    for i, (_, km) in enumerate(points):
+        k = bisect_right(tails, km)
+        prev[i] = tail_idx[k - 1] if k else None
+        if k == len(tails):
+            tails.append(km)
+            tail_idx.append(i)
+        else:
+            tails[k] = km
+            tail_idx[k] = i
+    run, i = [], tail_idx[-1] if tail_idx else None
+    while i is not None:
+        run.append(points[i])
+        i = prev[i]
+    return run[::-1]
+
+
+def latest_reading(vehicle, extra=()):
+    """The van's current km as (date, km): its newest believable reading,
+    from fuel fill-ups and from services that have actually happened (a
+    booked job's km is only a guess). `extra` adds readings not saved yet.
+    None if there are no readings."""
+    today = timezone.localdate()
+    points = set(FuelLog.objects.filter(vehicle=vehicle, odometer__isnull=False, date__lte=today).values_list("date", "odometer"))
+    points |= set(
+        ServiceRecord.objects.filter(vehicle=vehicle, odometer__isnull=False, date__lte=today)
+        .exclude(status="Booked")
+        .values_list("date", "odometer")
+    )
+    points |= {(d, km) for d, km in extra if km}
+    run = _rising_run(sorted(points))
+    return run[-1] if run else None
 
 
 def _bump_odometer_if_higher(vehicle, odometer):

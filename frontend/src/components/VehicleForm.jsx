@@ -124,6 +124,7 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         <Field label="Service interval (km)">
           <NumberInput value={form.service_interval_km} onChange={set('service_interval_km')} placeholder="e.g. 10000" />
         </Field>
+        <div />
       </FormRow>
       <FormRow>
         <Field label="Tyre replacement interval (km)">

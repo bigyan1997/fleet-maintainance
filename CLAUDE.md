@@ -21,6 +21,7 @@ A fuller copy of Claude's memory for this project is in `docs/claude-memory/` (s
 - Never read another app's credential files (NPD Tracker's `secrets/`). Ask the owner to copy a file or set a path.
 - Everything is **Sydney time** and dates are **dd-mm-yyyy**. One shared login, on purpose.
 - Keep the classic blue bar and the tabs Home, Vans, Services, Washes, Fuel, Tolls, Reports. Add features inside existing tabs; the SaaS-style redesign was rejected.
+- Insurance is deliberately not tracked ("we dont need insurance"): no warnings, fields or columns for it.
 - Nothing on screen may say "Claude" or mention an AI.
 - Label every figure with what it includes, and show money that is checked against a statement to the cent.
 

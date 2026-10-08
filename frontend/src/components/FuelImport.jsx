@@ -5,6 +5,31 @@ import { uploadFuelStatement } from '../api/fuelLogs'
 import { fmtDate } from '../lib/formatDate'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const km = (n) => `${Number(n).toLocaleString()} km`
+const FLAG_STYLE = { red: 'border-due bg-due-bg text-due', warn: 'border-warn bg-warn-bg text-warn' }
+
+// "233,741 → 234,512 km" and where the new number comes from.
+function VanKm({ o }) {
+  if (!o) return <span className="text-off">—</span>
+  if (!o.changed) return <span className="text-off">{km(o.before)}<div className="text-xs">no change</div></span>
+  return (
+    <span className={o.lower ? 'text-warn' : 'text-ok'}>
+      <b className="whitespace-nowrap">{km(o.before)} → {km(o.after)}</b>
+      <div className="text-xs">{o.lower ? 'lower than the app had' : 'goes up'}{o.date && ` · from ${fmtDate(o.date)}`}</div>
+    </span>
+  )
+}
+
+function KmFlags({ flags }) {
+  return (
+    <div className="grid gap-1">
+      {flags.map(([level, text], i) => (
+        <div key={i} className={'rounded border-l-4 px-2.5 py-1 text-xs ' + FLAG_STYLE[level]}>{text}</div>
+      ))}
+    </div>
+  )
+}
+
 const errorText = (err) => err?.response?.data?.detail || 'Something went wrong reading that file.'
 
 // Upload the monthly Metro fuel card statement (the MPDATA….TXT file), check
@@ -65,7 +90,26 @@ export function FuelImport({ onClose }) {
           {result ? (
             <div className="rounded-lg bg-ok-bg px-4 py-3 text-[13.5px] text-ok">
               Added <b>{result.created}</b> fill-up{result.created === 1 ? '' : 's'} and <b>{result.charges}</b> fee{result.charges === 1 ? '' : 's'} / charge{result.charges === 1 ? '' : 's'} to the Fuel log
-              {result.duplicates > 0 && <> ({result.duplicates} already logged, skipped)</>}. Van odometers were updated too.
+              {result.duplicates > 0 && <> ({result.duplicates} already logged, skipped)</>}.
+              {result.odometers?.length > 0 ? (
+                <div className="mt-2">
+                  <b>Van km updated:</b>
+                  {result.odometers.map((o) => <div key={o.vehicle}>{o.label}: {km(o.before)} → {km(o.after)}</div>)}
+                </div>
+              ) : (
+                <div className="mt-2">No van's km changed.</div>
+              )}
+              {result.odometerFlags?.length > 0 && (
+                <div className="mt-3 rounded-md bg-white px-3 py-2 text-ink">
+                  <b>Check these km:</b>
+                  {result.odometerFlags.map((f) => (
+                    <div key={f.vehicle} className="mt-1.5">
+                      <div className="font-semibold">{f.label}</div>
+                      <KmFlags flags={f.flags} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -86,6 +130,11 @@ export function FuelImport({ onClose }) {
                     <span>+ {preview.charges.count} card fees / other charges · <b>{money(preview.charges.total)}</b></span>
                     <span>Total <b>{money(fuelTotal + Number(preview.charges.total))}</b> <span className="text-off">(should match the statement)</span></span>
                   </div>
+                  {cards.some((c) => assignments[c.card] && c.odometer?.flags?.length > 0) && (
+                    <p className="mt-3 rounded-md bg-warn-bg px-3 py-2 text-[13px] text-warn">
+                      {cards.filter((c) => assignments[c.card] && c.odometer?.flags?.length > 0).length} van(s) have a km warning below. Check them: they affect when the next service shows as due.
+                    </p>
+                  )}
                   {unmatched > 0 && (
                     <p className="mt-3 rounded-md bg-warn-bg px-3 py-2 text-[13px] text-warn">
                       {unmatched} card{unmatched === 1 ? '' : 's'} couldn't be matched to a van — pick the van below, or it won't be imported.
@@ -98,6 +147,7 @@ export function FuelImport({ onClose }) {
                         <th className="py-2 pr-3 font-medium">Card on statement</th>
                         <th className="py-2 pr-3 font-medium">Van</th>
                         <th className="py-2 pr-3 font-medium">Fill-ups</th>
+                        <th className="py-2 pr-3 font-medium">Van's km</th>
                         <th className="py-2 pr-3 font-medium">Total (fuel + fees)</th>
                         <th className="py-2 font-medium" />
                       </tr>
@@ -128,6 +178,7 @@ export function FuelImport({ onClose }) {
                               {dupes > 0 && <div className="text-xs text-off">{dupes} already logged</div>}
                               {badOdo > 0 && <div className="text-xs text-warn">{badOdo} odd odometer{badOdo === 1 ? '' : 's'}</div>}
                             </td>
+                            <td className="py-2 pr-3"><VanKm o={assignments[c.card] ? c.odometer : null} /></td>
                             <td className="py-2 pr-3 whitespace-nowrap">{money([...c.rows, ...c.charges].reduce((s, r) => s + Number(r.cost), 0))}</td>
                             <td className="py-2 text-right">
                               <button onClick={() => setOpen(isOpen ? null : c.card)} className="rounded px-2 py-1 text-xs text-primary hover:bg-[#f0f5fb]">
@@ -135,9 +186,14 @@ export function FuelImport({ onClose }) {
                               </button>
                             </td>
                           </tr>,
+                          assignments[c.card] && c.odometer?.flags?.length > 0 && (
+                            <tr key={`${c.card}-km`} className="border-b border-[#f0f0f0]">
+                              <td colSpan={6} className="px-3 pt-0 pb-2"><KmFlags flags={c.odometer.flags} /></td>
+                            </tr>
+                          ),
                           isOpen && (
                             <tr key={`${c.card}-rows`} className="border-b border-[#f0f0f0] bg-[#fafafa]">
-                              <td colSpan={5} className="px-3 py-2">
+                              <td colSpan={6} className="px-3 py-2">
                                 <table className="w-full text-xs">
                                   <thead>
                                     <tr className="text-left text-off">

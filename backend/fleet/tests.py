@@ -1,3 +1,4 @@
+import json
 import tempfile
 from datetime import date
 from unittest import mock
@@ -354,3 +355,121 @@ class PdfAndDocumentDriveTests(TestCase):
             self.assertIs(self.api.get("/api/links/").data["drive"], False)
         with self.on:
             self.assertIs(self.api.get("/api/links/").data["drive"], True)
+
+
+class InsuranceIgnoredTests(TestCase):
+    """Insurance dates are not tracked: they never warn and never change a van's status."""
+
+    def test_an_expired_insurance_date_is_ignored_but_rego_still_counts(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 3", model="HiAce", rego="ABC123", insurance_expiry=today - timedelta(days=30), rego_expiry=today + timedelta(days=400))
+        self.assertEqual(services.vehicle_status_badge(van), "ok")
+        self.assertEqual(services.alerts(), [])
+        self.assertEqual(services.dashboard_summary()["due_count"], 0)
+        van.rego_expiry = today - timedelta(days=1)
+        van.save()
+        self.assertEqual(services.vehicle_status_badge(van), "attention")
+        self.assertEqual([a["title"] for a in services.alerts()], ["Registration expires"])
+
+
+FUEL_TEXT = "\n".join([
+    "METRO PETROLEUM CARD",
+    "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
+    "Vehicle\tCard No.\teGrant\tDate\tSupplier\tABN\tOur Ref\tCust Ref\tOdometer\tProduct\tLitres\tNett\tGST\tGross",
+    "",
+    "AAA111 HIACE\t1111 2222",
+    "\t\t\t10/08/2026\tMETRO SYDENHAM\t99610577896\t1\tAAA111\t182000\tDIESEL\t40.00\t80.00\t8.00\t88.00",
+    "\t\t\t07/09/2026\tMETRO SYDENHAM\t99610577896\t2\tAAA111\t183361\tDIESEL\t30.00\t60.00\t6.00\t66.00",
+    "BBB222 HIACE\t3333 4444",
+    "\t\t\t04/09/2026\tMETRO SYDENHAM\t99610577896\t3\tBBB222\t56101\tDIESEL\t35.00\t70.00\t7.00\t77.00",
+    "CCC333 HIACE\t5555 6666",
+    "\t\t\t10/08/2026\tMETRO SYDENHAM\t99610577896\t4\tCCC333\t100000\tDIESEL\t35.00\t70.00\t7.00\t77.00",
+    "\t\t\t05/09/2026\tMETRO SYDENHAM\t99610577896\t5\tCCC333\t2000000\tDIESEL\t35.00\t70.00\t7.00\t77.00",
+    "\t\t\t07/09/2026\tMETRO SYDENHAM\t99610577896\t6\tCCC333\t\tDIESEL\t20.00\t40.00\t4.00\t44.00",
+    "DDD444 HIACE\t7777 8888",
+    "\t\t\t05/09/2026\tMETRO SYDENHAM\t99610577896\t7\tDDD444\t\tDIESEL\t20.00\t40.00\t4.00\t44.00",
+    "EEE555 HIACE\t9999 0000",
+    "\t\t\t05/09/2026\tMETRO SYDENHAM\t99610577896\t8\tEEE555\t150000\tDIESEL\t20.00\t40.00\t4.00\t44.00",
+])
+
+
+class FuelStatementOdometerTests(TestCase):
+    """A fuel statement moves each van's km to its newest believable reading,
+    and the next-service reminder (last service km + interval) follows it."""
+
+    def setUp(self):
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        # Van A: 188,000 is a guess typed when a service was booked. Its last real service was at 175,000.
+        self.a = Vehicle.objects.create(make="Van 1", model="HiAce", rego="AAA111", odometer=188000, service_interval_km=10000)
+        ServiceRecord.objects.create(vehicle=self.a, service_type="Scheduled service", date=date(2026, 8, 1), odometer=175000, status="Invoiced")
+        ServiceRecord.objects.create(vehicle=self.a, service_type="Scheduled service", date=date(2026, 10, 7), odometer=188000, status="Booked")
+        # Van B: serviced on 30-09 at 61,218, after its last fill-up (56,101 on 04-09), so the service km is the newest reading.
+        self.b = Vehicle.objects.create(make="Van 2", model="HiAce", rego="BBB222", odometer=61218, service_interval_km=10000)
+        ServiceRecord.objects.create(vehicle=self.b, service_type="Scheduled service", date=date(2026, 9, 30), odometer=61218, status="Invoiced")
+        # Van C: a typo reading and a latest fill-up with no km at all.
+        self.c = Vehicle.objects.create(make="Van 3", model="HiAce", rego="CCC333", odometer=90000, service_interval_km=10000)
+        # Van D: nobody ever types the km at the pump. Van E: a reading 100,000 km above its last service.
+        self.d = Vehicle.objects.create(make="Van 4", model="HiAce", rego="DDD444", odometer=40000, service_interval_km=10000)
+        self.e = Vehicle.objects.create(make="Van 5", model="HiAce", rego="EEE555", odometer=50000, service_interval_km=10000)
+        ServiceRecord.objects.create(vehicle=self.e, service_type="Scheduled service", date=date(2026, 8, 1), odometer=50000, status="Invoiced")
+
+    def upload(self, **extra):
+        file = SimpleUploadedFile("MPDATA080926.TXT", FUEL_TEXT.encode(), content_type="text/plain")
+        return self.api.post("/api/fuel-import/", {"file": file, **extra}, format="multipart")
+
+    def test_preview_says_what_each_vans_km_will_become(self):
+        cards = {c["label"].split()[0]: c["odometer"] for c in self.upload().data["cards"]}
+        self.assertEqual({k: cards["AAA111"][k] for k in ("before", "after", "date", "changed", "lower")},
+                         {"before": 188000, "after": 183361, "date": "2026-09-07", "changed": True, "lower": True})
+        self.assertFalse(cards["BBB222"]["changed"])  # the service at 61,218 is newer than the fill-up
+        self.assertEqual((cards["CCC333"]["after"], cards["CCC333"]["changed"]), (100000, True))  # the 2,000,000 typo is ignored
+
+    def test_import_updates_km_and_the_next_service_reminder(self):
+        from . import services
+
+        before = services.next_service_due(self.a)["km_left"]
+        assignments = json.dumps({"1111 2222": self.a.pk, "3333 4444": self.b.pk, "5555 6666": self.c.pk, "7777 8888": self.d.pk, "9999 0000": self.e.pk})
+        result = self.upload(assignments=assignments).data
+        self.assertEqual(sorted((o["label"], o["before"], o["after"]) for o in result["odometers"]),
+                         [("Van 1", 188000, 183361), ("Van 3", 90000, 100000)])
+        for v in (self.a, self.b, self.c, self.d, self.e):
+            v.refresh_from_db()
+        self.assertEqual((self.a.odometer, self.b.odometer, self.c.odometer), (183361, 61218, 100000))
+        self.assertEqual((self.d.odometer, self.e.odometer), (40000, 50000))  # nothing usable on the statement: left alone
+        # Van A: last service at 175,000 + 10,000 = due at 185,000, so 1,639 km to go. With the guessed km it looked 3,000 km overdue.
+        self.assertEqual((before, services.next_service_due(self.a)["km_left"]), (-3000, 1639))
+        # Van B: its own last service km (61,218) is what the reminder counts from.
+        self.assertEqual(services.next_service_due(self.b), {"due_at": 71218, "km_left": 10000, "booked": None})
+
+    def test_anything_odd_about_the_km_is_flagged(self):
+        flags = {c["label"].split()[0]: [(f[0], f[1]) for f in c["odometer"]["flags"]] for c in self.upload().data["cards"]}
+        text = lambda key: " | ".join(x[1] for x in flags[key])
+        self.assertEqual(flags["BBB222"], [])  # a clean van has no flags
+        self.assertIn("lower than the km in the app", text("AAA111"))
+        self.assertIn("1 km reading on this statement looked wrong", text("CCC333"))
+        self.assertIn("km is from 10-08-2026, but it was last filled up on 07-09-2026", text("CCC333"))  # Van 3's newest fill-up has no km
+        self.assertIn("No km was typed at the pump", text("DDD444"))
+        self.assertEqual(flags["EEE555"][0][0], "red")  # 150,000 km in 35 days can't be right
+        self.assertIn("Every km reading on this statement looks wrong", text("EEE555"))
+        # after importing, the same warnings come back in the result
+        assignments = json.dumps({"1111 2222": self.a.pk, "7777 8888": self.d.pk, "9999 0000": self.e.pk})
+        result = self.upload(assignments=assignments).data
+        self.assertEqual(sorted(f["label"] for f in result["odometerFlags"]), ["Van 1", "Van 4", "Van 5"])
+        self.e.refresh_from_db()
+        self.assertEqual(self.e.odometer, 50000)
+
+    def test_each_van_says_when_its_km_was_last_confirmed(self):
+        from .serializers import VehicleSerializer
+
+        asof = {v["rego"]: v["odometerAsOf"] for v in VehicleSerializer(Vehicle.objects.all(), many=True).data}
+        self.assertEqual(asof["BBB222"], "2026-09-30")  # the service at 61,218
+        self.assertEqual(asof["AAA111"], "2026-08-01")  # the 188,000 on the booked job is only a guess, so the last real reading counts
+        self.assertIsNone(asof["DDD444"])  # nothing but a number typed in by hand
+

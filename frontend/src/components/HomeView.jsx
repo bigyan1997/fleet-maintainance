@@ -6,6 +6,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
 import { daysFromToday, fmtAgo, fmtDate, sydneyMonthName, todayIso } from '../lib/formatDate'
+import { kmAgeDays, kmIsOld } from '../lib/fleet'
 import { href } from '../lib/router'
 import { StatusSelect } from './StatusSelect'
 
@@ -137,6 +138,21 @@ export function HomeView() {
           }]
         : []
     })()),
+    ...((() => {
+      const old = (vehicles.data ?? []).filter(kmIsOld)
+      if (!old.length) return []
+      const oldest = Math.max(...old.map((v) => kmAgeDays(v) ?? 0))
+      return [{
+        key: 'km-old',
+        van: old.length === 1 ? old[0].label : `Vans ${old.map((v) => v.label.replace(/^Van\s*/i, '')).join(', ')}`,
+        vanId: old.length === 1 ? old[0].id : null,
+        text: oldest > 0
+          ? `km not updated for ${oldest} days, so the next service countdown may be wrong`
+          : "km wasn't taken from a fill-up or service, so the next service countdown may be wrong",
+        pill: ['amber', 'Km old'],
+        action: <a href={old.length === 1 ? href('vans', old[0].id) : href('vans')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
+      }]
+    })()),
     ...(dueWashes.length
       ? [{
           key: 'washes',
@@ -188,7 +204,7 @@ export function HomeView() {
                 <li key={it.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
                   <div className="min-w-[220px] flex-1">
                     <div>
-                      <a href={it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
+                      <a href={it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : it.key === 'km-old' ? href('vans') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
                       {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
                     </div>
                     <div className="text-[13px] text-ink">{it.text}</div>

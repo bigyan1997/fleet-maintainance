@@ -5,6 +5,9 @@
 - [Testing on live data](live-data-testing.md) — real DB is on the orders PC; this dev PC has a separate older copy (verified 2026-10-06); ASCII output; heredoc backslash quirk
 - [Open items](open-items.md) — data facts, what's waiting on the user, decided/removed features, Home rules (as of 2026-10-01)
 - [Fuel statement import](fuel-invoice-import.md) — Metro/WEX MPDATA TXT import in real use; charges included; quirks
-- [UI style preference](ui-style-preference.md) — classic blue bar + 6 tabs, simple; redesign rejected; picture first for big changes; no "Claude" in the app
+- [UI style preference](ui-style-preference.md) — classic blue bar + the seven tabs, simple; two redesigns rejected (SaaS 09-30, four-tab 10-08); picture first for big changes; no "Claude" in the app
 - [Don't wait for deploy](no-wait-for-deploy.md) — after a push, reply straight away; don't poll the orders PC
 - [Toll statement import](toll-statement-import.md) — Tolls tab, E-Toll PDF, fleet vans only (owner's cars left out), quirks
+- [Repo copy of this memory](../../../../fleet-maintenance/docs/claude-memory/README.md) — a cleaned copy lives in the repo at docs/claude-memory (plus CLAUDE.md); refresh it after big memory changes, removing emails, sheet IDs, key names and local IPs first
+
+- [Simplify plan](simplify-plan.md) — 2026-10-08 four-tab redesign built then REJECTED and reverted (git stash only); insurance removal kept

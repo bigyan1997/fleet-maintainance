@@ -12,7 +12,7 @@ import { fmtDate } from '../lib/formatDate'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
-  'Brake service', 'Repair / parts', 'Registration', 'Insurance', 'Fuel log',
+  'Brake service', 'Repair / parts', 'Registration', 'Fuel log',
 ]
 
 export function HistoryView({ onEdit, initialStatus = '', initialMechanic = '', onError }) {

@@ -4,6 +4,32 @@ import { daysFromToday, fmtAgo, fmtDate } from './formatDate'
 
 export const byNewest = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id)
 
+// A van's km is flagged when its newest reading is older than this (a fuel
+// statement comes monthly, so a van that was filled up in the last cycle is never this old).
+export const KM_STALE_DAYS = 35
+
+export function kmAgeDays(van) {
+  return van.odometerAsOf ? -daysFromToday(van.odometerAsOf) : null
+}
+
+export function kmIsOld(van) {
+  const days = kmAgeDays(van)
+  return van.odometer > 0 ? days === null || days > KM_STALE_DAYS : false
+}
+
+// Where a van's km comes from, and a warning when it is old or was just typed in.
+export function KmAsOf({ van }) {
+  if (!van.odometer) return null
+  const days = kmAgeDays(van)
+  if (days === null) return <div className="text-[11px] font-medium text-warn">not from a fill-up or service</div>
+  const old = days > KM_STALE_DAYS
+  return (
+    <div className={'text-[11px] ' + (old ? 'font-medium text-warn' : 'text-off')}>
+      {old ? `km is ${days} days old (${fmtDate(van.odometerAsOf)})` : `as of ${fmtDate(van.odometerAsOf)}`}
+    </div>
+  )
+}
+
 export function kmColour(kmLeft) {
   if (kmLeft < 0) return 'text-due'
   if (kmLeft < 2000) return 'text-warn'
