@@ -7,6 +7,7 @@ import { Tabs } from './ui'
 const TABS = [
   { key: 'spending', label: 'Spending' },
   { key: 'fuel', label: 'Fuel' },
+  { key: 'tolls', label: 'Tolls' },
   { key: 'budget', label: 'Budget' },
 ]
 
@@ -39,6 +40,7 @@ export function ReportsView({ sub }) {
           </div>
         </>
       )}
+      {tab === 'tolls' && <AnalyticsView key="tolls" section="tolls" />}
       {tab === 'budget' && <BudgetView />}
     </div>
   )

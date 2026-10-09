@@ -5,6 +5,12 @@ export async function fetchFuelLogs(filters = {}) {
   return res.data
 }
 
+// The statements imported so far, newest first: [{ date, lines, total }].
+export async function fetchFuelStatements() {
+  const res = await api.get('/fuel-statements/')
+  return res.data
+}
+
 export async function createFuelLog(data) {
   const res = await api.post('/fuel-logs/', data)
   return res.data

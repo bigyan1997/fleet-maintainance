@@ -367,8 +367,16 @@ def delete_incident(pk):
 # ── Fuel log CRUD ──────────────────────────────────────────────────────────
 
 
-def list_fuel_logs(vehicle=None, date_from=None, date_to=None, search=""):
+def list_fuel_logs(vehicle=None, date_from=None, date_to=None, search="", statement=None):
     qs = FuelLog.objects.select_related("vehicle").all()
+    if statement:
+        # Exactly the lines on that statement, plus anything logged by hand
+        # between the previous statement and this one.
+        previous = FuelLog.objects.filter(statement__lt=statement).aggregate(m=Max("statement"))["m"]
+        by_hand = Q(statement__isnull=True, date__lte=statement)
+        if previous:
+            by_hand &= Q(date__gt=previous)
+        qs = qs.filter(Q(statement=statement) | by_hand)
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
     if date_from:
@@ -643,6 +651,39 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         key=lambda r: -r["total"],
     )
 
+    # Each van, month by month: fuel (dollars + litres) and tolls (dollars + trips).
+    month_info = [{"key": k, "label": m.strftime("%b %y")} for k, m in zip(month_keys, months)]
+
+    def by_van_month(qs, cost_field, extra):
+        table = {}
+        grouped = qs.annotate(month=TruncMonth("date")).values("vehicle", "month").annotate(cost=Sum(cost_field), **extra)
+        for r in grouped:
+            key = r["month"].strftime("%Y-%m")
+            if key in month_keys:
+                table.setdefault(r["vehicle"], {})[key] = {"cost": float(r["cost"] or 0), **{n: float(r[n] or 0) for n in extra}}
+        return table
+
+    fuel_table = by_van_month(fuel_qs, "cost", {"litres": Sum("litres", filter=fuel_only_q())})
+    toll_table = by_van_month(tolls_qs, "amount", {"trips": Count("id", filter=Q(is_fee=False))})
+    van_names = {v.pk: str(v) for v in Vehicle.objects.filter(pk__in=set(fuel_table) | set(toll_table))}
+
+    def van_rows(table, fields):
+        out = []
+        for vid, cells in table.items():
+            total = {f: sum(c[f] for c in cells.values()) for f in ("cost", *fields)}
+            if total["cost"] > 0:
+                out.append({"id": vid, "label": van_names.get(vid, "?"), "months": cells, "total": total})
+        return sorted(out, key=lambda r: -r["total"]["cost"])
+
+    monthly_tolls = [
+        {
+            "label": label,
+            "value": sum(c.get(k, {}).get("cost", 0) for c in toll_table.values()),
+            "trips": sum(c.get(k, {}).get("trips", 0) for c in toll_table.values()),
+        }
+        for label, k in zip(month_labels, month_keys)
+    ]
+
     cost_by_type = [
         {"label": r["service_type"], "value": float(r["total"])}
         for r in services_qs.values("service_type").annotate(total=Sum("cost")).filter(total__gt=0).order_by(
@@ -666,6 +707,10 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         "costByType": cost_by_type,
         "runningCost": running_cost,
         "tollCost": tolls_qs.aggregate(t=Sum("amount"))["t"] or 0,
+        "tollFees": tolls_qs.filter(is_fee=True).aggregate(t=Sum("amount"))["t"] or 0,
+        "tollTrips": tolls_qs.filter(is_fee=False).count(),
+        "monthlyTolls": monthly_tolls,
+        "vanMonths": {"months": month_info, "fuel": van_rows(fuel_table, ["litres"]), "tolls": van_rows(toll_table, ["trips"])},
         **fuel_insights(fuel_qs),
     }
 

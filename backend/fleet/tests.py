@@ -473,3 +473,71 @@ class FuelStatementOdometerTests(TestCase):
         self.assertEqual(asof["AAA111"], "2026-08-01")  # the 188,000 on the booked job is only a guess, so the last real reading counts
         self.assertIsNone(asof["DDD444"])  # nothing but a number typed in by hand
 
+
+
+class VanMonthsTests(TestCase):
+    """Reports: each van's fuel and tolls, month by month."""
+
+    def test_each_van_month_by_month(self):
+        from datetime import time, timedelta
+
+        from django.utils import timezone
+
+        from . import services
+        from .models import FuelLog, TollStatement, TollTrip
+
+        today = timezone.localdate()
+        last_day_of_last_month = today.replace(day=1) - timedelta(days=1)
+        van = Vehicle.objects.create(make="Van 1", model="HiAce", rego="AAA111")
+        FuelLog.objects.create(vehicle=van, date=today, litres=50, cost=100, product="")  # diesel
+        FuelLog.objects.create(vehicle=van, date=today, litres=0, cost=10, product="Card fee")  # a card charge: dollars, no litres
+        FuelLog.objects.create(vehicle=van, date=last_day_of_last_month, litres=30, cost=60, product="")
+        st = TollStatement.objects.create(invoice_number="9", period_start=last_day_of_last_month, period_end=today, total=0)
+        for day, amount, fee in ((today, "5.00", False), (today, "0.55", True), (last_day_of_last_month, "3.00", False)):
+            TollTrip.objects.create(statement=st, vehicle=van, source="tag", date=day, time=time(8, 0), road="WestConnex", detail="Church St", amount=amount, is_fee=fee)
+
+        data = services.analytics()["vanMonths"]
+        this_key, last_key = today.strftime("%Y-%m"), last_day_of_last_month.strftime("%Y-%m")
+        self.assertEqual([m["key"] for m in data["months"]][-2:], [last_key, this_key])
+        fuel = data["fuel"][0]
+        self.assertEqual((fuel["label"], fuel["months"][this_key], fuel["months"][last_key]), ("Van 1", {"cost": 110.0, "litres": 50.0}, {"cost": 60.0, "litres": 30.0}))
+        self.assertEqual(fuel["total"], {"cost": 170.0, "litres": 80.0})
+        toll = data["tolls"][0]
+        self.assertEqual((toll["months"][this_key], toll["months"][last_key]), ({"cost": 5.55, "trips": 1.0}, {"cost": 3.0, "trips": 1.0}))
+        self.assertEqual(toll["total"], {"cost": 8.55, "trips": 2.0})
+
+
+class FuelStatementPeriodTests(TestCase):
+    """Fuel statements overlap by a day (late-posted fill-ups). Each statement shows exactly its own lines."""
+
+    HEADER = "Vehicle\tCard No.\teGrant\tDate\tSupplier\tABN\tOur Ref\tCust Ref\tOdometer\tProduct\tLitres\tNett\tGST\tGross"
+    ROW = "\t\t\t{d}\tMETRO SYDENHAM\t99610577896\t{n}\tAAA111\t{odo}\tDIESEL\t{l}\t0.00\t0.00\t{c}"
+
+    def setUp(self):
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.van = Vehicle.objects.create(make="Van 1", model="HiAce", rego="AAA111")
+
+    def statement(self, to, rows):
+        text = "\n".join(["METRO PETROLEUM CARD", f"VEHICLE REPORT AND STATEMENT TO {to}", self.HEADER, "", "AAA111 HIACE\t1111 2222"] + rows)
+        file = SimpleUploadedFile("MPDATA.TXT", text.encode(), content_type="text/plain")
+        res = self.api.post("/api/fuel-import/", {"file": file, "assignments": json.dumps({"1111 2222": self.van.pk})}, format="multipart")
+        self.assertEqual(res.status_code, 201)
+
+    def test_a_statement_shows_exactly_its_own_lines(self):
+        from .models import FuelLog
+
+        self.statement("08 SEP 26", [self.ROW.format(d="10/08/2026", n=1, odo=182000, l="40.00", c="88.00"), self.ROW.format(d="07/09/2026", n=2, odo=183361, l="30.00", c="66.00")])
+        FuelLog.objects.create(vehicle=self.van, date=date(2026, 9, 20), litres=10, cost=30)  # logged by hand between the two statements
+        # The next statement lists a fill-up dated 08-09, the day the last one ended.
+        self.statement("08 OCT 26", [self.ROW.format(d="08/09/2026", n=3, odo=183500, l="20.00", c="50.00"), self.ROW.format(d="05/10/2026", n=4, odo=184000, l="30.00", c="60.00")])
+
+        listed = self.api.get("/api/fuel-statements/").data
+        self.assertEqual([(str(s["date"]), s["lines"], float(s["total"])) for s in listed], [("2026-10-08", 2, 110.0), ("2026-09-08", 2, 154.0)])
+
+        def costs(statement):
+            rows = self.api.get("/api/fuel-logs/", {"statement": statement, "page_size": 100}).data["results"]
+            return sorted(float(r["cost"]) for r in rows)
+
+        self.assertEqual(costs("2026-09-08"), [66.0, 88.0])  # not the 50.00 dated 08-09
+        self.assertEqual(costs("2026-10-08"), [30.0, 50.0, 60.0])  # its own two lines, plus the one logged by hand in between

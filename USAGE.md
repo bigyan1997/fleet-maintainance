@@ -96,7 +96,7 @@ After you click **Import**, each van's km becomes the km on its **newest believa
 Fill-ups, card fees and AdBlue are all imported, so each van's total matches the statement to the cent. Litres, $/L and L/100km count diesel only.
 
 ### Reading the Fuel tab
-- It opens on the **latest statement**. Use **‹ ›** for earlier statements, or **All time**.
+- It opens on the **latest statement**, showing exactly the lines on that statement, so its total matches the statement to the cent (the fuel company's statements overlap by a day: a few late-posted fill-ups are dated the day the last one ended, and they belong to the newer one). Use **‹ ›** for earlier statements, or **All time**.
 - One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups.
 - **Filters ▾** has van, dates, search, and "Every line" for the full list.
 - **Log fill-up** adds one by hand (rarely needed).
@@ -104,7 +104,8 @@ Fill-ups, card fees and AdBlue are all imported, so each van's total matches the
 ## Reports
 
 - **Spending:** maintenance spend by month, by van and by type of work.
-- **Fuel:** fuel use by van (vans using 15% more than the fleet average are highlighted), fuel checks worth asking about (two fill-ups in a day, premium diesel, odometer typos), monthly fuel card spend, and month-by-month trends with price per litre and the cheapest stations.
+- **Fuel:** **Fuel by van, month by month** (dollars on the fuel card and litres of diesel for every van in every month, darker blue = more, with totals), then fuel use by van (vans using 15% more than the fleet average are highlighted), fuel checks worth asking about (two fill-ups in a day, premium diesel, odometer typos), monthly fuel card spend, and month-by-month trends with price per litre and the cheapest stations.
+- **Tolls:** **Tolls by van, month by month** (dollars and number of trips for every van in every month, with totals) and a monthly chart. The month is the date of each trip, so a statement that runs from 29-08 to 28-09 is split across August and September.
 - **Budget:** set a monthly budget for fuel and for maintenance, and see each month against it.
 - **Download (Excel / CSV):** everything as a spreadsheet.
 

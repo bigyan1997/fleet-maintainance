@@ -4,6 +4,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { fetchAnalytics } from '../api/analytics'
 import { BarList } from './charts/BarList'
 import { LineChart } from './charts/LineChart'
+import { VanMonths } from './VanMonths'
 import { fmtDate } from '../lib/formatDate'
 
 function Metric({ label, value, color, sub }) {
@@ -108,7 +109,22 @@ export function AnalyticsView({ section = 'spending' }) {
 
       </>)}
 
+      {section === 'tolls' && (<>
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Metric label={`Tolls — ${rangeLabel}`} value={cents(data.tollCost)} sub="trips + fees, from the toll statements added so far" />
+        <Metric label="Toll trips" value={Number(data.tollTrips).toLocaleString('en-AU')} sub="not counting fees" />
+        <Metric label="Fees for tags that didn't beep" value={cents(data.tollFees)} color={Number(data.tollFees) ? 'text-due' : undefined} sub="avoidable: see the Tolls tab" />
+      </div>
+      <VanMonths kind="tolls" data={data.vanMonths} rangeLabel={rangeLabel} />
+      <div className="mb-4 rounded-lg border border-line bg-white p-4">
+        <h2 className="mb-3 text-[15px] font-semibold text-ink">Monthly tolls — {rangeLabel}</h2>
+        <p className="-mt-2 mb-3 text-xs text-off">All vans together, by the date of each trip.</p>
+        <LineChart rows={data.monthlyTolls ?? []} />
+      </div>
+      </>)}
+
       {section === 'fuel' && (<>
+      <VanMonths kind="fuel" data={data.vanMonths} rangeLabel={rangeLabel} />
       <FuelUse vans={data.fuelVans ?? []} fleetAvg={data.fuelFleetPer100} />
       <FuelFlags flags={data.fuelFlags ?? []} />
 

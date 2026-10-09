@@ -17,3 +17,5 @@ Reaffirmed 2026-10-06: "dont push anything until i say now". Commit locally if u
 
 Update 2026-10-06 (evening): the user said "push to github" after holding it all day, and everything was pushed (commit b72a3f4). The hold is over; the rule is still: push only when told.
 
+Lesson 2026-10-09: someone at the office (a Claude session on the orders PC) can push to main between my pushes (it removed insurance on 07-10 while I was working). Always `git fetch` before trusting `git status`, and expect a rebase conflict on NOTES.md/USAGE.md/shared screens; resolve by keeping the office's wording for what it already did and mine for the rest, then re-run the tests and build before pushing.
+

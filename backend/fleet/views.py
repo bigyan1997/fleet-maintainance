@@ -1,6 +1,7 @@
 import re
 
 from django.conf import settings
+from django.db.models import Count, Sum
 from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -183,7 +184,7 @@ class IncidentViewSet(viewsets.ViewSet):
 
 class FuelLogViewSet(viewsets.ViewSet):
     def list(self, request):
-        rows = _filtered_list(request, services.list_fuel_logs)
+        rows = _filtered_list(request, services.list_fuel_logs, lambda r: {"statement": parse_date(r.query_params.get("statement") or "")})
         return _paginated(request, rows, FuelLogSerializer)
 
     def create(self, request):
@@ -240,6 +241,19 @@ class FuelImportView(APIView):
             return Response(fuel_import.preview(raw))
         except fuel_import.ImportFileError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FuelStatementsView(APIView):
+    """The fuel statements imported so far, newest first, with what each one totals."""
+
+    def get(self, request):
+        rows = (
+            FuelLog.objects.filter(statement__isnull=False)
+            .values("statement")
+            .annotate(lines=Count("id"), total=Sum("cost"))
+            .order_by("-statement")
+        )
+        return Response([{"date": r["statement"], "lines": r["lines"], "total": r["total"]} for r in rows])
 
 
 class DashboardView(APIView):

@@ -277,6 +277,7 @@ def import_statement(raw, assignments):
     card number -> vehicle id (the user can override the automatic match or
     leave a card out with None). Returns counts."""
     data = parse_statement(raw)
+    statement_date = datetime.fromisoformat(data["statementDate"]).date() if data["statementDate"] else None
     vehicles = {v.pk: v for v in Vehicle.objects.all()}
     created = charges = duplicates = 0
     touched_cards = 0
@@ -305,6 +306,7 @@ def import_statement(raw, assignments):
                         odometer=None if r["odometerBad"] else r["odometer"],
                         invoice_number=r["docket"],
                         notes=_note(r, data["statementDate"]),
+                        statement=statement_date,
                     )
                     created += 1
                     charges += r in card["charges"]

@@ -153,8 +153,9 @@ class FuelLogSerializer(serializers.ModelSerializer):
         model = FuelLog
         fields = [
             "id", "vehicle", "vehicleLabel", "vehicleSub", "date", "product", "isFuel", "litres", "cost",
-            "pricePerLitre", "odometer", "invoice_number", "notes",
+            "pricePerLitre", "odometer", "invoice_number", "notes", "statement",
         ]
+        read_only_fields = ["statement"]
 
     def get_pricePerLitre(self, obj):
         return obj.price_per_litre

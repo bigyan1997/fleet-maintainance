@@ -56,6 +56,7 @@ export function FuelImport({ onClose }) {
     onSuccess: (data) => {
       setResult(data)
       queryClient.invalidateQueries({ queryKey: ['fuel-logs'] })
+      queryClient.invalidateQueries({ queryKey: ['fuel-statements'] })
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['alerts'] })

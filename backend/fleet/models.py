@@ -254,6 +254,10 @@ class FuelLog(models.Model):
     odometer = models.PositiveIntegerField(null=True, blank=True)
     invoice_number = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
+    # The fuel statement this line came from (its "statement to" date); blank
+    # for fuel logged by hand. Statements overlap by a day (late-posted
+    # fill-ups), so a statement's lines are not simply "its dates".
+    statement = models.DateField(null=True, blank=True, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

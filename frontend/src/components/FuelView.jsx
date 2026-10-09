@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
-import { deleteFuelLog, fetchFuelLogs } from '../api/fuelLogs'
+import { deleteFuelLog, fetchFuelLogs, fetchFuelStatements } from '../api/fuelLogs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { FuelByVan } from './FuelByVan'
@@ -40,14 +40,23 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const latestQuery = useQuery({ queryKey: ['fuel-logs', { latest: true }], queryFn: () => fetchFuelLogs({ page_size: 1 }) })
   const latest = latestQuery.data?.results?.[0]?.date
+  // A statement can include late-posted fill-ups dated just before its own
+  // period, so a statement is shown by its own lines, not by dates.
+  const statementsQuery = useQuery({ queryKey: ['fuel-statements'], queryFn: fetchFuelStatements })
+  const statements = statementsQuery.data ?? []
+  const current = statements.length > 0 && period !== 'all' ? statements[Math.min(period, statements.length - 1)] : null
   // A statement period ends on the latest fuel date and starts the day after
   // the same date a month earlier (08-09 -> 09-08 to 08-09).
   const ownDates = Boolean(dateFrom || dateTo)
-  const periodTo = latest && period !== 'all' ? shiftMonths(latest, -period) : null
+  const periodTo = !current && latest && period !== 'all' ? shiftMonths(latest, -period) : null
   const periodFrom = periodTo ? addDays(shiftMonths(periodTo, -1), 1) : null
+  const useStatement = Boolean(current) && !ownDates
   const from = ownDates ? dateFrom : periodFrom
   const to = ownDates ? dateTo : periodTo
-  const filters = { vehicle: vehicle || undefined, date_from: from || undefined, date_to: to || undefined, search: search || undefined, page }
+  const filters = {
+    vehicle: vehicle || undefined, date_from: from || undefined, date_to: to || undefined, search: search || undefined, page,
+    statement: useStatement ? current.date : undefined,
+  }
   // By van needs every matching fill-up to total them, not just one page.
   const queryFilters = view === 'van' ? { ...filters, page: undefined, page_size: 5000 } : filters
   const fuelQuery = useQuery({ queryKey: ['fuel-logs', queryFilters], queryFn: () => fetchFuelLogs(queryFilters) })
@@ -84,10 +93,11 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
           <span className="font-semibold">All fuel, every statement</span>
         ) : (
           <>
-            <button onClick={() => { setPeriod((p) => p + 1); setPage(1) }} className="rounded-md border border-line bg-white px-2.5 py-1 hover:bg-[#f5f5f5]" title="Earlier statement">‹</button>
+            <button disabled={Boolean(current) && period >= statements.length - 1} onClick={() => { setPeriod((p) => p + 1); setPage(1) }} className="rounded-md border border-line bg-white px-2.5 py-1 hover:bg-[#f5f5f5] disabled:opacity-40" title="Earlier statement">‹</button>
             <span className="font-semibold">
               {period === 0 ? 'Latest statement' : `${period} statement${period === 1 ? '' : 's'} back`}
-              {periodFrom && <span className="font-normal text-off"> · {fmtDate(periodFrom)} – {fmtDate(periodTo)}</span>}
+              {current && <span className="font-normal text-off"> · statement to {fmtDate(current.date)} · {current.lines} lines</span>}
+              {!current && periodFrom && <span className="font-normal text-off"> · {fmtDate(periodFrom)} – {fmtDate(periodTo)}</span>}
             </span>
             <button disabled={period === 0} onClick={() => { setPeriod((p) => p - 1); setPage(1) }} className="rounded-md border border-line bg-white px-2.5 py-1 hover:bg-[#f5f5f5] disabled:opacity-40" title="Later statement">›</button>
           </>
