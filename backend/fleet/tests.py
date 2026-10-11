@@ -406,6 +406,28 @@ class OffRoadTests(TestCase):
         self.assertTrue(wash["offRoad"])
 
 
+class TollSheetTabTests(TestCase):
+    def test_tolls_tab_has_a_row_per_trip_with_weekend_and_afternoon_flags(self):
+        from datetime import date, time
+        from decimal import Decimal
+
+        from . import sheets_sync
+        from .models import TollStatement, TollTrip
+
+        van = Vehicle.objects.create(make="Van 9", model="HiAce", rego="YLS91M")
+        st = TollStatement.objects.create(invoice_number="X1", period_start=date(2026, 8, 29), period_end=date(2026, 9, 28), total=Decimal("9.50"))
+        TollTrip.objects.create(statement=st, vehicle=van, source="tag", date=date(2026, 9, 5), time=time(14, 30), road="M5", detail="d", amount=Decimal("5.00"))  # a Saturday, after 12
+        TollTrip.objects.create(statement=st, vehicle=van, source="plate", date=date(2026, 9, 7), time=time(9, 0), road="M2", detail="d", amount=Decimal("4.50"))  # a Monday morning
+        header, rows = sheets_sync.TABS["Tolls"]()
+        self.assertEqual(len(rows), 2)
+        col = {h: i for i, h in enumerate(header)}
+        sat, mon = rows
+        self.assertEqual((sat[col["Day"]], sat[col["Weekend?"]], sat[col["After 12 pm?"]]), ("Sat", "Yes", "Yes"))
+        self.assertEqual((mon[col["Day"]], mon[col["Weekend?"]], mon[col["After 12 pm?"]]), ("Mon", "", ""))
+        self.assertIn("didn't beep", mon[col["Charged to"]])
+        self.assertEqual(sheets_sync.MODEL_TABS["TollStatement"], ["Tolls"])
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

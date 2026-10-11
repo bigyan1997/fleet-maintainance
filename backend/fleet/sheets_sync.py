@@ -110,13 +110,33 @@ def _fuel_rows():
     return header, rows
 
 
+def _toll_rows():
+    from .models import TollTrip
+
+    header = [
+        "ID", "Statement from", "Statement to", "Vehicle ID", "Vehicle", "Rego", "Date", "Day", "Time", "Toll road",
+        "Detail", "Amount ($)", "Fee?", "Charged to", "Weekend?", "After 12 pm?",
+    ]
+    rows = []
+    trips = TollTrip.objects.select_related("vehicle", "statement").order_by("date", "time", "pk")
+    for t in trips:
+        rows.append([
+            t.pk, _date(t.statement.period_start), _date(t.statement.period_end), t.vehicle_id, str(t.vehicle), t.vehicle.rego,
+            _date(t.date), t.date.strftime("%a"), t.time.strftime("%H:%M"), t.road, t.detail, _num(t.amount),
+            "Fee" if t.is_fee else "", "number plate (tag didn't beep)" if t.source == "plate" else "tag",
+            "Yes" if t.date.weekday() >= 5 and not t.is_fee else "", "Yes" if t.time.hour >= 12 and not t.is_fee else "",
+        ])
+    return header, rows
+
+
 # Tab name -> row builder. Service/incident/fuel rows show the vehicle's
-# label and rego, so a vehicle edit also refreshes those tabs.
+# label and rego, so a vehicle edit also refreshes those tabs (Tolls too).
 TABS = {
     "Vehicles": _vehicle_rows,
     "Service History": _service_rows,
     "Incidents": _incident_rows,
     "Fuel Log": _fuel_rows,
+    "Tolls": _toll_rows,
 }
 MODEL_TABS = {
     "Vehicle": list(TABS),
@@ -124,6 +144,10 @@ MODEL_TABS = {
     "Incident": ["Incidents"],
     "IncidentUpdate": ["Incidents"],
     "FuelLog": ["Fuel Log"],
+    # A statement's trips are written in bulk, so the statement itself (saved
+    # or removed once per import) is what triggers the Tolls tab; its trips
+    # follow it when the push runs after the commit.
+    "TollStatement": ["Tolls"],
 }
 
 

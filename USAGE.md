@@ -137,7 +137,7 @@ Only the fleet vans are shown. Other vehicles on the toll account are left out, 
 
 ## Google Sheet
 
-The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten.
+The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten. Its tabs are Vehicles, Service History (washes too), Incidents, Fuel Log and **Tolls** (one row per toll trip, with the day, time, road, amount, whether it was a fee, and **Weekend?** / **After 12 pm?** flags; it refreshes after each toll statement import).
 
 ## If the app won't open
 
