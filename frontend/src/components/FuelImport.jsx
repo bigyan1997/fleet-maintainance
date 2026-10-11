@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
 import { uploadFuelStatement } from '../api/fuelLogs'
-import { fmtDate } from '../lib/formatDate'
+import { fmtDate, fmtDayDate } from '../lib/formatDate'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const km = (n) => `${Number(n).toLocaleString()} km`
@@ -15,7 +15,7 @@ function VanKm({ o }) {
   return (
     <span className={o.lower ? 'text-warn' : 'text-ok'}>
       <b className="whitespace-nowrap">{km(o.before)} → {km(o.after)}</b>
-      <div className="text-xs">{o.lower ? 'lower than the app had' : 'goes up'}{o.date && ` · from ${fmtDate(o.date)}`}</div>
+      <div className="text-xs">{o.lower ? 'lower than the app had' : 'goes up'}{o.date && ` · from ${fmtDayDate(o.date)}`}</div>
     </span>
   )
 }
@@ -209,7 +209,7 @@ export function FuelImport({ onClose }) {
                                   <tbody>
                                     {c.rows.map((r, i) => (
                                       <tr key={i} className={r.duplicate ? 'text-off' : ''}>
-                                        <td className="py-1 pr-2 whitespace-nowrap">{fmtDate(r.date)}</td>
+                                        <td className="py-1 pr-2 whitespace-nowrap">{fmtDayDate(r.date)}</td>
                                         <td className="py-1 pr-2">{r.station}{r.product !== 'Diesel' && <span className="text-off"> · {r.product}</span>}</td>
                                         <td className="py-1 pr-2">{r.litres} L</td>
                                         <td className="py-1 pr-2">{money(r.cost)}</td>

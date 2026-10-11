@@ -25,6 +25,15 @@ export function daysFromToday(iso) {
   return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000)
 }
 
+// "Sun 04-10-2026": the day of the week next to the date, so it's easy to read.
+export function fmtDayDate(iso) {
+  if (!iso) return ''
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return fmtDate(iso)
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+  return `${day} ${fmtDate(iso)}`
+}
+
 export function fmtDate(iso) {
   if (!iso) return ''
   const [y, m, d] = String(iso).slice(0, 10).split('-')

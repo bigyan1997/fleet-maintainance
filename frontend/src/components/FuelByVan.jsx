@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { byNewest } from '../lib/fleet'
-import { fmtDate } from '../lib/formatDate'
+import { fmtDate, fmtDayDate } from '../lib/formatDate'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const sum = (rows, key) => rows.reduce((s, r) => s + Number(r[key]), 0)
@@ -56,7 +56,7 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
         <tbody>
           {fills.map((f, i) => (
             <tr key={f.id} className={`cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb] ${i % 2 ? 'bg-[#fafafa]' : ''}`} onClick={() => onPick(f)}>
-              <td className="py-2 pr-3 pl-3 whitespace-nowrap">{fmtDate(f.date)}</td>
+              <td className="py-2 pr-3 pl-3 whitespace-nowrap">{fmtDayDate(f.date)}</td>
               <td className="py-2 pr-3">
                 {station(f) || '—'}
                 {f.product && f.product !== 'Diesel' && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">{f.product}</span>}
@@ -83,7 +83,7 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
               </tr>
               {charges.map((f) => (
                 <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] text-off hover:bg-[#f0f5fb]" onClick={() => onPick(f)}>
-                  <td className="py-2 pr-3 pl-3 whitespace-nowrap">{fmtDate(f.date)}</td>
+                  <td className="py-2 pr-3 pl-3 whitespace-nowrap">{fmtDayDate(f.date)}</td>
                   <td className="py-2 pr-3" colSpan={3}>{f.product || 'Charge'}</td>
                   <td className={num}>{money(f.cost)}</td>
                   <td colSpan={2} />
@@ -162,7 +162,7 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
                 <td className={num}>{money(fuelCost)}</td>
                 <td className={`${num} text-off`}>{money(sum(charges, 'cost'))}</td>
                 <td className={`${num} font-semibold`}>{money(sum(g.rows, 'cost'))}</td>
-                <td className={num}>{fills[0] ? fmtDate(fills[0].date) : '—'}</td>
+                <td className={num}>{fills[0] ? fmtDayDate(fills[0].date) : '—'}</td>
                 <td className="px-3 py-2.5 text-right text-xs text-primary">{isOpen ? 'Hide' : 'Show fill-ups'}</td>
               </tr>,
               isOpen && (

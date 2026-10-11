@@ -97,7 +97,7 @@ Fill-ups, card fees and AdBlue are all imported, so each van's total matches the
 
 ### Reading the Fuel tab
 - It opens on the **latest statement**, showing exactly the lines on that statement, so its total matches the statement to the cent (the fuel company's statements overlap by a day: a few late-posted fill-ups are dated the day the last one ended, and they belong to the newer one). Use **‹ ›** for earlier statements, or **All time**.
-- One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups.
+- One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups. Every date on the Fuel pages has the day of the week in front of it (for example **Tue 06-10-2026**).
 - **Filters ▾** has van, dates, search, and "Every line" for the full list.
 - **Log fill-up** adds one by hand (rarely needed).
 
