@@ -1,5 +1,5 @@
 - [User profile](user-profile.md) — who Bigyan is, casual non-dev style, restate-then-build, live update every change, push only when told, Sydney time
-- [Live server & redeploy](live-server-deploy.md) — real server = orders PC :8002 (100.66.249.69), auto-deploys from GitHub main every 5 min; dev PC :8001 is secondary
+- [Live server & redeploy](live-server-deploy.md) — real server = orders PC :8002 (orders PC), auto-deploys from GitHub main every 5 min; dev PC :8001 is secondary
 - [Google Sheets setup](google-sheets-setup.md) — service account, key path, legacy + mirror sheet IDs, GitHub repo
 - [Commit policy](commit-policy.md) — no AI attribution, push to main only when asked, never stage .env/secrets/media/logs/samples/dist
 - [Testing on live data](live-data-testing.md) — real DB is on the orders PC; this dev PC has a separate older copy (verified 2026-10-06); ASCII output; heredoc backslash quirk

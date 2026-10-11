@@ -7,7 +7,7 @@ metadata:
   modified: 2026-09-30T01:11:45.830Z
 ---
 
-**Update 2026-10-06:** the real data now lives in the orders PC's own Postgres. This dev PC's database (DB_HOST=127.0.0.1; its pg_hba.conf only allows local connections) is a separate, older copy, so nothing done here reaches the real app's data, and the real data can't be inspected from here. Anything the user must see (e.g. a toll statement import) has to be done through the app at http://100.66.249.69:8002. Testing here is now safe, but still roll back or clean up to keep the copy tidy.
+**Update 2026-10-06:** the real data now lives in the orders PC's own Postgres. This dev PC's database (DB_HOST=127.0.0.1; its pg_hba.conf only allows local connections) is a separate, older copy, so nothing done here reaches the real app's data, and the real data can't be inspected from here. Anything the user must see (e.g. a toll statement import) has to be done through the app at http://orders-hostcomputer:8002. Testing here is now safe, but still roll back or clean up to keep the copy tidy.
 
 
 There is only one database and it's the real one (both users are editing it live). Test writes inside `transaction.atomic()` and raise to roll back; if a test must go through the API, record the created IDs and clean up in a `finally`, and restore any field you change.
