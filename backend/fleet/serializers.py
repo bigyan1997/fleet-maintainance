@@ -23,7 +23,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastWashed", "openJob",
+            "wash_needed", "off_road", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastWashed", "openJob",
         ]
 
         read_only_fields = ["report_token"]

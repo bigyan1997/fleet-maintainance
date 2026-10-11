@@ -101,7 +101,10 @@ export function HomeView() {
         text: alertText(a),
         detail: a.sub.includes('·') ? a.sub.slice(a.sub.indexOf('·') + 1).trim() : '',
         pill: a.overdue ? ['red', 'Overdue'] : ['amber', 'Due soon'],
-        action: <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
+        // Rego dates are changed on the Rego dates page, not on the van's history.
+        action: a.title.includes('Registration')
+          ? <a href={href('vans', 'dates')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Update rego date</a>
+          : <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
       })),
     ...(incidents.data?.results ?? [])
       .filter((i) => i.status !== 'Resolved')

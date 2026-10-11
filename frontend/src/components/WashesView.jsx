@@ -38,7 +38,8 @@ export function WashesView({ onError }) {
   })
 
   const onCycle = vans.filter((w) => w.washNeeded)
-  const takeHome = vans.filter((w) => !w.washNeeded)
+  const takeHome = vans.filter((w) => !w.washNeeded && !w.offRoad)
+  const offRoad = vans.filter((w) => w.offRoad)
   const due = onCycle
     .filter((w) => w.daysSince === null || w.daysSince >= cycle - SOON_DAYS)
     .sort((a, b) => (b.daysSince ?? 9999) - (a.daysSince ?? 9999))
@@ -110,6 +111,9 @@ export function WashesView({ onError }) {
             </summary>
             <div className="mt-1.5">{takeHome.map((w) => w.vehicleLabel).join(', ')}. Change this in the van's Details → Edit.</div>
           </details>
+        )}
+        {offRoad.length > 0 && (
+          <span className="text-off">Off the road, no washes needed: {offRoad.map((w) => w.vehicleLabel).join(', ')}.</span>
         )}
         <button onClick={() => openForm('wash')} className="font-medium text-primary hover:underline">Log a past wash</button>
       </div>

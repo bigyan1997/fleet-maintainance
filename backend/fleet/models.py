@@ -99,6 +99,9 @@ class Vehicle(models.Model):
     # False for vans a driver takes home after each run — they're not washed
     # by us, so the dashboard doesn't nag about them.
     wash_needed = models.BooleanField(default=True)
+    # True while a van is parked and not being driven (e.g. after an accident):
+    # no km, service, tyre or wash warnings until it is switched back on.
+    off_road = models.BooleanField(default=False)
     driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True, related_name="vehicles")
     # Secret part of the van's QR-sticker link, so drivers can report a
     # problem or a wash without logging in (and without seeing anything else).

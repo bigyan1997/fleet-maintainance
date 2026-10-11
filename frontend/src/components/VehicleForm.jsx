@@ -12,7 +12,7 @@ function blankForm() {
   return {
     make: '', model: '', year: '', rego: '', vin: '', vehicle_number: '',
     fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '',
-    service_interval_km: '', tyre_interval_km: '', wash_needed: true, driver: '',
+    service_interval_km: '', tyre_interval_km: '', wash_needed: true, off_road: false, driver: '',
   }
 }
 
@@ -22,7 +22,7 @@ function fromVehicle(v) {
     vin: v.vin || '', vehicle_number: v.vehicle_number || '', fuel_card_number: v.fuel_card_number || '',
     fuel_type: v.fuel_type || '', odometer: v.odometer ?? '', rego_expiry: v.rego_expiry || '',
     service_interval_km: v.service_interval_km ?? '',
-    tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true, driver: v.driver ?? '',
+    tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true, off_road: v.off_road ?? false, driver: v.driver ?? '',
   }
 }
 
@@ -140,6 +140,19 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
             <option value="no">No need — driver takes it home</option>
           </select>
         </Field>
+      </FormRow>
+      <FormRow>
+        <Field label="On the road?">
+          <select
+            value={form.off_road ? 'off' : 'on'}
+            onChange={(e) => set('off_road')(e.target.value === 'off')}
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="on">On the road — normal</option>
+            <option value="off">Off the road — parked (no km, service or wash warnings)</option>
+          </select>
+        </Field>
+        <div />
       </FormRow>
 
       <div className="mt-4 flex items-center gap-3">

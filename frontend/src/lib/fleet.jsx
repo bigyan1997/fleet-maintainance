@@ -14,6 +14,7 @@ export function kmAgeDays(van) {
 
 export function kmIsOld(van) {
   const days = kmAgeDays(van)
+  if (van.off_road) return false
   return van.odometer > 0 ? days === null || days > KM_STALE_DAYS : false
 }
 

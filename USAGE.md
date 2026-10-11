@@ -72,6 +72,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
   - **Drivers:** add drivers and choose each van's usual driver.
   - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
   - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.
+- **Off the road:** for a van that is parked and not being driven (for example after an accident), open it → **Details → Edit details → On the road?** → *Off the road*. It gets an **Off the road** grey badge and no more km-old, service, tyre or wash warnings. Rego warnings stay. Switch it back to *On the road* when it drives again.
 - **+ Add vehicle** is at the top of the Vans list.
 
 ## Washes

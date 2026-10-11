@@ -378,6 +378,29 @@ class InsuranceIgnoredTests(TestCase):
         self.assertEqual([a["title"] for a in services.alerts()], ["Registration expires"])
 
 
+class OffRoadTests(TestCase):
+    """A parked van (e.g. after an accident) gets no service, tyre or wash warnings; rego still counts."""
+
+    def test_off_road_van_is_left_out_of_warnings_but_rego_still_counts(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 6", model="HiAce", rego="FWF88G", odometer=100000, rego_expiry=today + timedelta(days=5))
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today - timedelta(days=200), status="Invoiced", odometer=80000)
+        self.assertIn("Scheduled service due", [a["title"] for a in services.alerts()])
+        van.off_road = True
+        van.save()
+        self.assertEqual([a["title"] for a in services.alerts()], ["Registration expires"])
+        self.assertEqual(services.vehicle_status_badge(van), "off_road")
+        wash = [w for w in services.wash_summary() if w["vehicle"] == van.pk][0]
+        self.assertFalse(wash["washNeeded"])
+        self.assertTrue(wash["offRoad"])
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

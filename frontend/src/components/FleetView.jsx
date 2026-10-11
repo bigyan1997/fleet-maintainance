@@ -12,6 +12,7 @@ const BADGE = {
   ok: { label: 'OK', className: 'bg-ok-bg text-ok', rank: 2 },
   due_soon: { label: 'Due soon', className: 'bg-warn-bg text-warn', rank: 1 },
   attention: { label: 'Attention', className: 'bg-due-bg text-due', rank: 0 },
+  off_road: { label: 'Off the road', className: 'bg-[#eceff1] text-off', rank: 3 },
 }
 
 const SORT_TYPES = { statusRank: 'number', odometer: 'number', serviceKm: 'number', vanNumber: 'number' }
