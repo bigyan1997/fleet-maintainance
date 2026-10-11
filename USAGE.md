@@ -38,7 +38,7 @@ Start here each day.
 1. Click **+ Log service**.
 2. Pick the **Van** and **What** (e.g. Scheduled service), the **Date** and **Status = Booked**.
 3. Pick the **Mechanic**. For someone new, choose **+ Add new mechanic…** and type the name.
-4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job. Underneath, **+ Add photo** adds photos of the problem (on a phone it can open the camera); click a photo to see it full size. They're kept in Google Drive in **Fleet Maintenance Photos › Services › van** (incidents: **› Incidents › van**), named by the job's date, e.g. 06-10-2026.jpg (**Open in Google Drive ↗**). A photo you drop into that folder in Drive, named with the job's date, shows up on that job too. Incidents have the same thing for **Photos of the damage**.
+4. Click **+ More** to write **Issues for the mechanic** (e.g. "right brake light"). They show on Home and on the job. Underneath, **+ Add photo** adds photos of the problem (on a phone it can open the camera); click a photo to see it full size. They're kept in Google Drive in **Fleet Maintenance Photos › Services › van** (incidents: **› Incidents › van**), named **SER-VAN6-12102026.jpg** (service, van, date; a second photo that day ends **(2)**) (**Open in Google Drive ↗**). A photo you drop into that folder in Drive, named in that style (or just with the job's date, as older photos are), shows up on that job too. Incidents have the same thing for **Photos of the damage**.
 5. **Save record**.
 
 ### When the work is done
@@ -54,7 +54,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 
 ### The Services tab
 - **Services:** every service, newest first, with columns Van, What, **Mechanic** (who did it), Status and Cost. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
-- **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; add **Photos of the damage** under the description (kept in Google Drive in **Fleet Maintenance Photos › Incidents › van**, named by the incident's date); open one to add follow-up notes, and to say what was done when it's resolved.
+- **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; add **Photos of the damage** under the description (kept in Google Drive in **Fleet Maintenance Photos › Incidents › van**, named like **INC-VAN6-12102026.jpg**); open one to add follow-up notes, and to say what was done when it's resolved.
 - **Mechanics:** the workshops you use, with their phone number, number of jobs, total spent and last job. **See jobs** lists everything a workshop did.
 
 ## Vans
@@ -65,7 +65,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 - Click a van to open its page:
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
-  - **Documents:** attach rego papers, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**.
+  - **Documents:** attach rego papers, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**, named like **DOC-VAN6-12102026 - invoice.pdf** (the original name is kept after the dash). Toll statement PDFs are named like **TOL-29082026-28092026.pdf**.
   - **Details:** rego, VIN, fuel card, intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
   - **Rego dates:** type or pick each van's rego date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before one expires. (Insurance isn't tracked.)

@@ -5,10 +5,10 @@ the same way NPD Tracker keeps its product photos:
     Fleet Maintenance Photos/
         Incidents/
             <Van>/
-                06-10-2026.jpg, 06-10-2026 (2).jpg   (named by the incident's date)
+                INC-VAN6-06102026.jpg, INC-VAN6-06102026 (2).jpg   (incident, van, date)
         Services/
             <Van>/
-                07-10-2026.jpg                       (named by the service's date)
+                SER-VAN6-07102026.jpg                              (service, van, date)
 
 The Drive is the achievecafeprovisions@gmail.com account's. A personal
 account can't take files from a service account (no storage quota), so the
@@ -18,8 +18,8 @@ app acts as that account through an OAuth refresh token, written once by
 PDFs and other documents go to Drive too:
 
     Fleet Maintenance Photos/
-        Tolls/            E-Toll statement 29-08-2026 to 28-09-2026.pdf
-        Documents/<Van>/  invoices, quotes, rego papers (original file names)
+        Tolls/            TOL-29082026-28092026.pdf
+        Documents/<Van>/  DOC-VAN6-12102026 - <original file name>
 
 Drive is the source of truth for photos: a photo dropped into a van's folder in the
 Drive app, named with a job's date, shows up on that job the next time it's
@@ -28,6 +28,7 @@ any other attachment.
 """
 
 import io
+import re
 import logging
 import time as _time
 import threading
@@ -35,6 +36,7 @@ from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
+from django.utils import timezone
 from google.auth.transport.requests import AuthorizedSession, Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -179,7 +181,19 @@ def section_name(job):
     return "Incidents" if hasattr(job, "incident_type") else "Services"
 
 
+def van_code(vehicle):
+    """"Van 6" -> "VAN6" (letters and digits only, for file names)."""
+    return re.sub(r"[^A-Za-z0-9]", "", str(vehicle)).upper()
+
+
 def date_name(job):
+    """INC-VAN6-12102026 for an incident, SER-VAN6-12102026 for a service."""
+    prefix = "INC" if hasattr(job, "incident_type") else "SER"
+    return f"{prefix}-{van_code(job.vehicle)}-{job.date:%d%m%Y}"
+
+
+def old_date_name(job):
+    """How photos were named before 12-10-2026 (just the date); still recognised."""
     return f"{job.date:%d-%m-%Y}"
 
 
@@ -199,8 +213,8 @@ def ensure_folder(client, job):
 
 
 def photo_name(client, folder_id, job, original_name):
-    """The job's date plus the original extension: 06-10-2026.jpg, then
-    06-10-2026 (2).jpg and so on for more photos that day."""
+    """INC-VAN6-06102026.jpg, then INC-VAN6-06102026 (2).jpg and so on for
+    more photos that day (SER- for a service)."""
     ext = ("." + original_name.rsplit(".", 1)[-1].lower()) if "." in original_name else ""
     taken = {f["name"].lower() for f in client.list_images(folder_id)}
     base, n = date_name(job), 1
@@ -230,7 +244,8 @@ def upload_for(client, *, vehicle, job, kind, filename, content, content_type):
         folder = ensure_folder(client, job)
         name = photo_name(client, folder, job, filename)
     else:
-        folder, name = ensure_path(client, "Documents", str(vehicle)), filename
+        folder = ensure_path(client, "Documents", str(vehicle))
+        name = f"DOC-{van_code(vehicle)}-{timezone.localdate():%d%m%Y} - {filename}"
     return client.upload(folder, name, content, content_type), name
 
 
@@ -285,7 +300,7 @@ def move_local_files(limit=10, force=False):
 
 
 def toll_pdf_name(statement):
-    return f"E-Toll statement {statement.period_start:%d-%m-%Y} to {statement.period_end:%d-%m-%Y}.pdf"
+    return f"TOL-{statement.period_start:%d%m%Y}-{statement.period_end:%d%m%Y}.pdf"
 
 
 def sync_job(job):
@@ -313,7 +328,7 @@ def sync_job(job):
         }
         if meta["id"] in known:
             Attachment.objects.filter(pk=known[meta["id"]], **link).update(**fields)
-        elif meta["name"].startswith(date_name(job)):
+        elif meta["name"].startswith((date_name(job), old_date_name(job))):
             Attachment.objects.create(**link, **fields, vehicle=job.vehicle, kind=ISSUE_PHOTO, drive_file_id=meta["id"])
         seen.add(meta["id"])
     Attachment.objects.filter(**link, kind=ISSUE_PHOTO, drive_file_id__isnull=False).exclude(drive_file_id__in=seen).delete()

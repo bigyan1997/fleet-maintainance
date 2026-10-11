@@ -1,4 +1,5 @@
 import json
+from django.utils import timezone
 import tempfile
 from datetime import date
 from unittest import mock
@@ -92,9 +93,10 @@ class IssuePhotoTests(TestCase):
             self.assertEqual(att.drive_file_id, "file1")
             self.service.refresh_from_db()
             self.assertEqual(fake.path(self.service.drive_folder_id), f"Services/{self.van}")
-            self.assertEqual(att.original_name, "07-10-2026.jpg")
+            self.assertEqual(att.original_name, drive.date_name(self.service) + ".jpg")
+            self.assertRegex(att.original_name, r"^SER-[A-Z0-9]+-07102026\.jpg$")
             # A second photo the same day gets its own name.
-            self.assertEqual(self.upload(service=self.service.pk).data["original_name"], "07-10-2026 (2).jpg")
+            self.assertEqual(self.upload(service=self.service.pk).data["original_name"], drive.date_name(self.service) + " (2).jpg")
             self.assertTrue(res.data["driveFolderUrl"].endswith(self.service.drive_folder_id))
 
             # Full size comes from Drive, the tile from Drive's preview.
@@ -116,11 +118,13 @@ class IssuePhotoTests(TestCase):
 
             # Photos dropped into the van folder in Drive join the incident
             # with that date; other dates stay out; one deleted in Drive goes.
-            fake.upload(folder, "05-10-2026 (2).jpg", JPEG, "image/jpeg")
-            fake.upload(folder, "01-09-2026.jpg", JPEG, "image/jpeg")
+            name = drive.date_name(self.incident)
+            fake.upload(folder, f"{name} (2).jpg", JPEG, "image/jpeg")
+            fake.upload(folder, "INC-OTHER-01092026.jpg", JPEG, "image/jpeg")
+            fake.upload(folder, "05-10-2026 (3).jpg", JPEG, "image/jpeg")  # the old date-only name still counts
             fake.files.pop("file1")
             names = [d["original_name"] for d in self.api.get("/api/attachments/", {"incident": self.incident.pk}).data]
-            self.assertEqual(names, ["05-10-2026 (2).jpg"])
+            self.assertEqual(sorted(names), sorted([f"{name} (2).jpg", "05-10-2026 (3).jpg"]))
 
     def test_drive_failure_keeps_photo_on_disk(self):
         broken = mock.Mock(side_effect=RuntimeError("Drive down"))
@@ -307,7 +311,7 @@ class PdfAndDocumentDriveTests(TestCase):
             res = self.api.post("/api/attachments/", {"file": pdf, "kind": "Invoice", "service": self.service.pk}, format="multipart")
             self.assertEqual(res.status_code, 201)
             att = Attachment.objects.get()
-            self.assertEqual((att.file.name, att.drive_file_id, att.original_name), ("", "file1", "invoice.pdf"))
+            self.assertEqual((att.file.name, att.drive_file_id, att.original_name), ("", "file1", f"DOC-{drive.van_code(self.van)}-{timezone.localdate():%d%m%Y} - invoice.pdf"))
             self.assertEqual(self.fake.path(self.fake.files["file1"][0]["parents"][0]), f"Documents/{self.van}")
             # A real PDF comes back, not a picture of its first page.
             got = self.api.get(res.data["url"])
@@ -325,7 +329,7 @@ class PdfAndDocumentDriveTests(TestCase):
             st = self.toll_import.TollStatement.objects.get()
             self.assertEqual((st.file.name, st.drive_file_id), ("", "file1"))
             meta = self.fake.files["file1"][0]
-            self.assertEqual((self.fake.path(meta["parents"][0]), meta["name"]), ("Tolls", "E-Toll statement 29-08-2026 to 28-09-2026.pdf"))
+            self.assertEqual((self.fake.path(meta["parents"][0]), meta["name"]), ("Tolls", "TOL-29082026-28092026.pdf"))
             current = self.api.get("/api/tolls/").data["current"]["statement"]
             self.assertEqual(self.api.get(current["fileUrl"]).content, b"%PDF-1.4 toll")
             self.assertEqual(self.toll_post().data["replaced"], True)  # re-import replaces: the old PDF goes to the Bin
@@ -346,7 +350,8 @@ class PdfAndDocumentDriveTests(TestCase):
             self.assertEqual(drive.move_local_files(force=True), 3)
             self.assertEqual(Attachment.objects.exclude(file="").count(), 0)
             names = sorted(a.original_name for a in Attachment.objects.all())
-            self.assertEqual(names, ["07-10-2026.jpg", "rego.pdf"])  # the photo is renamed by the job's date
+            from django.utils import timezone
+            self.assertEqual(names, sorted([drive.date_name(self.service) + ".jpg", f"DOC-{drive.van_code(self.van)}-{timezone.localdate():%d%m%Y} - rego.pdf"]))  # renamed: photo by job, document by van and day
             self.assertEqual(self.toll_import.TollStatement.objects.get().file.name, "")
             self.assertEqual(drive.move_local_files(force=True), 0)  # nothing left to move
 
