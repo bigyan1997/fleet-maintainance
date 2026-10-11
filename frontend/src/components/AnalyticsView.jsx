@@ -64,7 +64,7 @@ export function AnalyticsView({ section = 'spending' }) {
 
       {section === 'spending' && (<>
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label={`Maintenance spend — ${rangeLabel}`} value={money(data.totalSpend)} sub="services, repairs and incidents" />
+        <Metric label={`Maintenance only — ${rangeLabel}`} value={money(data.totalSpend)} sub="services, repairs and incidents (no fuel or tolls: see the table below for the full cost)" />
         <Metric label="This month's maintenance" value={money(data.monthSpend)} />
         <Metric label="Average service cost" value={money(data.avgService)} />
         <Metric label="Open incident cost" value={money(data.openIncidentCost)} color="text-due" />
@@ -206,7 +206,7 @@ function FuelUse({ vans, fleetAvg }) {
     <div className="mb-4 overflow-hidden rounded-lg border border-line bg-white">
       <div className="flex flex-wrap items-baseline justify-between gap-2 px-4 pt-4 pb-3">
         <h2 className="text-[15px] font-semibold text-ink">Fuel use by van</h2>
-        {fleetAvg && <span className="text-xs text-off">Fleet average <b className="text-ink">{fleetAvg} L/100km</b> · highlighted vans use 15%+ more</span>}
+        {fleetAvg && <span className="text-xs text-off">Fleet average <b className="text-ink">{fleetAvg} L/100km</b> · L/100km = litres used per 100 km (lower is better) · highlighted vans use 15%+ more</span>}
       </div>
       {vans.length === 0 ? (
         <div className="px-4 pb-6 text-center text-sm text-off">No fuel logged in this range.</div>

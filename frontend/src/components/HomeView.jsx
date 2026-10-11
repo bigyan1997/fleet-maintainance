@@ -5,7 +5,7 @@ import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
-import { daysFromToday, fmtAgo, fmtDate, sydneyMonthName, todayIso } from '../lib/formatDate'
+import { daysFromToday, fmtAgo, fmtDate, fmtDayDate, sydneyMonthName, todayIso } from '../lib/formatDate'
 import { kmAgeDays, kmIsOld } from '../lib/fleet'
 import { href } from '../lib/router'
 import { StatusSelect } from './StatusSelect'
@@ -87,12 +87,12 @@ export function HomeView() {
       .map((a) => missedBooking(a) ? ({
         key: `m-${a.booked.id}`,
         van: a.vehicle, vanId: a.vehicleId,
-        text: `Booked for ${fmtDate(a.booked.date)} but not done yet`,
+        text: `Booked for ${fmtDayDate(a.booked.date)} but not done yet`,
         detail: alertText(a),
         pill: ['amber', 'Check booking'],
         action: (
           <button onClick={() => { const job = allJobs.find((j) => j.id === a.booked.id); if (job) openForm('service', job) }} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">
-            Open job
+            Open
           </button>
         ),
       }) : ({
@@ -108,7 +108,7 @@ export function HomeView() {
       .map((i) => ({
         key: `i-${i.id}`,
         van: i.vehicleLabel, vanId: i.vehicle,
-        text: `${i.incident_type} (${i.severity.toLowerCase()}) on ${fmtDate(i.date)}, still ${i.status.toLowerCase()}`,
+        text: `${i.incident_type} (${i.severity.toLowerCase()}) on ${fmtDayDate(i.date)}, still ${i.status.toLowerCase()}`,
         pill: ['red', 'Incident'],
         action: <button onClick={() => openForm('incident', i)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">Open</button>,
       })),
@@ -117,7 +117,7 @@ export function HomeView() {
       .map((s) => ({
         key: `s-${s.id}`,
         van: s.vehicleLabel, vanId: s.vehicle,
-        text: `Invoice late: ${s.service_type.toLowerCase()} done ${fmtDate(s.date)}, invoice was expected around ${fmtDate(s.expected)}`,
+        text: `Invoice late: ${s.service_type.toLowerCase()} done ${fmtDayDate(s.date)}, invoice was expected around ${fmtDayDate(s.expected)}`,
         detail: s.mechanicName ? `Check with ${s.mechanicName}` : 'Check with the mechanic',
         pill: ['amber', 'Invoice late'],
         action: (
@@ -134,7 +134,7 @@ export function HomeView() {
             van: missing.length === (vehicles.data ?? []).length ? 'All vans' : `Vans ${missing.map((v) => v.label.replace(/^Van\s*/i, '')).join(', ')}`,
             text: `Rego date missing for ${missing.length} van${missing.length === 1 ? '' : 's'}, so the rego expiry warning can't show yet`,
             pill: ['blue', 'Set up'],
-            action: <a href={href('vans', 'dates')} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white no-underline hover:bg-primary-dark">Enter dates</a>,
+            action: <a href={href('vans', 'dates')} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white no-underline hover:bg-primary-dark">Open</a>,
           }]
         : []
     })()),
@@ -159,7 +159,7 @@ export function HomeView() {
           van: dueWashes.length === 1 ? dueWashes[0].vehicleLabel : `Vans ${dueWashes.map((w) => w.vehicleLabel.replace(/^Van\s*/i, '')).join(', ')}`,
           text: `Due a wash (every ${cycle / 7} weeks)`,
           pill: ['blue', 'Wash'],
-          action: <a href={href('washes')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Go to Washes</a>,
+          action: <a href={href('washes')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
         }]
       : []),
   ]
@@ -233,7 +233,7 @@ export function HomeView() {
                     <div className="min-w-[200px] flex-1">
                       <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
                       <div className="text-xs text-off">
-                        {fmtDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
+                        {fmtDayDate(s.date)} ({fmtAgo(s.date)}){s.mechanicName ? ` · ${s.mechanicName}` : ''}
                       </div>
                       {reasonFor[s.id] && <div className="text-xs font-medium text-due">{reasonFor[s.id]}</div>}
                       {s.issues && <div className="text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
@@ -259,7 +259,7 @@ export function HomeView() {
                     <div className="min-w-[200px] flex-1">
                       <div className="text-[14px] font-semibold">{s.vehicleLabel} <span className="text-xs font-normal text-off">· {s.service_type}</span></div>
                       <div className={'text-xs ' + (s.late ? 'font-medium text-warn' : 'text-off')}>
-                        done {fmtDate(s.date)} · invoice {s.late ? 'was expected' : 'expected'} around {fmtDate(s.expected)}
+                        done {fmtDayDate(s.date)} · invoice {s.late ? 'was expected' : 'expected'} around {fmtDayDate(s.expected)}
                         {s.mechanicName ? ` · ${s.mechanicName}` : ''}
                       </div>
                     </div>

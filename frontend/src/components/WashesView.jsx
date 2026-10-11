@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { createService, deleteService } from '../api/services'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate, todayIso } from '../lib/formatDate'
+import { fmtAgo, fmtDate, fmtDayDate, todayIso } from '../lib/formatDate'
 import { ConfirmDialog } from './ConfirmDialog'
 
 const SOON_DAYS = 4 // a van shows "due in N days" this close to the end of its cycle
@@ -63,7 +63,7 @@ export function WashesView({ onError }) {
                     <span className="text-[14px] font-semibold">{w.vehicleLabel}</span> <span className="text-xs text-off">· {w.rego}</span>
                   </div>
                   <span className={'text-xs font-medium ' + (overdue ? 'text-due' : 'text-warn')}>
-                    {w.lastWashed ? `last washed ${fmtDate(w.lastWashed)} (${fmtAgo(w.lastWashed)})` : 'never logged'}
+                    {w.lastWashed ? `last washed ${fmtDayDate(w.lastWashed)} (${fmtAgo(w.lastWashed)})` : 'never logged'}
                     {!overdue && ` · due in ${cycle - w.daysSince} day${cycle - w.daysSince === 1 ? '' : 's'}`}
                   </span>
                   <button
@@ -94,7 +94,7 @@ export function WashesView({ onError }) {
                 <div className="min-w-[160px] flex-1">
                   <span className="text-[14px] font-semibold">{r.vehicleLabel}</span> <span className="text-xs text-off">· {r.rego}</span>
                 </div>
-                <span className="text-xs font-medium text-ok">{fmtDate(r.date)} · {fmtAgo(r.date)}</span>
+                <span className="text-xs font-medium text-ok">{fmtDayDate(r.date)} · {fmtAgo(r.date)}</span>
                 <button onClick={() => setRemoving(r)} title="Remove (logged by mistake)" className="rounded px-1.5 py-1 text-off hover:bg-due-bg hover:text-due">✕</button>
               </li>
             ))}

@@ -212,7 +212,7 @@ function MainApp({ username }) {
                 </a>
               ))}
             </div>
-            <div className="flex items-center gap-2 pb-2">
+            <div className={'items-center gap-2 pb-2 ' + (path[0] === 'vans' && /^\d+$/.test(path[1] ?? '') ? 'hidden' : 'flex')}>
               <button onClick={() => openForm('wash')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
                 Log wash
               </button>

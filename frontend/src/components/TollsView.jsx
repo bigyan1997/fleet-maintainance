@@ -155,7 +155,7 @@ function TripList({ rows }) {
             {r.weekend && <span className={`${tag} bg-due`}>weekend</span>}
             {r.double && <span className={`${tag} bg-due`}>possible double charge</span>}
             {r.late && <span className={`${tag} bg-warn`}>after 12 pm</span>}
-            {r.byPlate && !r.isFee && <span className={`${tag} bg-warn`}>tag not read</span>}
+            {r.byPlate && !r.isFee && <span className={`${tag} bg-warn`}>tag didn't beep</span>}
           </span>
           <span className="tabular-nums">{money(r.amount)}</span>
         </div>
@@ -361,10 +361,10 @@ function VanTable({ data, onOpen }) {
               <td className={num}>{money(v.usual)}</td>
               <td className="px-3 py-2.5">
                 <div className="flex flex-wrap gap-1">
-                  {Number(v.fees) > 0 && <span className={RED}>tag not working · {money(v.fees)} fees</span>}
+                  {Number(v.fees) > 0 && <span className={RED}>tag didn't beep · {money(v.fees)} fees</span>}
                   {Number(v.doubleExtra) > 0 && <span className={RED}>charged twice? {money(v.doubleExtra)}</span>}
                   {v.weekend > 0 && <span className={RED}>{v.weekend} weekend</span>}
-                  {v.heavyDays > 0 && <span className={RED}>{v.heavyDays} heavy day{v.heavyDays === 1 ? '' : 's'}</span>}
+                  {v.heavyDays > 0 && <span className={RED}>{v.heavyDays} big toll day{v.heavyDays === 1 ? '' : 's'}</span>}
                   {v.shift && <span className={GREY}>new run from {shortDate(v.shift.date)}</span>}
                   {v.late > 0 && <span className={GREY}>{v.late} after 12 pm</span>}
                 </div>
@@ -379,6 +379,9 @@ function VanTable({ data, onOpen }) {
           </tr>
         </tbody>
       </table>
+      <p className="px-4 pt-2 text-xs text-off">
+        <b className="text-ink">What the words mean:</b> <b>tag didn't beep</b> = the toll was charged by number plate, which adds a fee · <b>big toll day</b> = a day well above that van's usual · <b>usual day</b> = what that van normally pays on a day it uses tolls · <b>after 12 pm</b> / <b>weekend</b> = trips at those times.
+      </p>
       <p className="px-4 py-2 text-xs text-off">
         {data.quiet.length > 0 && <>No toll trips this statement: {data.quiet.join(', ')}. </>}
         {Number(data.otherTotal) > 0 && <>The statement's total is {money(data.statementTotal)}; the other {money(data.otherTotal)} is for vehicles that aren't fleet vans, left out here.</>}
@@ -421,9 +424,9 @@ const FILTERS = [
   { key: 'all', label: 'All trips' },
   { key: 'weekend', label: 'Weekend' },
   { key: 'late', label: 'After 12 pm' },
-  { key: 'heavy', label: 'Heavy days' },
+  { key: 'heavy', label: 'Big toll days' },
   { key: 'double', label: 'Double charges' },
-  { key: 'tag', label: 'Tag not read' },
+  { key: 'tag', label: "Tag didn't beep" },
 ]
 
 // One van: its trips grouped by day, with filters for what's flagged.
@@ -478,7 +481,7 @@ function VanDetail({ van, cells, run, filter, setFilter, onBack }) {
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-[#f5f8fc] px-2.5 py-1.5 text-[13px] font-semibold">
               <span>{g.day} {fmtDate(g.date)}</span>
               {weekend && <span className={RED}>weekend</span>}
-              {cell?.heavy && <span className={RED}>heavy day · {cell.times}× its usual</span>}
+              {cell?.heavy && <span className={RED}>big toll day · {cell.times}× its usual</span>}
               <span className="ml-auto">{money(g.rows.reduce((s, r) => s + Number(r.amount), 0))} · {g.rows.filter((r) => !r.isFee).length} trip{g.rows.filter((r) => !r.isFee).length === 1 ? '' : 's'}</span>
             </div>
             <TripList rows={g.rows} />
@@ -511,7 +514,7 @@ function Daily({ data }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-line bg-white p-4">
-        <div className="mb-1 text-[14px] font-semibold text-ink">Heavy days {heavy.length > 0 && <span className="ml-1 rounded-full bg-due-bg px-2 py-0.5 text-xs text-due">{heavy.length}</span>}</div>
+        <div className="mb-1 text-[14px] font-semibold text-ink">Big toll days {heavy.length > 0 && <span className="ml-1 rounded-full bg-due-bg px-2 py-0.5 text-xs text-due">{heavy.length}</span>}</div>
         <p className="mb-2 text-xs text-off">Days where a van's tolls were at least 1.5 times its usual day, and $10 or more above it. Biggest first; click one to see the trips.</p>
         {heavy.length === 0 ? (
           <div className="py-3 text-center text-[13px] text-off">No van had a day well above its usual.</div>
@@ -546,7 +549,7 @@ function Daily({ data }) {
 
       <div className="rounded-lg border border-line bg-white p-4">
         <div className="mb-1 text-[14px] font-semibold text-ink">Each van, each day</div>
-        <p className="mb-2 text-xs text-off">Dollars of tolls per day. Darker blue = more; <span className="rounded bg-due-bg px-1 font-medium text-due">red</span> = a heavy day for that van. Click a square for the trips, or a date for every van that day.</p>
+        <p className="mb-2 text-xs text-off">Dollars of tolls per day. Darker blue = more; <span className="rounded bg-due-bg px-1 font-medium text-due">red</span> = a big toll day for that van. Click a square for the trips, or a date for every van that day.</p>
         <div className="overflow-x-auto">
           <table className="border-separate border-spacing-0.5 text-[11px]">
             <thead>
@@ -608,7 +611,7 @@ function Daily({ data }) {
                     <td className="py-1 pr-3 font-medium text-primary">{v.label}</td>
                     <td className="py-1 pr-3">{v.cells[sel.date].trips} trips</td>
                     <td className="py-1 pr-3 text-off">usual day {money(v.usual)}</td>
-                    <td className="py-1 pr-3">{v.cells[sel.date].heavy && <span className="rounded bg-due px-1.5 py-0.5 text-[11px] font-medium text-white">heavy day</span>}</td>
+                    <td className="py-1 pr-3">{v.cells[sel.date].heavy && <span className="rounded bg-due px-1.5 py-0.5 text-[11px] font-medium text-white">big toll day</span>}</td>
                     <td className="py-1 text-right font-medium tabular-nums">{money(v.cells[sel.date].total)}</td>
                   </tr>
                 ))}
@@ -663,8 +666,8 @@ function Compare({ compare }) {
 const VIEWS = [
   { key: 'vans', label: 'Vans' },
   { key: 'doubles', label: 'Double charges' },
-  { key: 'odd', label: 'Odd times' },
-  { key: 'runs', label: 'Regular runs' },
+  { key: 'odd', label: 'Late & weekend trips' },
+  { key: 'runs', label: 'Usual runs' },
   { key: 'days', label: 'Days' },
   { key: 'compare', label: 'Compare months' },
 ]

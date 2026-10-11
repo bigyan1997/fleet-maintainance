@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { createMechanic, deleteMechanic, fetchMechanics, updateMechanic } from '../api/extra'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { fmtAgo, fmtDate, fmtDayDate } from '../lib/formatDate'
 import { href } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
 
@@ -106,7 +106,7 @@ export function MechanicsView() {
                     <td className="px-3 py-2.5">{m.address || '—'}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{m.jobs}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{money(m.spend)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">{m.lastJob ? <>{fmtDate(m.lastJob)} <span className="text-off">· {fmtAgo(m.lastJob)}</span></> : '—'}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">{m.lastJob ? <>{fmtDayDate(m.lastJob)} <span className="text-off">· {fmtAgo(m.lastJob)}</span></> : '—'}</td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {m.jobs > 0 && <a href={href('services', 'mechanic', m.id)} className="mr-2 text-xs font-medium text-primary hover:underline">See jobs</a>}
                       <button onClick={() => setEditing({ ...m })} className="mr-1 rounded px-1.5 py-1 text-off hover:bg-[#f0f0f0]" title="Edit">✎</button>

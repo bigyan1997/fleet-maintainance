@@ -8,7 +8,7 @@ import { DetailModal } from './DetailModal'
 import { IssuePhotoStrip } from './IssuePhotos'
 import { StatusSelect } from './StatusSelect'
 import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
-import { fmtDate } from '../lib/formatDate'
+import { fmtDate, fmtDayDate } from '../lib/formatDate'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
@@ -131,7 +131,7 @@ export function HistoryView({ onEdit, initialStatus = '', initialMechanic = '', 
                   <td className="px-3 py-2.5">
                     <div>{s.service_type}</div>
                     <div className="text-xs text-off">
-                      {fmtDate(s.date)}
+                      {fmtDayDate(s.date)}
                       {s.odometer ? ` · ${s.odometer.toLocaleString()} km` : ''}
                     </div>
                     {s.issues && <div className="max-w-[420px] text-xs whitespace-pre-wrap text-warn">⚠ {s.issues}</div>}
@@ -165,7 +165,7 @@ export function HistoryView({ onEdit, initialStatus = '', initialMechanic = '', 
           vehicleId={detail.vehicle}
           rows={[
             ['Type', detail.service_type],
-            ['Date', fmtDate(detail.date)],
+            ['Date', fmtDayDate(detail.date)],
             ['Status', statusWord(detail.status)],
             ['Mechanic', detail.mechanicName || '—'],
             ['Odometer', detail.odometer ? `${detail.odometer.toLocaleString()} km` : '—'],

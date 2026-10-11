@@ -6,7 +6,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { IssuePhotoStrip } from './IssuePhotos'
 import { IncidentLog } from './IncidentLog'
-import { fmtDate } from '../lib/formatDate'
+import { fmtDate, fmtDayDate } from '../lib/formatDate'
 
 const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const STATUSES = ['Open', 'In progress', 'Resolved']
@@ -96,7 +96,7 @@ export function IncidentsView({ onEdit, onAdd }) {
                 <tr key={x.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(x)}>
                   <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{x.vehicleLabel}</td>
                   <td className="px-3 py-2.5">{x.incident_type}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(x.date)}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDayDate(x.date)}</td>
                   <td className="px-3 py-2.5">{x.severity}</td>
                   <td className="px-3 py-2.5"><span className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + (STATUS_BADGE[x.status] ?? '')}>{x.status}</span></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{x.cost ? `$${x.cost}` : '—'}</td>
@@ -117,7 +117,7 @@ export function IncidentsView({ onEdit, onAdd }) {
           subtitle={detail.vehicleSub}
           vehicleId={detail.vehicle}
           rows={[
-            ['Type', detail.incident_type], ['Date', fmtDate(detail.date)], ['Severity', detail.severity],
+            ['Type', detail.incident_type], ['Date', fmtDayDate(detail.date)], ['Severity', detail.severity],
             ['Status', detail.status], ['Location', detail.location || '—'], ['Cost', detail.cost ? `$${detail.cost}` : '—'],
             ['Description', detail.description || '—'],
             ['Updates', <div key="updates" className="text-left font-normal"><IncidentLog updates={detail.updates} /></div>],

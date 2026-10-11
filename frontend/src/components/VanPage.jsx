@@ -6,7 +6,7 @@ import { fetchIncidents } from '../api/incidents'
 import { deleteService, fetchServices } from '../api/services'
 import { deleteVehicle, fetchVehicles } from '../api/vehicles'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate } from '../lib/formatDate'
+import { fmtAgo, fmtDate, fmtDayDate } from '../lib/formatDate'
 import { statusWord } from '../lib/serviceStatus'
 import { href, navigate } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -50,7 +50,7 @@ function Timeline({ entries, onOpen }) {
       <ul className="divide-y divide-[#eef1f5]">
         {entries.slice(0, limit).map((e) => (
           <li key={e.key} className="grid cursor-pointer grid-cols-[92px_80px_1fr_auto] items-baseline gap-3 px-4 py-2.5 text-[13px] hover:bg-[#f8fafc]" onClick={() => onOpen(e)}>
-            <span className="text-xs text-off tabular-nums">{fmtDate(e.date)}</span>
+            <span className="text-xs text-off tabular-nums">{fmtDayDate(e.date)}</span>
             <span><Pill tone={tone[e.kind]}>{e.kind}</Pill></span>
             <span className="min-w-0">
               <span className="font-medium">{e.title}</span>
@@ -185,7 +185,8 @@ export function VanPage({ id }) {
         actions={
           <>
             <Button icon="incident" onClick={() => openForm('incident', preset)}>Report incident</Button>
-            <Button variant="primary" icon="plus" onClick={() => openForm('service', preset)}>Log service for {v.label}</Button>
+            <Button onClick={() => openForm('wash', preset)}>Log wash</Button>
+            <Button variant="primary" icon="plus" onClick={() => openForm('service', preset)}>Log service</Button>
           </>
         }
       />
@@ -200,7 +201,7 @@ export function VanPage({ id }) {
           {svc ? km(svc.due_at) : '—'}
         </Fact>
         <Fact label="Last service" sub={lastService ? [lastService.service_type, lastService.cost && Number(lastService.cost) ? money(lastService.cost) : ''].filter(Boolean).join(' · ') : 'none logged yet'}>
-          {lastService ? fmtDate(lastService.date) : '—'}
+          {lastService ? fmtDayDate(lastService.date) : '—'}
         </Fact>
         <Fact
           label="Fuel use"
@@ -215,12 +216,12 @@ export function VanPage({ id }) {
         <div className="mb-5 flex flex-wrap gap-2.5">
           {v.openJob && (
             <button onClick={() => openForm('service', v.openJob)} className="rounded-lg border border-[#bcd5ee] bg-[#eef5fc] px-3.5 py-2 text-left text-[13px] hover:brightness-95">
-              <span className="font-semibold text-primary">Open job:</span> {v.openJob.service_type} · {statusWord(v.openJob.status)} · {fmtDate(v.openJob.date)}
+              <span className="font-semibold text-primary">Open job:</span> {v.openJob.service_type} · {statusWord(v.openJob.status)} · {fmtDayDate(v.openJob.date)}
             </button>
           )}
           {openIncidents.map((i) => (
             <button key={i.id} onClick={() => openForm('incident', i)} className="rounded-lg border border-[#f5b5b5] bg-due-bg px-3.5 py-2 text-left text-[13px] text-due hover:brightness-95">
-              <span className="font-semibold">Open incident:</span> {i.incident_type} · {i.severity} · {fmtDate(i.date)}
+              <span className="font-semibold">Open incident:</span> {i.incident_type} · {i.severity} · {fmtDayDate(i.date)}
             </button>
           ))}
         </div>
