@@ -90,6 +90,9 @@ class Vehicle(models.Model):
     vin = models.CharField("VIN", max_length=17, blank=True, db_index=True)
     vehicle_number = models.CharField(max_length=50, blank=True)
     fuel_card_number = models.CharField(max_length=50, blank=True)
+    # The van's E-Toll tag number; filled in by the first toll statement that
+    # shows exactly one tag for the van, or typed in.
+    toll_tag_number = models.CharField(max_length=30, blank=True)
     fuel_type = models.CharField(max_length=20, choices=FUEL_TYPE_CHOICES, blank=True)
     odometer = models.PositiveIntegerField(default=0)
     rego_expiry = models.DateField(null=True, blank=True)

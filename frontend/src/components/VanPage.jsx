@@ -292,6 +292,7 @@ export function VanPage({ id }) {
             <DetailRow label="VIN"><span className="font-mono text-xs">{v.vin || '—'}</span></DetailRow>
             <DetailRow label="Fuel type">{v.fuel_type || '—'}</DetailRow>
             <DetailRow label="Fuel card">{v.fuel_card_number || '— (filled in by the first statement import)'}</DetailRow>
+            <DetailRow label="Toll tag">{v.toll_tag_number || '— (filled in by the toll statement import)'}</DetailRow>
             <DetailRow label="Odometer">{v.odometer ? km(v.odometer) : '—'}<KmAsOf van={v} /></DetailRow>
             <DetailRow label="Service interval">every {km(v.service_interval_km || 10000)}</DetailRow>
             <DetailRow label="Tyre interval">{v.tyre_interval_km ? `every ${km(v.tyre_interval_km)}` : 'not set'}</DetailRow>

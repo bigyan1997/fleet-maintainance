@@ -262,6 +262,16 @@ def import_statement(raw, file_name, user=None):
         )
         for t in trips
     )
+    # A van with no tag number yet gets the one this statement shows for it
+    # (only when it shows exactly one).
+    seen = {}
+    for t in trips:
+        if t["source"] == "tag" and t["tag"]:
+            seen.setdefault(t["vehicle"].pk, (t["vehicle"], set()))[1].add(t["tag"])
+    for vehicle, tags in seen.values():
+        if not vehicle.toll_tag_number and len(tags) == 1:
+            vehicle.toll_tag_number = next(iter(tags))
+            vehicle.save(update_fields=["toll_tag_number", "updated_at"])
     return {
         "id": statement.pk, "trips": sum(1 for t in trips if not t["is_fee"]),
         "total": s["total"] - other_total, "replaced": bool(old),
@@ -556,7 +566,7 @@ def analysis(statement):
     vans, roads = {}, defaultdict(lambda: {"trips": 0, "total": Decimal(0)})
     for t in rows:
         v = vans.setdefault(t.vehicle_id, {
-            "vehicle": t.vehicle_id, "label": str(t.vehicle), "sub": t.vehicle.subtitle,
+            "vehicle": t.vehicle_id, "label": str(t.vehicle), "sub": t.vehicle.subtitle, "tag": t.vehicle.toll_tag_number,
             "trips": 0, "tolls": Decimal(0), "fees": Decimal(0), "plateTrips": 0, "rows": [],
             "weekend": 0, "late": 0, "doubles": 0,
         })

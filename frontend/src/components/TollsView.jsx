@@ -355,6 +355,7 @@ function VanTable({ data, onOpen }) {
               <td className={td}>
                 <span className="font-medium text-primary">{v.label}</span>
                 <div className="text-xs text-off">{v.sub}</div>
+                <div className="text-xs text-off">{v.tag ? `Tag ${v.tag}` : 'Tag number not set'}</div>
               </td>
               <td className={`${num} font-semibold`}>{money(v.total)}</td>
               <td className={num}>{v.trips}</td>
@@ -448,7 +449,7 @@ function VanDetail({ van, cells, run, filter, setFilter, onBack }) {
       <button onClick={onBack} className="mb-2 text-[13px] font-medium text-primary hover:underline">‹ All vans</button>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="text-[17px] font-semibold text-ink">{van.label}</span>
-        <span className="text-xs text-off">{van.sub}</span>
+        <span className="text-xs text-off">{van.sub}{van.tag ? ` · Tag ${van.tag}` : ""}</span>
         <a href={href('vans', van.vehicle)} className="text-xs font-medium text-primary no-underline hover:underline">Van page →</a>
         <span className="ml-auto text-xs text-off">
           {money(van.total)} · {van.trips} trips · {Object.keys(cells).length} days on toll roads · usual day {money(van.usual)}

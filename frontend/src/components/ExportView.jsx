@@ -48,7 +48,7 @@ export function ExportView() {
       XLSX.utils.json_to_sheet(
         vehicles.map((v) => ({
           Make: v.make, Model: v.model, Year: v.year, Rego: v.rego, VIN: v.vin,
-          'Vehicle Number': v.vehicle_number, 'Fuel Card': v.fuel_card_number, 'Fuel Type': v.fuel_type,
+          'Vehicle Number': v.vehicle_number, 'Fuel Card': v.fuel_card_number, 'Toll Tag': v.toll_tag_number, 'Fuel Type': v.fuel_type,
           'Odometer (km)': v.odometer, 'Rego Expiry': fmtDate(v.rego_expiry),
           'Service Interval (km)': v.service_interval_km, 'Tyre Interval (km)': v.tyre_interval_km,
         })),
@@ -93,7 +93,7 @@ export function ExportView() {
     if (which === 'vehicles') {
       const vehicles = await fetchVehicles('')
       download(
-        toCSV(vehicles, ['make', 'model', 'year', 'rego', 'vin', 'vehicle_number', 'fuel_card_number', 'fuel_type', 'odometer', 'rego_expiry', 'service_interval_km', 'tyre_interval_km']),
+        toCSV(vehicles, ['make', 'model', 'year', 'rego', 'vin', 'vehicle_number', 'fuel_card_number', 'toll_tag_number', 'fuel_type', 'odometer', 'rego_expiry', 'service_interval_km', 'tyre_interval_km']),
         'fleet-vehicles.csv',
         'text/csv',
       )

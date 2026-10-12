@@ -11,7 +11,7 @@ const FUEL_TYPES = [
 function blankForm() {
   return {
     make: '', model: '', year: '', rego: '', vin: '', vehicle_number: '',
-    fuel_card_number: '', fuel_type: '', odometer: '', rego_expiry: '',
+    fuel_card_number: '', toll_tag_number: '', fuel_type: '', odometer: '', rego_expiry: '',
     service_interval_km: '', tyre_interval_km: '', wash_needed: true, off_road: false, driver: '',
   }
 }
@@ -20,6 +20,7 @@ function fromVehicle(v) {
   return {
     make: v.make || '', model: v.model || '', year: v.year ?? '', rego: v.rego || '',
     vin: v.vin || '', vehicle_number: v.vehicle_number || '', fuel_card_number: v.fuel_card_number || '',
+    toll_tag_number: v.toll_tag_number || '',
     fuel_type: v.fuel_type || '', odometer: v.odometer ?? '', rego_expiry: v.rego_expiry || '',
     service_interval_km: v.service_interval_km ?? '',
     tyre_interval_km: v.tyre_interval_km ?? '', wash_needed: v.wash_needed ?? true, off_road: v.off_road ?? false, driver: v.driver ?? '',
@@ -101,11 +102,16 @@ export function VehicleForm({ vehicle, onDone, onSaved, onError }) {
         <div className="self-end pb-2 text-xs text-off">Add drivers on Vans → Drivers.</div>
       </FormRow>
 
-      <SectionLabel>Fuel</SectionLabel>
+      <SectionLabel>Fuel card and toll tag</SectionLabel>
       <FormRow>
         <Field label="Fuel card number">
           <TextInput value={form.fuel_card_number} onChange={set('fuel_card_number')} placeholder="e.g. 7002 1234 5678" />
         </Field>
+        <Field label="Toll tag number">
+          <TextInput value={form.toll_tag_number} onChange={set('toll_tag_number')} placeholder="filled in by the toll statement" />
+        </Field>
+      </FormRow>
+      <FormRow>
         <Field label="Fuel type">
           <SelectInput value={form.fuel_type} onChange={set('fuel_type')} options={FUEL_TYPES} placeholder="Select…" />
         </Field>

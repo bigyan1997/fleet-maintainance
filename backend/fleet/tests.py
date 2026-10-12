@@ -322,6 +322,19 @@ class PdfAndDocumentDriveTests(TestCase):
             self.api.get("/api/attachments/", {"service": self.service.pk})
             self.assertEqual(Attachment.objects.count(), 1)
 
+    def test_toll_import_fills_in_a_vans_tag_number_once(self):
+        van = self.van  # Van 9, YLS91M
+        with self.on, self.client_patch:
+            self.assertEqual(self.toll_post().status_code, 201)
+        van.refresh_from_db()
+        self.assertEqual(van.toll_tag_number, "6123405")
+        van.toll_tag_number = "TYPED-IN"  # a typed-in number is never overwritten
+        van.save()
+        with self.on, self.client_patch:
+            self.toll_post()
+        van.refresh_from_db()
+        self.assertEqual(van.toll_tag_number, "TYPED-IN")
+
     def test_toll_pdf_goes_to_the_tolls_folder_and_is_served_and_trashed(self):
         Vehicle.objects.create(make="Van 5", model="HiAce", rego="YNU05R")
         with self.on, self.client_patch:

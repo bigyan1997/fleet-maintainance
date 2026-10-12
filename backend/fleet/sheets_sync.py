@@ -41,14 +41,14 @@ def _vehicle_rows():
     from .models import Vehicle
 
     header = [
-        "ID", "Make", "Model", "Year", "Rego", "VIN", "Vehicle number", "Fuel card number",
+        "ID", "Make", "Model", "Year", "Rego", "VIN", "Vehicle number", "Fuel card number", "Toll tag number",
         "Fuel type", "Odometer (km)", "Rego expiry",
         "Service interval (km)", "Tyre interval (km)", "Washing",
     ]
     rows = [
         [
             v.pk, v.make, v.model, _num(v.year), v.rego, v.vin, v.vehicle_number,
-            v.fuel_card_number, v.fuel_type, v.odometer, _date(v.rego_expiry),
+            v.fuel_card_number, v.toll_tag_number, v.fuel_type, v.odometer, _date(v.rego_expiry),
             v.service_interval_km, _num(v.tyre_interval_km),
             "Needed" if v.wash_needed else "No need",
         ]

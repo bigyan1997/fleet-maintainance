@@ -66,7 +66,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
   - **Documents:** attach rego papers, invoices and photos (PDF, photo, Word or Excel, up to 20 MB). Files attached to a service or incident show here too. They're kept in Google Drive in **Documents › van**, named like **DOC-VAN6-12102026 - invoice.pdf** (the original name is kept after the dash). Toll statement PDFs are named like **TOL-29082026-28092026.pdf**.
-  - **Details:** rego, VIN, fuel card, intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
+  - **Details:** rego, VIN, fuel card, **toll tag** (filled in by the first toll statement that shows one tag for the van; you can type or change it under Edit details), intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
   - **Rego dates:** type or pick each van's rego date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before one expires. (Insurance isn't tracked.)
   - **Drivers:** add drivers and choose each van's usual driver.
