@@ -36,6 +36,17 @@ export function BookedNote({ job }) {
 
 
 
+// How far through its service interval a van is: full and red when overdue.
+function ServiceBar({ kmLeft, interval }) {
+  const used = Math.min(1, Math.max(0, 1 - kmLeft / (interval || 10000)))
+  const colour = kmLeft < 0 ? 'bg-[#d23b3b]' : kmLeft < 2000 ? 'bg-[#d9a400]' : 'bg-[#22a35a]'
+  return (
+    <div className="my-1 h-1.5 w-[160px] max-w-full overflow-hidden rounded-full bg-[#e9edf2]" aria-hidden="true">
+      <div className={'h-full rounded-full ' + colour} style={{ width: `${used * 100}%` }} />
+    </div>
+  )
+}
+
 // ── Table view ────────────────────────────────────────────────────────────
 
 function FleetTable({ rows, onOpen }) {
@@ -65,6 +76,7 @@ function FleetTable({ rows, onOpen }) {
                   {svc ? (
                     <>
                       <div className="font-semibold text-ink tabular-nums">{svc.due_at.toLocaleString()} km</div>
+                      {!v.off_road && <ServiceBar kmLeft={svc.km_left} interval={v.service_interval_km} />}
                       <span className={'text-xs ' + kmColour(svc.km_left) + (svc.km_left < 2000 ? ' font-medium' : '')}>{svc.km_left < 0 ? serviceText(svc) : `${svc.km_left.toLocaleString()} km to go`}</span>
                       {svc.booked && <span className="text-xs"><BookedNote job={svc.booked} /></span>}
                     </>

@@ -18,7 +18,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 ## The screen at a glance
 
 - **Blue bar:** Google Sheet (a read-only copy of everything) and Log out.
-- **Tabs:** Home · Vans · Services · Washes · Fuel · Reports.
+- **Tabs:** Home · Vans · Services · Washes · Fuel · Tolls · Reports, each with a small picture. On a computer the blue bar and the tabs stay at the top while you scroll.
 - **Two buttons beside the tabs:** **Log wash** and **+ Log service**, the two things you do most. On a van's own page they sit beside **Report incident** instead, already set to that van.
 - Dates on Home, Services, Washes and the van pages show the day of the week too (for example Tue 06-10-2026).
 - Every form opens as a pop-up over the page you're on. Close it with ✕ or Cancel.
@@ -27,8 +27,9 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 
 Start here each day.
 
-- **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card).
-- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego dates running out within 60 days, a driver's licence expired or expiring within 30 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
+- **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card + tolls; the thin bar shows the share of each, darkest = services, lightest = tolls).
+- **Your vans:** one small box per van with its status and the km to its next service (green edge = OK, amber = due soon, red = needs attention, grey = off the road). Click a box to open that van.
+- **Needs doing (left):** only things that need action, in three groups, **Do first** (red), **Coming up** (amber) and **When there's time** (blue), most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego dates running out within 60 days, a driver's licence expired or expiring within 30 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
 - **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
 - **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
 

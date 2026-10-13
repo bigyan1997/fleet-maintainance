@@ -33,13 +33,13 @@ import { href, redirect, useRoute } from './lib/router'
 // The tabs across the top. The key is also the web address (#/vans/29 is a
 // van's page, which lives under the Vans tab).
 const TABS = [
-  { key: 'home', label: 'Home' },
-  { key: 'vans', label: 'Vans' },
-  { key: 'services', label: 'Services' },
-  { key: 'washes', label: 'Washes' },
-  { key: 'fuel', label: 'Fuel' },
-  { key: 'tolls', label: 'Tolls' },
-  { key: 'reports', label: 'Reports' },
+  { key: 'home', icon: 'today', label: 'Home' },
+  { key: 'vans', icon: 'vans', label: 'Vans' },
+  { key: 'services', icon: 'jobs', label: 'Services' },
+  { key: 'washes', icon: 'washes', label: 'Washes' },
+  { key: 'fuel', icon: 'fuel', label: 'Fuel' },
+  { key: 'tolls', icon: 'tolls', label: 'Tolls' },
+  { key: 'reports', icon: 'reports', label: 'Reports' },
 ]
 
 // Old addresses (bookmarks) that moved in the simpler layout.
@@ -199,34 +199,39 @@ function MainApp({ username }) {
     <ActionsContext.Provider value={actions}>
       <div className="min-h-screen bg-paper">
         <UpdateBanner />
-        <TopBar username={username} links={linksQuery.data} onLogout={() => logoutMutation.mutate()} />
-        <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
-          {/* Tabs and the two everyday buttons share one line. */}
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-line">
-            <div className="flex gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
-              {TABS.map((t) => (
-                <a
-                  key={t.key}
-                  href={href(t.key)}
-                  className={
-                    'border-b-2 px-3.5 py-2.5 text-[14px] font-medium whitespace-nowrap no-underline ' +
-                    (tab === t.key ? 'border-primary text-primary' : 'border-transparent text-off hover:text-ink')
-                  }
-                >
-                  {t.label}
-                </a>
-              ))}
-            </div>
-            <div className={'items-center gap-2 pb-2 ' + (path[0] === 'vans' && /^\d+$/.test(path[1] ?? '') ? 'hidden' : 'flex')}>
-              <button onClick={() => openForm('wash')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
-                Log wash
-              </button>
-              <button onClick={() => openForm('service')} className="rounded-md bg-primary px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-primary-dark">
-                + Log service
-              </button>
+        {/* The blue bar and the tabs stay at the top of the screen while you scroll. */}
+        <header className="z-40 md:sticky md:top-0">
+          <TopBar username={username} links={linksQuery.data} onLogout={() => logoutMutation.mutate()} />
+          <div className="border-b border-line bg-white shadow-[0_1px_3px_rgba(16,24,40,.06)]">
+            <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-x-4 px-2 lg:px-6">
+              <nav className="flex overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+                {TABS.map((t) => (
+                  <a
+                    key={t.key}
+                    href={href(t.key)}
+                    aria-current={tab === t.key ? 'page' : undefined}
+                    className={
+                      'flex items-center gap-1.5 border-b-[3px] px-3.5 py-3 text-[14.5px] whitespace-nowrap no-underline ' +
+                      (tab === t.key ? 'border-primary font-semibold text-primary' : 'border-transparent font-medium text-off hover:bg-[#f4f7fb] hover:text-ink')
+                    }
+                  >
+                    <Icon name={t.icon} className="h-[17px] w-[17px]" />
+                    {t.label}
+                  </a>
+                ))}
+              </nav>
+              <div className={'items-center gap-2 py-2 pr-2 ' + (path[0] === 'vans' && /^\d+$/.test(path[1] ?? '') ? 'hidden' : 'flex')}>
+                <button onClick={() => openForm('wash')} className="rounded-md border border-line bg-white px-3.5 py-1.5 text-[13px] font-medium hover:bg-[#f5f5f5]">
+                  Log wash
+                </button>
+                <button onClick={() => openForm('service')} className="rounded-md bg-primary px-3.5 py-1.5 text-[13px] font-medium text-white hover:bg-primary-dark">
+                  + Log service
+                </button>
+              </div>
             </div>
           </div>
-
+        </header>
+        <div className="mx-auto max-w-[1600px] px-4 py-5 lg:px-8">
           {page}
         </div>
       </div>

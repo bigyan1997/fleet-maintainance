@@ -5,8 +5,8 @@ export const SERVICE_STATUSES = ['Booked', 'In service', 'Completed, awaiting in
 export const STATUS_STYLES = {
   Booked: 'bg-[#e8f1fb] text-primary border-[#bcd5ee]',
   'In service': 'bg-warn-bg text-warn border-[#f0dd8a]',
-  'Completed, awaiting invoice': 'bg-due-bg text-due border-[#f5b5b5]',
-  Invoiced: 'bg-[#f0f0f0] text-off border-line',
+  'Completed, awaiting invoice': 'bg-[#fff1e0] text-[#9a4a00] border-[#f3cf9d]',
+  Invoiced: 'bg-ok-bg text-ok border-[#b7e4c7]',
 }
 
 // How each status reads on screen. The stored values (and the Google Sheet)

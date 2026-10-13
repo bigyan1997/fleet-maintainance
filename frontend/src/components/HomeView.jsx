@@ -7,8 +7,9 @@ import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
 import { useActions } from '../lib/actions'
 import { daysFromToday, fmtAgo, fmtDate, fmtDayDate, sydneyMonthName, todayIso } from '../lib/formatDate'
-import { kmAgeDays, kmIsOld } from '../lib/fleet'
+import { kmAgeDays, kmColour, kmIsOld } from '../lib/fleet'
 import { href } from '../lib/router'
+import { StatusBadge } from './FleetView'
 import { StatusSelect } from './StatusSelect'
 
 const money = (n) => `$${Number(n || 0).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
@@ -18,12 +19,64 @@ const PILL = {
   blue: 'bg-[#e8f1fb] text-primary',
 }
 
-function Tile({ label, value, note, tone }) {
+function Tile({ label, value, note, tone, children }) {
   return (
-    <div className="rounded-lg border border-line bg-white px-4 py-3">
-      <div className="text-xs text-off">{label}</div>
-      <div className={'text-2xl font-semibold tabular-nums ' + (tone ?? 'text-ink')}>{value}</div>
+    <div className="rounded-lg border border-line bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,.04)]">
+      <div className="text-xs font-medium text-off">{label}</div>
+      <div className={'text-[26px] leading-tight font-semibold tabular-nums ' + (tone ?? 'text-ink')}>{value}</div>
+      {children}
       <div className="text-[11.5px] text-off">{note}</div>
+    </div>
+  )
+}
+
+// Needs doing is split into three groups by how soon it matters.
+const GROUPS = [
+  ['red', 'Do first', 'bg-[#fdf3f3] text-due', 'border-l-[#d23b3b]'],
+  ['amber', 'Coming up', 'bg-[#fffbea] text-warn', 'border-l-[#d9a400]'],
+  ['blue', "When there's time", 'bg-[#f3f8fd] text-primary', 'border-l-[#7fb0de]'],
+]
+
+const VAN_EDGE = {
+  ok: 'border-l-[#22a35a]',
+  due_soon: 'border-l-[#d9a400]',
+  attention: 'border-l-[#d23b3b]',
+  off_road: 'border-l-[#b6bec8]',
+}
+const vanNo = (v) => Number((v.label.match(/\d+/) ?? [9999])[0])
+
+// Every van at a glance: its status and how far it is from the next service.
+function VanStrip({ vans }) {
+  if (!vans.length) return null
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 className="text-[15px] font-semibold text-ink">
+          Your vans <span className="text-xs font-normal text-off">· km to each van's next service · click a van to open it</span>
+        </h2>
+        <a href={href('vans')} className="text-xs font-medium text-primary no-underline hover:underline">All vans →</a>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(168px,1fr))]">
+        {[...vans].sort((a, b) => vanNo(a) - vanNo(b)).map((v) => {
+          const svc = v.nextServiceDue
+          const n = svc ? Math.abs(svc.km_left).toLocaleString() : ''
+          return (
+            <a
+              key={v.id}
+              href={href('vans', v.id)}
+              className={'rounded-lg border border-l-4 border-line bg-white px-3 py-2 no-underline shadow-[0_1px_2px_rgba(16,24,40,.04)] hover:bg-[#f7fafd] ' + (VAN_EDGE[v.statusBadge] ?? VAN_EDGE.ok)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[14px] font-semibold text-ink">{v.label}</span>
+                <StatusBadge status={v.statusBadge} />
+              </div>
+              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && kmColour(svc.km_left)) || 'text-off')}>
+                {v.off_road ? 'not being driven' : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
+              </div>
+            </a>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -189,6 +242,7 @@ export function HomeView() {
   ]
 
   const monthName = sydneyMonthName()
+  const spent = Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0) + Number(d?.monthTolls ?? 0)
   // e.g. "Van 9 booked for 07-10" (one or two jobs) or "2 booked · 1 at the mechanic".
   const booked = jobs.filter((j) => j.status === 'Booked')
   const atMechanic = jobs.filter((j) => j.status !== 'Booked')
@@ -208,38 +262,59 @@ export function HomeView() {
         <Tile label="Booked & at the mechanic" value={jobs.length} note={jobsNote} />
         <Tile
           label={`Spent in ${monthName} so far`}
-          value={money(Number(d?.monthServices ?? 0) + Number(d?.monthFuel ?? 0) + Number(d?.monthTolls ?? 0))}
+          value={money(spent)}
           note={`services ${money(d?.monthServices)} + fuel card ${money(d?.monthFuel)} + tolls ${money(d?.monthTolls ?? 0)}`}
-        />
+        >
+          {spent > 0 && (
+            <div className="my-1.5 flex h-1.5 overflow-hidden rounded-full bg-[#eef1f5]" aria-hidden="true">
+              <div className="bg-primary" style={{ width: `${(Number(d?.monthServices ?? 0) / spent) * 100}%` }} />
+              <div className="bg-[#5aa0dd]" style={{ width: `${(Number(d?.monthFuel ?? 0) / spent) * 100}%` }} />
+              <div className="bg-[#b9d6f0]" style={{ width: `${(Number(d?.monthTolls ?? 0) / spent) * 100}%` }} />
+            </div>
+          )}
+        </Tile>
       </div>
+
+      <VanStrip vans={vehicles.data ?? []} />
 
       {/* Needs doing on the left; work at the mechanic and invoices on the right (stacked on a phone). */}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-lg border border-line bg-white">
           <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
             <h2 className="text-[15px] font-semibold text-ink">Needs doing</h2>
-            <span className="text-xs text-off">most urgent first</span>
+            <span className="text-xs text-off">{items.length ? `${items.length} thing${items.length === 1 ? '' : 's'}, most urgent first` : ''}</span>
           </div>
           {items.length === 0 ? (
             <div className="px-4 py-8 text-center text-[13px] text-off">All clear: nothing needs doing right now.</div>
           ) : (
-            <ul className="divide-y divide-[#f0f0f0]">
-              {items.map((it) => (
-                <li key={it.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
-                  <div className="min-w-[220px] flex-1">
-                    <div>
-                      <a href={it.link ? it.link : it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : it.key === 'km-old' ? href('vans') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
-                      {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
-                      {it.sub && <span className="text-xs text-off"> · {it.sub}</span>}
-                    </div>
-                    <div className="text-[13px] text-ink">{it.text}</div>
-                    {it.detail && <div className="text-xs text-off">{it.detail}</div>}
+            GROUPS.map(([tone, title, head, edge]) => {
+              const rows = items.filter((it) => it.pill[0] === tone)
+              if (!rows.length) return null
+              return (
+                <div key={tone}>
+                  <div className={'border-b border-[#f0f0f0] px-4 py-1.5 text-xs font-semibold ' + head}>
+                    {title} <span className="font-normal">· {rows.length}</span>
                   </div>
-                  <span className={'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + PILL[it.pill[0]]}>{it.pill[1]}</span>
-                  {it.action}
-                </li>
-              ))}
-            </ul>
+                  <ul className="divide-y divide-[#f0f0f0] border-b border-[#f0f0f0]">
+                    {rows.map((it) => (
+                      <li key={it.key} className={'flex flex-wrap items-center gap-x-3 gap-y-1.5 border-l-4 py-3 pr-4 pl-3 ' + edge}>
+                        <div className="min-w-[220px] flex-1">
+                          <div>
+                            <a href={it.link ? it.link : it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : it.key === 'km-old' ? href('vans') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
+                            {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
+                            {it.sub && <span className="text-xs text-off"> · {it.sub}</span>}
+                          </div>
+                          <div className="text-[13px] text-ink">{it.text}</div>
+                          {it.detail && <div className="text-xs text-off">{it.detail}</div>}
+                        </div>
+                        <span className={'rounded-full px-2.5 py-0.5 text-[11px] font-semibold ' + PILL[it.pill[0]]}>{it.pill[1]}</span>
+                        {it.action}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })
           )}
         </div>
 
