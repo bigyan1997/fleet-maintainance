@@ -28,7 +28,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 Start here each day.
 
 - **Three numbers:** how many things need doing, how many jobs are **booked or at the mechanic** (the note underneath names them), and what's been spent this month (services + fuel card).
-- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego dates running out within 60 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
+- **Needs doing (left):** only things that need action, most urgent first: services or tyres due or overdue (once one is booked it leaves this list, and only comes back if the booked date passes without the work being done), rego dates running out within 60 days, a driver's licence expired or expiring within 30 days, open incidents, invoices that are late (more than 6 weeks after the service), vans due a wash, and missing rego dates. Each line has a button for the next step.
 - **Booked & at the mechanic (right):** work not finished yet. Change its status right there.
 - **Waiting for invoices (right):** finished work. The mechanic sends each invoice about a month after the service, so this shows when each one is expected. When it arrives, click **Invoice arrived**, type the cost, and it's done.
 
@@ -69,7 +69,10 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
   - **Details:** rego, VIN, fuel card, **toll tag** (filled in by the first toll statement that shows one tag for the van; you can type or change it under Edit details), intervals, tyres, rego expiry, washing, usual driver, and the **change history** (who changed what, and when). **Edit details** and **Delete van** are here.
 - Links at the top of the Vans list:
   - **Rego dates:** type or pick each van's rego date once; it saves when you click out of the box (or press Enter). Home then warns 60 days before one expires. (Insurance isn't tracked.)
-  - **Drivers:** add drivers and choose each van's usual driver.
+  - **Drivers:** the list of drivers with their usual van, licence, licence expiry, demerit points and the date they joined, and under it **Who drives which van** (pick each van's usual driver). **Add driver** opens the form.
+    - **Click a driver** for their page: licence expiry, demerit points, date joined and date of birth at the top, then the licence details and the **licence photos** (front and back; a phone photo or a PDF scan). Photos are kept in Google Drive in **Drivers › name**.
+    - **Edit details** is the form for everything: name, mobile, date of birth, date joined, licence number, class, state and expiry, **demerit points** and the date you checked them (you type the points in; nothing looks them up), and notes. Untick **Still driving for us** when someone leaves, to keep their record.
+    - A licence shows **due soon 30 days before it expires** and **expired** after, on the list, on the driver's page and on Home.
   - **Tyres:** when each van last had new tyres and when the next set is due. Set how many km a set lasts; **Log new tyres** records a tyre change.
   - **QR stickers:** print a sticker for each van. A driver scans it with their phone (on the office Wi-Fi) to **report a problem** or **log a wash**, with no login. Reports appear under Services → Incidents and on Home.
 - **Off the road:** for a van that is parked and not being driven (for example after an accident), open it → **Details → Edit details → On the road?** → *Off the road*. It gets an **Off the road** grey badge and no more km-old, service, tyre or wash warnings. Rego warnings stay. Switch it back to *On the road* when it drives again.
@@ -137,7 +140,7 @@ Only the fleet vans are shown. Other vehicles on the toll account are left out, 
 
 ## Google Sheet
 
-The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten. Its tabs are Vehicles, Service History (washes too), Incidents, Fuel Log and **Tolls** (one row per toll trip, with the day, time, road, amount, whether it was a fee, and **Weekend?** / **After 12 pm?** flags; it refreshes after each toll statement import).
+The **Google Sheet** button opens a copy of all the data that updates by itself after every change. It's for viewing only: changes made in the sheet are overwritten. Its tabs are Vehicles, Service History (washes too), Incidents, Fuel Log, **Drivers** (name, mobile, date of birth, date joined, licence number, class, state and expiry, demerit points, usual van) and **Tolls** (one row per toll trip, with the day, time, road, amount, whether it was a fee, and **Weekend?** / **After 12 pm?** flags; it refreshes after each toll statement import).
 
 ## If the app won't open
 

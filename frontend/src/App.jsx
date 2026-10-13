@@ -9,6 +9,8 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { HomeView } from './components/HomeView'
 import { FleetView } from './components/FleetView'
 import { VanPage } from './components/VanPage'
+import { DriverPage } from './components/DriverPage'
+import { DriverForm } from './components/DriverForm'
 import { HistoryView } from './components/HistoryView'
 import { MechanicsView } from './components/MechanicsView'
 import { WashesView } from './components/WashesView'
@@ -87,6 +89,7 @@ function FormModal({ form, onClose, toast }) {
     vehicle: <VehicleForm vehicle={form.record} {...common} />,
     wash: <WashForm wash={form.record} {...common} />,
     finish: <FinishJobForm job={form.record} {...common} />,
+    driver: <DriverForm driver={form.record} {...common} />,
   }[form.kind]
   return (
     <Modal onClose={onClose}>
@@ -148,6 +151,8 @@ function MainApp({ username }) {
     page = <HomeView />
   } else if (tab === 'vans' && /^\d+$/.test(path[1] ?? '')) {
     page = <VanPage key={path[1]} id={path[1]} />
+  } else if (tab === 'vans' && path[1] === 'drivers' && /^\d+$/.test(path[2] ?? '')) {
+    page = <DriverPage key={path[2]} id={path[2]} />
   } else if (tab === 'vans') {
     const sub = FLEET_TABS.some((t) => t.key === path[1]) ? path[1] : ''
     page = sub === '' ? (

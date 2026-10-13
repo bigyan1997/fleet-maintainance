@@ -129,6 +129,24 @@ def _toll_rows():
     return header, rows
 
 
+def _driver_rows():
+    from .models import Driver
+
+    header = [
+        "ID", "Name", "Phone", "Date of birth", "Date joined", "Licence number", "Licence class", "Licence state",
+        "Licence expiry", "Demerit points", "Points checked on", "Usual van", "Still driving for us", "Notes",
+    ]
+    rows = [
+        [
+            d.pk, d.name, d.phone, _date(d.date_of_birth), _date(d.date_joined), d.licence_number, d.licence_class,
+            d.licence_state, _date(d.licence_expiry), _num(d.demerit_points), _date(d.points_checked),
+            ", ".join(str(v) for v in d.vehicles.all()), "Yes" if d.active else "No", d.notes,
+        ]
+        for d in Driver.objects.prefetch_related("vehicles").order_by("name", "pk")
+    ]
+    return header, rows
+
+
 # Tab name -> row builder. Service/incident/fuel rows show the vehicle's
 # label and rego, so a vehicle edit also refreshes those tabs (Tolls too).
 TABS = {
@@ -137,6 +155,7 @@ TABS = {
     "Incidents": _incident_rows,
     "Fuel Log": _fuel_rows,
     "Tolls": _toll_rows,
+    "Drivers": _driver_rows,
 }
 MODEL_TABS = {
     "Vehicle": list(TABS),
@@ -148,6 +167,7 @@ MODEL_TABS = {
     # or removed once per import) is what triggers the Tolls tab; its trips
     # follow it when the push runs after the commit.
     "TollStatement": ["Tolls"],
+    "Driver": ["Drivers"],
 }
 
 

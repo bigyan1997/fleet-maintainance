@@ -26,6 +26,8 @@ from .views_extra import (
     TollTodoView,
     TollsView,
     BudgetView,
+    DriverFileView,
+    DriverFileViewSet,
     DriverViewSet,
     MechanicViewSet,
     FuelTrendsView,
@@ -37,6 +39,7 @@ router.register("services", ServiceRecordViewSet, basename="service")
 router.register("incidents", IncidentViewSet, basename="incident")
 router.register("fuel-logs", FuelLogViewSet, basename="fuel-log")
 router.register("drivers", DriverViewSet, basename="driver")
+router.register("driver-files", DriverFileViewSet, basename="driver-file")
 router.register("mechanics", MechanicViewSet, basename="mechanic")
 router.register("attachments", AttachmentViewSet, basename="attachment")
 
@@ -44,6 +47,7 @@ urlpatterns = [
     path("dashboard/", DashboardView.as_view(), name="dashboard"),
     path("alerts/", AlertsView.as_view(), name="alerts"),
     path("attachments/<int:pk>/file/", AttachmentFileView.as_view(), name="attachment-file"),
+    path("driver-files/<int:pk>/file/", DriverFileView.as_view(), name="driver-file-file"),
     path("tolls/", TollsView.as_view(), name="tolls"),
     path("tolls/<int:pk>/", TollStatementView.as_view(), name="toll-statement"),
     path("tolls/<int:pk>/done/", TollTodoView.as_view(), name="toll-todo"),

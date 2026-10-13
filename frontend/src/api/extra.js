@@ -6,6 +6,16 @@ export const createDriver = async (data) => (await api.post('/drivers/', data)).
 export const updateDriver = async (id, data) => (await api.patch(`/drivers/${id}/`, data)).data
 export const deleteDriver = async (id) => api.delete(`/drivers/${id}/`)
 
+// A driver's licence photos and scans
+export const fetchDriverFiles = async (driver) => (await api.get('/driver-files/', { params: { driver } })).data
+export async function uploadDriverFile(driver, file) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('driver', driver)
+  return (await api.post('/driver-files/', form)).data
+}
+export const deleteDriverFile = async (id) => api.delete(`/driver-files/${id}/`)
+
 // One field on a van (driver, tyre interval…)
 export const patchVehicle = async (id, data) => (await api.patch(`/vehicles/${id}/`, data)).data
 

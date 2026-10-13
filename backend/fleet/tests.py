@@ -604,3 +604,90 @@ class FuelStatementPeriodTests(TestCase):
 
         self.assertEqual(costs("2026-09-08"), [66.0, 88.0])  # not the 50.00 dated 08-09
         self.assertEqual(costs("2026-10-08"), [30.0, 50.0, 60.0])  # its own two lines, plus the one logged by hand in between
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class DriverDetailsTests(TestCase):
+    """Licence details, the expiry warning, licence photos and the Sheet's Drivers tab."""
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from .models import Driver
+
+        self.Driver, self.days = Driver, lambda n: timezone.localdate() + timedelta(days=n)
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.driver = Driver.objects.create(name="Sam Example", phone="0400 000 001")
+        self.fake = FakeDrive()
+
+    def photo(self, name="licence.jpg"):
+        return SimpleUploadedFile(name, JPEG, content_type="image/jpeg")
+
+    def test_licence_details_are_saved_and_the_warning_starts_30_days_out(self):
+        res = self.api.patch(f"/api/drivers/{self.driver.pk}/", {
+            "date_of_birth": "1990-05-04", "date_joined": "2022-03-12", "licence_number": "1234 5678",
+            "licence_class": "C", "licence_state": "NSW", "licence_expiry": self.days(45).isoformat(),
+            "demerit_points": 3, "points_checked": self.days(-10).isoformat(),
+        }, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual((res.data["licenceStatus"], res.data["licenceDaysLeft"], res.data["demerit_points"]), ("ok", 45, 3))
+        for days, status in ((29, "due_soon"), (0, "due_soon"), (-1, "expired")):
+            res = self.api.patch(f"/api/drivers/{self.driver.pk}/", {"licence_expiry": self.days(days).isoformat()}, format="json")
+            self.assertEqual((res.data["licenceStatus"], res.data["licenceDaysLeft"]), (status, days))
+        res = self.api.patch(f"/api/drivers/{self.driver.pk}/", {"licence_expiry": None}, format="json")
+        self.assertEqual(res.data["licenceStatus"], "")
+
+    def test_a_half_typed_year_or_silly_points_are_refused(self):
+        for bad in ({"licence_expiry": "0002-05-04"}, {"date_of_birth": self.days(1).isoformat()}, {"demerit_points": 99}):
+            self.assertEqual(self.api.patch(f"/api/drivers/{self.driver.pk}/", bad, format="json").status_code, 400)
+
+    def test_licence_photo_goes_to_the_drivers_drive_folder_and_is_binned_when_removed(self):
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=self.fake):
+            first = self.api.post("/api/driver-files/", {"file": self.photo(), "driver": self.driver.pk}, format="multipart")
+            second = self.api.post("/api/driver-files/", {"file": self.photo("back.jpg"), "driver": self.driver.pk}, format="multipart")
+            self.assertEqual((first.status_code, second.status_code), (201, 201))
+            stamp = f"{timezone.localdate():%d%m%Y}"
+            self.assertEqual([first.data["original_name"], second.data["original_name"]], [f"LIC-SAMEXAMPLE-{stamp}.jpg", f"LIC-SAMEXAMPLE-{stamp} (2).jpg"])
+            meta = self.fake.files[self.driver.files.first().drive_file_id][0]
+            self.assertEqual(self.fake.path(meta["parents"][0]), "Drivers/Sam Example")
+            self.assertEqual(len(self.api.get("/api/driver-files/", {"driver": self.driver.pk}).data), 2)
+            self.assertEqual(self.api.get(first.data["url"]).content, JPEG)
+            self.assertEqual(self.api.delete(f"/api/driver-files/{first.data['id']}/").status_code, 204)
+            self.assertEqual(len(self.fake.trashed), 1)
+            # Removing the driver bins what is left.
+            self.assertEqual(self.api.delete(f"/api/drivers/{self.driver.pk}/").status_code, 204)
+            self.assertEqual(len(self.fake.trashed), 2)
+
+    def test_without_drive_the_photo_waits_on_disk_then_moves(self):
+        from .models import DriverFile
+
+        with mock.patch.object(drive, "enabled", return_value=False):
+            res = self.api.post("/api/driver-files/", {"file": self.photo(), "driver": self.driver.pk}, format="multipart")
+            self.assertEqual(res.status_code, 201)
+            self.assertEqual(self.api.post("/api/driver-files/", {"file": SimpleUploadedFile("x.exe", b"x"), "driver": self.driver.pk}, format="multipart").status_code, 400)
+        saved = DriverFile.objects.get()
+        self.assertTrue(saved.file and not saved.drive_file_id)
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=self.fake):
+            self.assertEqual(drive.move_local_files(force=True), 1)
+        saved.refresh_from_db()
+        self.assertTrue(saved.drive_file_id and not saved.file)
+
+    def test_licence_photos_need_a_login(self):
+        with mock.patch.object(drive, "enabled", return_value=False):
+            res = self.api.post("/api/driver-files/", {"file": self.photo(), "driver": self.driver.pk}, format="multipart")
+        anonymous = APIClient()
+        self.assertIn(anonymous.get(res.data["url"]).status_code, (401, 403))
+        self.assertIn(anonymous.get("/api/drivers/").status_code, (401, 403))
+
+    def test_sheet_gets_a_drivers_tab(self):
+        from . import sheets_sync
+
+        van = Vehicle.objects.create(make="Van 4", model="HiAce", rego="YKG89N", driver=self.driver)
+        self.Driver.objects.filter(pk=self.driver.pk).update(licence_number="1234 5678", licence_class="C", licence_state="NSW", licence_expiry=date(2026, 11, 18), demerit_points=3)
+        header, rows = sheets_sync.TABS["Drivers"]()
+        row = dict(zip(header, rows[0]))
+        self.assertEqual((row["Name"], row["Licence number"], row["Licence expiry"], row["Demerit points"], row["Usual van"], row["Still driving for us"]),
+                         ("Sam Example", "1234 5678", "18-11-2026", "3", str(van), "Yes"))
+        self.assertIn("Drivers", sheets_sync.MODEL_TABS["Driver"])
+        self.assertIn("Drivers", sheets_sync.MODEL_TABS["Vehicle"])  # changing a van's usual driver refreshes it

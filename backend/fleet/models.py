@@ -66,11 +66,35 @@ def new_report_token():
     return secrets.token_urlsafe(16)
 
 
+LICENCE_CLASS_CHOICES = [
+    ("C", "C (car)"),
+    ("LR", "LR (light rigid)"),
+    ("MR", "MR (medium rigid)"),
+    ("HR", "HR (heavy rigid)"),
+    ("HC", "HC (heavy combination)"),
+    ("MC", "MC (multi combination)"),
+]
+LICENCE_STATE_CHOICES = [(s, s) for s in ("NSW", "VIC", "QLD", "ACT", "SA", "WA", "TAS", "NT", "Overseas")]
+# A licence shows as "due soon" (and on Home's Needs doing) this many days
+# before it expires. Shorter than rego's 60: the owner asked for 30.
+LICENCE_DUE_SOON_DAYS = 30
+
+
 class Driver(models.Model):
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=30, blank=True)
     notes = models.TextField(blank=True)
     active = models.BooleanField(default=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    date_joined = models.DateField(null=True, blank=True)
+    licence_number = models.CharField(max_length=30, blank=True)
+    licence_class = models.CharField(max_length=4, choices=LICENCE_CLASS_CHOICES, blank=True)
+    licence_state = models.CharField(max_length=10, choices=LICENCE_STATE_CHOICES, blank=True)
+    licence_expiry = models.DateField(null=True, blank=True)
+    # Typed in by the office after the driver shows their Service NSW record;
+    # nothing can look these up.
+    demerit_points = models.PositiveSmallIntegerField(null=True, blank=True)
+    points_checked = models.DateField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -80,6 +104,19 @@ class Driver(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def licence_days_left(self):
+        return (self.licence_expiry - timezone.localdate()).days if self.licence_expiry else None
+
+    @property
+    def licence_status(self):
+        """"expired", "due_soon" (within LICENCE_DUE_SOON_DAYS), "ok", or ""
+        when no expiry date has been entered."""
+        days = self.licence_days_left
+        if days is None:
+            return ""
+        return "expired" if days < 0 else "due_soon" if days < LICENCE_DUE_SOON_DAYS else "ok"
 
 
 class Vehicle(models.Model):
@@ -322,6 +359,28 @@ class Attachment(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+
+def driver_file_path(instance, filename):
+    return f"driver_files/{secrets.token_hex(6)}-{filename}"
+
+
+class DriverFile(models.Model):
+    """A photo or scan of a driver's licence (front, back). Kept in Google
+    Drive under Drivers/<name>/; on the server's disk until Drive is connected."""
+
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="files")
+    file = models.FileField(upload_to=driver_file_path, blank=True)  # empty when kept in Google Drive
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    drive_file_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    drive_modified_at = models.DateTimeField(null=True, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
 
 
 def toll_statement_path(instance, filename):

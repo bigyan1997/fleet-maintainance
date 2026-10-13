@@ -20,6 +20,7 @@ PDFs and other documents go to Drive too:
     Fleet Maintenance Photos/
         Tolls/            TOL-29082026-28092026.pdf
         Documents/<Van>/  DOC-VAN6-12102026 - <original file name>
+        Drivers/<Name>/   LIC-SAMEXAMPLE-14102026.jpg                (licence photos)
 
 Drive is the source of truth for photos: a photo dropped into a van's folder in the
 Drive app, named with a job's date, shows up on that job the next time it's
@@ -249,6 +250,20 @@ def upload_for(client, *, vehicle, job, kind, filename, content, content_type):
     return client.upload(folder, name, content, content_type), name
 
 
+def upload_driver_file(client, driver, filename, content, content_type):
+    """A licence photo or scan: Drivers/<name>/LIC-<NAME>-<today>.jpg, then
+    "(2)" and so on. Returns (Drive's file info, the name it was given)."""
+    ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
+    folder = ensure_path(client, "Drivers", driver.name)
+    taken = {f["name"].lower() for f in client.list_images(folder)}
+    base = f"LIC-{re.sub(r'[^A-Za-z0-9]', '', driver.name).upper()}-{timezone.localdate():%d%m%Y}"
+    name, n = f"{base}{ext}", 1
+    while name.lower() in taken:
+        n += 1
+        name = f"{base} ({n}){ext}"
+    return client.upload(folder, name, content, content_type), name
+
+
 # Files saved on the server's disk while Drive wasn't connected are moved to
 # Drive the first time they're needed after it is (at most this often).
 _MOVE_EVERY_SECONDS = 120
@@ -260,14 +275,15 @@ def move_local_files(limit=10, force=False):
     call often: it does nothing when Drive isn't connected or there is
     nothing to move. Returns how many files were moved."""
     global _last_move
-    from .models import Attachment, TollStatement
+    from .models import Attachment, DriverFile, TollStatement
 
     if not enabled() or (not force and _time.monotonic() - _last_move < _MOVE_EVERY_SECONDS):
         return 0
     _last_move = _time.monotonic()
     atts = list(Attachment.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("vehicle", "service", "incident")[:limit])
     tolls = list(TollStatement.objects.filter(drive_file_id="").exclude(file="")[:limit])
-    if not (atts or tolls):
+    licences = list(DriverFile.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("driver")[:limit])
+    if not (atts or tolls or licences):
         return 0
     moved = 0
     client = DriveClient()
@@ -296,6 +312,18 @@ def move_local_files(limit=10, force=False):
             moved += 1
         except Exception:
             logger.exception("Couldn't move toll statement %s to Drive", st.pk)
+    for lic in licences:
+        try:
+            with lic.file.open("rb") as f:
+                content = f.read()
+            meta, name = upload_driver_file(client, lic.driver, lic.original_name, content, lic.content_type)
+            lic.file.delete(save=False)
+            DriverFile.objects.filter(pk=lic.pk).update(
+                file="", drive_file_id=meta["id"], original_name=name[:255], drive_modified_at=parse_time(meta.get("modifiedTime")),
+            )
+            moved += 1
+        except Exception:
+            logger.exception("Couldn't move licence photo %s to Drive", lic.original_name)
     return moved
 
 

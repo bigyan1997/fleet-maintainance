@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchAlerts } from '../api/alerts'
 import { fetchDashboard } from '../api/dashboard'
+import { fetchDrivers } from '../api/extra'
 import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
@@ -59,6 +60,7 @@ export function HomeView() {
   const washes = useQuery({ queryKey: ['washes'], queryFn: fetchWashes })
   const incidents = useQuery({ queryKey: ['incidents', { open: true }], queryFn: () => fetchIncidents({ page_size: 200 }) })
   const vehicles = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
+  const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
   const sub = Object.fromEntries((vehicles.data ?? []).map((v) => [v.id, v.subtitle]))
 
 
@@ -106,6 +108,25 @@ export function HomeView() {
           ? <a href={href('vans', 'dates')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Update rego date</a>
           : <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
       })),
+    // Drivers' licences: expired ones first, then those within 30 days (the
+    // server decides the status). People who have left aren't chased.
+    ...(drivers.data ?? [])
+      .filter((dr) => dr.active && (dr.licenceStatus === 'expired' || dr.licenceStatus === 'due_soon'))
+      .sort((a, b) => a.licenceDaysLeft - b.licenceDaysLeft)
+      .map((dr) => {
+        const n = Math.abs(dr.licenceDaysLeft)
+        const unit = n === 1 ? 'day' : 'days'
+        return {
+          key: `d-${dr.id}`,
+          van: dr.name,
+          link: href('vans', 'drivers', dr.id),
+          sub: `driver${dr.vans.length ? ` · usually ${dr.vans.map((v) => v.label).join(', ')}` : ''}`,
+          text: dr.licenceStatus === 'expired' ? `Driver's licence expired ${n} ${unit} ago` : n === 0 ? "Driver's licence expires today" : `Driver's licence expires in ${n} ${unit}`,
+          detail: `Licence expiry ${fmtDate(dr.licence_expiry)}. Update it on their page once it's renewed.`,
+          pill: dr.licenceStatus === 'expired' ? ['red', 'Overdue'] : ['amber', 'Due soon'],
+          action: <a href={href('vans', 'drivers', dr.id)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
+        }
+      }),
     ...(incidents.data?.results ?? [])
       .filter((i) => i.status !== 'Resolved')
       .map((i) => ({
@@ -207,8 +228,9 @@ export function HomeView() {
                 <li key={it.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
                   <div className="min-w-[220px] flex-1">
                     <div>
-                      <a href={it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : it.key === 'km-old' ? href('vans') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
+                      <a href={it.link ? it.link : it.vanId ? href('vans', it.vanId) : it.key === 'dates' ? href('vans', 'dates') : it.key === 'km-old' ? href('vans') : href('washes')} className="text-[14px] font-semibold text-ink no-underline hover:text-primary">{it.van}</a>
                       {it.vanId && sub[it.vanId] && <span className="text-xs text-off"> · {sub[it.vanId]}</span>}
+                      {it.sub && <span className="text-xs text-off"> · {it.sub}</span>}
                     </div>
                     <div className="text-[13px] text-ink">{it.text}</div>
                     {it.detail && <div className="text-xs text-off">{it.detail}</div>}

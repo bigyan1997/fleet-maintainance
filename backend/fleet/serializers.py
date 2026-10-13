@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from . import services
 from . import drive
-from .models import ActivityLog, Attachment, Driver, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
+from .models import ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -163,13 +163,60 @@ class FuelLogSerializer(serializers.ModelSerializer):
 
 class DriverSerializer(serializers.ModelSerializer):
     vans = serializers.SerializerMethodField()
+    licenceStatus = serializers.CharField(source="licence_status", read_only=True)
+    licenceDaysLeft = serializers.IntegerField(source="licence_days_left", read_only=True)
 
     class Meta:
         model = Driver
-        fields = ["id", "name", "phone", "notes", "active", "vans"]
+        fields = [
+            "id", "name", "phone", "notes", "active", "vans",
+            "date_of_birth", "date_joined", "licence_number", "licence_class", "licence_state", "licence_expiry",
+            "demerit_points", "points_checked", "licenceStatus", "licenceDaysLeft",
+        ]
 
     def get_vans(self, obj):
         return [{"id": v.pk, "label": str(v)} for v in obj.vehicles.all()]
+
+    def _real_date(self, value, what, earliest=1930):
+        # A half-typed year (the browser reads "2" as 0002) must never be saved.
+        if value and not earliest <= value.year <= 2099:
+            raise serializers.ValidationError(f"That {what} has the year {value.year}. Check the date.")
+        return value
+
+    def validate_date_of_birth(self, value):
+        value = self._real_date(value, "date of birth")
+        if value and value > timezone.localdate():
+            raise serializers.ValidationError("That date of birth is in the future. Check the date.")
+        return value
+
+    def validate_date_joined(self, value):
+        return self._real_date(value, "date joined", 1980)
+
+    def validate_licence_expiry(self, value):
+        return self._real_date(value, "licence expiry", 2000)
+
+    def validate_points_checked(self, value):
+        return self._real_date(value, "points checked date", 2000)
+
+    def validate_demerit_points(self, value):
+        if value is not None and value > 30:
+            raise serializers.ValidationError("That's more demerit points than a licence can hold. Check the number.")
+        return value
+
+
+class DriverFileSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+    thumb = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DriverFile
+        fields = ["id", "driver", "original_name", "content_type", "size", "created_at", "url", "thumb"]
+
+    def get_url(self, obj):
+        return f"/api/driver-files/{obj.pk}/file/"
+
+    def get_thumb(self, obj):
+        return f"{self.get_url(obj)}?thumb=1" if obj.drive_file_id else self.get_url(obj)
 
 
 class AttachmentSerializer(serializers.ModelSerializer):

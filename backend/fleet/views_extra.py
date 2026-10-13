@@ -15,13 +15,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import activity, drive, services, toll_import
-from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
-from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverSerializer, MechanicSerializer
+from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
+from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
 
 logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ALLOWED_UPLOAD_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
+LICENCE_FILE_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic"}
 
 
 # ── Drivers ────────────────────────────────────────────────────────────────
@@ -56,9 +57,89 @@ class DriverViewSet(viewsets.ViewSet):
         if not driver:
             return Response({"detail": "Driver not found."}, status=status.HTTP_404_NOT_FOUND)
         name = driver.name
+        # Their licence photos go to Drive's Bin with them (the database rows cascade).
+        for f in driver.files.all():
+            if not _remove_driver_file(f):
+                return Response({"detail": "Couldn't remove their licence photos from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
         driver.delete()  # their vans just lose the driver (SET_NULL)
         activity.log(request.user, "Deleted", "Driver", name)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _remove_driver_file(f):
+    """Bin the stored file (Drive or disk). False if Drive refused."""
+    if f.drive_file_id:
+        try:
+            drive.DriveClient().trash(f.drive_file_id)
+        except Exception:
+            logger.exception("Drive trash failed for %s", f.drive_file_id)
+            return False
+    elif f.file:
+        f.file.delete(save=False)
+    return True
+
+
+class DriverFileViewSet(viewsets.ViewSet):
+    """Licence photos and scans for one driver (?driver=<id>)."""
+
+    def list(self, request):
+        drive.move_local_files()  # anything saved on this server's disk earlier goes to Drive now
+        qs = DriverFile.objects.filter(driver_id=request.query_params.get("driver") or 0)
+        return Response(DriverFileSerializer(qs, many=True).data)
+
+    def create(self, request):
+        upload = request.FILES.get("file")
+        driver = Driver.objects.filter(pk=request.data.get("driver") or 0).first()
+        if not upload or not driver:
+            return Response({"detail": "Choose a photo or scan of the licence."}, status=status.HTTP_400_BAD_REQUEST)
+        ext = ("." + upload.name.rsplit(".", 1)[-1].lower()) if "." in upload.name else ""
+        if ext not in LICENCE_FILE_EXTS:
+            return Response({"detail": "Use a photo or a PDF of the licence."}, status=status.HTTP_400_BAD_REQUEST)
+        if upload.size > MAX_UPLOAD_BYTES:
+            return Response({"detail": "That file is over 20 MB. Try a smaller scan or photo."}, status=status.HTTP_400_BAD_REQUEST)
+        content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
+        fields = dict(driver=driver, original_name=upload.name[:255], content_type=content_type, size=upload.size, uploaded_by=request.user)
+        saved = None
+        if drive.enabled():
+            try:
+                meta, name = drive.upload_driver_file(drive.DriveClient(), driver, upload.name, upload.read(), content_type)
+                saved = DriverFile.objects.create(
+                    **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
+                )
+            except Exception:
+                # Never lose the photo: keep it on this PC instead.
+                logger.exception("Drive upload failed; keeping %s on disk", upload.name)
+                upload.seek(0)
+        if saved is None:
+            saved = DriverFile.objects.create(file=upload, **fields)
+        activity.log(request.user, "Added", "Driver", f"Licence photo for {driver.name}")
+        return Response(DriverFileSerializer(saved).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        f = DriverFile.objects.select_related("driver").filter(pk=pk).first()
+        if not f:
+            return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not _remove_driver_file(f):
+            return Response({"detail": "Couldn't remove it from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
+        activity.log(request.user, "Deleted", "Driver", f"Licence photo for {f.driver.name}")
+        f.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DriverFileView(APIView):
+    """Streams a licence photo — only to logged-in users."""
+
+    def get(self, request, pk):
+        f = DriverFile.objects.filter(pk=pk).first()
+        if not f or not (f.file or f.drive_file_id):
+            raise Http404
+        if f.drive_file_id:
+            thumb = request.query_params.get("thumb") == "1"
+            data, content_type = drive.thumbnail(f) if thumb else drive.full(f)
+            response = HttpResponse(data, content_type=content_type)
+            response["Cache-Control"] = "private, max-age=86400" if thumb else "private, no-store"
+            return response
+        return FileResponse(f.file.open("rb"), filename=f.original_name, content_type=f.content_type or None)
 
 
 # ── Mechanics ──────────────────────────────────────────────────────────────

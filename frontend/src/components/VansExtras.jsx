@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
-import { createDriver, deleteDriver, fetchDrivers, patchVehicle, updateDriver } from '../api/extra'
+import { fetchDrivers, patchVehicle } from '../api/extra'
 import { fetchServices } from '../api/services'
 import { fetchVehicles } from '../api/vehicles'
 import { useActions } from '../lib/actions'
 import { daysFromToday, fmtAgo, fmtDate } from '../lib/formatDate'
-import { href } from '../lib/router'
-import { ConfirmDialog } from './ConfirmDialog'
+import { href, navigate } from '../lib/router'
+import { LicencePill } from './DriverPage'
 import { Button, Card, Empty, Pill } from './ui'
 
 const km = (n) => `${Number(n).toLocaleString()} km`
@@ -23,82 +23,81 @@ function sortVans(vans) {
 
 // ── Drivers ────────────────────────────────────────────────────────────────
 
+// The list of drivers (click one for their page: licence, photos, points)
+// and, below it, which van each one usually drives.
 export function DriversView() {
   const queryClient = useQueryClient()
-  const { toast } = useActions()
+  const { openForm, toast } = useActions()
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
   const vans = useVans()
-  const [form, setForm] = useState({ name: '', phone: '' })
-  const [editing, setEditing] = useState(null)
-  const [removing, setRemoving] = useState(null)
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['drivers'] })
-    queryClient.invalidateQueries({ queryKey: ['vehicles'] })
-  }
-  const add = useMutation({
-    mutationFn: () => createDriver(form),
-    onSuccess: () => { refresh(); setForm({ name: '', phone: '' }); toast('Driver added.') },
-    onError: () => toast('Could not add the driver.', true),
-  })
-  const save = useMutation({
-    mutationFn: (d) => updateDriver(d.id, { name: d.name, phone: d.phone, active: d.active }),
-    onSuccess: () => { refresh(); setEditing(null); toast('Driver saved.') },
-    onError: () => toast('Could not save the driver.', true),
-  })
-  const remove = useMutation({
-    mutationFn: (d) => deleteDriver(d.id),
-    onSuccess: () => { refresh(); setRemoving(null); toast('Driver removed.') },
-  })
   const assign = useMutation({
     mutationFn: ({ van, driver }) => patchVehicle(van.id, { driver }),
-    onSuccess: (v) => { refresh(); toast(v.driverName ? `${v.label}: ${v.driverName} is now the usual driver.` : `${v.label}: no regular driver.`) },
+    onSuccess: (v) => {
+      queryClient.invalidateQueries({ queryKey: ['drivers'] })
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+      toast(v.driverName ? `${v.label}: ${v.driverName} is now the usual driver.` : `${v.label}: no regular driver.`)
+    },
     onError: () => toast('Could not change the driver.', true),
   })
-  const list = drivers.data ?? []
+  // Still driving first, then by name; people who left go to the bottom.
+  const list = [...(drivers.data ?? [])].sort((a, b) => b.active - a.active || a.name.localeCompare(b.name))
   const active = list.filter((d) => d.active)
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <Card title="Drivers" description="The people who drive the vans. Their name then shows on the van, its incidents and fuel checks." padded={false}>
-        <form
-          className="flex flex-wrap gap-2 border-b border-line p-4"
-          onSubmit={(e) => { e.preventDefault(); if (form.name.trim()) add.mutate() }}
-        >
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Driver's name" aria-label="Driver's name" className={inputCls + ' min-w-[160px] flex-1'} />
-          <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Mobile (optional)" aria-label="Mobile" className={inputCls + ' w-[160px]'} />
-          <Button type="submit" variant="primary" icon="plus" disabled={!form.name.trim() || add.isPending}>Add driver</Button>
-        </form>
+    <div className="grid gap-5">
+      <Card
+        title="Drivers"
+        description="Click a driver to see their licence, licence photos and demerit points. A licence shows as due soon 30 days before it expires."
+        actions={<Button variant="primary" icon="plus" onClick={() => openForm('driver')}>Add driver</Button>}
+        padded={false}
+      >
         {list.length === 0 ? (
-          <Empty>No drivers yet. Add the first one above.</Empty>
+          <Empty>No drivers yet. Add the first one with the button above.</Empty>
         ) : (
-          <ul className="divide-y divide-[#eef1f5]">
-            {list.map((d) =>
-              editing?.id === d.id ? (
-                <li key={d.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
-                  <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Name" className={inputCls + ' min-w-[140px] flex-1'} />
-                  <input value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} aria-label="Mobile" className={inputCls + ' w-[150px]'} />
-                  <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} /> Still driving for us</label>
-                  <Button variant="primary" className="h-8 text-xs" onClick={() => save.mutate(editing)}>Save</Button>
-                  <Button variant="ghost" className="h-8 text-xs" onClick={() => setEditing(null)}>Cancel</Button>
-                </li>
-              ) : (
-                <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[13px]">
-                  <div className="min-w-0 flex-1">
-                    <span className="font-semibold">{d.name}</span> {!d.active && <Pill tone="off">Left</Pill>}
-                    <div className="text-xs text-off">
-                      {d.phone || 'no mobile'} · {d.vans.length ? d.vans.map((v) => v.label).join(', ') : 'no van assigned'}
-                    </div>
-                  </div>
-                  <Button variant="ghost" icon="edit" className="h-8 text-xs" onClick={() => setEditing({ ...d })}>Edit</Button>
-                  <Button variant="ghost" icon="trash" className="h-8 text-xs" onClick={() => setRemoving(d)}>Remove</Button>
-                </li>
-              ),
-            )}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-line bg-[#f8fafc] text-left text-xs text-off">
+                  <th className="px-4 py-2 font-medium">Driver</th>
+                  <th className="px-2 py-2 font-medium">Usual van</th>
+                  <th className="px-2 py-2 font-medium">Licence</th>
+                  <th className="px-2 py-2 font-medium">Licence expires</th>
+                  <th className="px-2 py-2 font-medium">Demerit points</th>
+                  <th className="px-2 py-2 font-medium">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((d) => (
+                  <tr key={d.id} onClick={() => navigate('vans', 'drivers', d.id)} className="cursor-pointer border-b border-[#eef1f5] last:border-0 hover:bg-[#fafafa]">
+                    <td className="px-4 py-2.5">
+                      <a href={href('vans', 'drivers', d.id)} className="font-semibold text-ink no-underline hover:text-primary">{d.name}</a>{' '}
+                      {!d.active && <Pill tone="off">Left</Pill>}
+                      <div className="text-xs text-off">{d.phone || 'no mobile'}</div>
+                    </td>
+                    <td className="px-2 py-2.5">{d.vans.length ? d.vans.map((v) => v.label).join(', ') : <span className="text-off">—</span>}</td>
+                    <td className="px-2 py-2.5">
+                      {d.licence_number || d.licence_class
+                        ? [d.licence_class, d.licence_state, d.licence_number].filter(Boolean).join(' · ')
+                        : <Pill tone="off">not entered</Pill>}
+                    </td>
+                    <td className="px-2 py-2.5 whitespace-nowrap">
+                      {d.licence_expiry && <span className="mr-2 tabular-nums">{fmtDate(d.licence_expiry)}</span>}
+                      <LicencePill driver={d} />
+                    </td>
+                    <td className="px-2 py-2.5">
+                      {d.demerit_points === null ? <span className="text-off">—</span> : <span className="tabular-nums">{d.demerit_points}</span>}
+                      {d.points_checked && <div className="text-xs text-off">checked {fmtDate(d.points_checked)}</div>}
+                    </td>
+                    <td className="px-2 py-2.5 whitespace-nowrap tabular-nums">{d.date_joined ? fmtDate(d.date_joined) : <span className="text-off">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
-      <Card title="Who drives which van" description="Pick each van's usual driver. It saves straight away." padded={false}>
+      <Card title="Who drives which van" description="Pick each van's usual driver. It saves straight away." padded={false} className="max-w-[640px]">
         <ul className="divide-y divide-[#eef1f5]">
           {sortVans(vans.data ?? []).map((v) => (
             <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-[13px]">
@@ -118,17 +117,6 @@ export function DriversView() {
           ))}
         </ul>
       </Card>
-
-      {removing && (
-        <ConfirmDialog
-          title="Remove driver?"
-          message={`Remove ${removing.name}? ${removing.vans.length ? 'Their van will show no regular driver. ' : ''}If they've just left, you can instead edit them and untick "Still driving for us" to keep the history.`}
-          confirmLabel="Remove"
-          confirming={remove.isPending}
-          onCancel={() => setRemoving(null)}
-          onConfirm={() => remove.mutate(removing)}
-        />
-      )}
     </div>
   )
 }
