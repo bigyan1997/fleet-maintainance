@@ -6,7 +6,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { FuelByVan } from './FuelByVan'
 import { FuelImport } from './FuelImport'
-import { fmtDate, fmtDayDate } from '../lib/formatDate'
+import { fmtDate, fmtDayDate, isWeekend } from '../lib/formatDate'
 
 // ISO date helpers for statement periods (they run e.g. 09-08 to 08-09).
 function shiftMonths(iso, n) {
@@ -169,7 +169,7 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
               rows.map((f) => (
                 <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(f)}>
                   <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDayDate(f.date)}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDayDate(f.date)}{f.isFuel && isWeekend(f.date) && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">Weekend</span>}</td>
                   <td className="px-3 py-2.5">{f.isFuel ? `${f.litres} L` : <span className="text-off">{f.product}</span>}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">${f.cost}</td>
                   <td className="px-3 py-2.5">{f.pricePerLitre ? `$${f.pricePerLitre}` : '—'}</td>

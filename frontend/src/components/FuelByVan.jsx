@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { byNewest } from '../lib/fleet'
-import { fmtDate, fmtDayDate } from '../lib/formatDate'
+import { fmtDayDate, isWeekend } from '../lib/formatDate'
 
 const money = (n) => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const sum = (rows, key) => rows.reduce((s, r) => s + Number(r[key]), 0)
@@ -56,7 +56,10 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
         <tbody>
           {fills.map((f, i) => (
             <tr key={f.id} className={`cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb] ${i % 2 ? 'bg-[#fafafa]' : ''}`} onClick={() => onPick(f)}>
-              <td className="py-2 pr-3 pl-3 whitespace-nowrap">{fmtDayDate(f.date)}</td>
+              <td className="py-2 pr-3 pl-3 whitespace-nowrap">
+                {fmtDayDate(f.date)}
+                {isWeekend(f.date) && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">Weekend</span>}
+              </td>
               <td className="py-2 pr-3">
                 {station(f) || '—'}
                 {f.product && f.product !== 'Diesel' && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">{f.product}</span>}
@@ -147,6 +150,7 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
             const litres = sum(fills, 'litres')
             const fuelCost = sum(fills, 'cost')
             const per100 = consumption(fills)
+            const weekend = fills.filter((f) => isWeekend(f.date)).length
             const isOpen = open === g.id
             const num = 'px-3 py-2.5 text-right tabular-nums whitespace-nowrap'
             return [
@@ -155,7 +159,10 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
                   <span className="mr-1.5 inline-block w-3 text-off">{isOpen ? '▾' : '▸'}</span>
                   {g.label}
                 </td>
-                <td className={num}>{fills.length}</td>
+                <td className={num}>
+                  {fills.length}
+                  {weekend > 0 && <div className="text-[11px] font-medium text-warn">{weekend} on a weekend</div>}
+                </td>
                 <td className={num}>{litres.toFixed(2)} L</td>
                 <td className={num}>{litres ? `$${(fuelCost / litres).toFixed(3)}` : '—'}</td>
                 <td className={num}>{per100 ? per100.toFixed(1) : '—'}</td>
@@ -178,7 +185,10 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
         <tfoot>
           <tr className="border-t border-line bg-[#fafafa] font-semibold">
             <td className="px-3 py-2.5">All vans</td>
-            <td className="px-3 py-2.5 text-right tabular-nums">{allFuel.length}</td>
+            <td className="px-3 py-2.5 text-right tabular-nums">
+              {allFuel.length}
+              {allFuel.some((f) => isWeekend(f.date)) && <div className="text-[11px] font-medium text-warn">{allFuel.filter((f) => isWeekend(f.date)).length} on a weekend</div>}
+            </td>
             <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{sum(allFuel, 'litres').toFixed(2)} L</td>
             <td colSpan={2} />
             <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{money(sum(allFuel, 'cost'))}</td>
@@ -190,7 +200,7 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
       </table>
       <p className="border-t border-line px-3 py-2.5 text-xs text-off">
         <b>Fuel</b> = diesel fill-ups. <b>Card fees</b> = roadside assist, card &amp; management fees, AdBlue and other non-fuel charges on the fuel card.
-        <b> Total</b> = both, the same as each card's total on the fuel card statement. Fill-ups, litres, $/L and L/100km count diesel only.
+        <b> Total</b> = both, the same as each card's total on the fuel card statement. Fill-ups, litres, $/L and L/100km count diesel only. <b>Weekend</b> marks a fill-up made on a Saturday or Sunday.
       </p>
     </div>
   )

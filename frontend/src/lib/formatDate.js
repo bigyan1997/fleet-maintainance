@@ -34,6 +34,14 @@ export function fmtDayDate(iso) {
   return `${day} ${fmtDate(iso)}`
 }
 
+// True for a Saturday or Sunday (the date as written, no time zone shift).
+export function isWeekend(iso) {
+  const [y, m, d] = String(iso ?? '').slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return false
+  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  return day === 0 || day === 6
+}
+
 export function fmtDate(iso) {
   if (!iso) return ''
   const [y, m, d] = String(iso).slice(0, 10).split('-')

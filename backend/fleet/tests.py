@@ -691,3 +691,17 @@ class DriverDetailsTests(TestCase):
                          ("Sam Example", "1234 5678", "18-11-2026", "3", str(van), "Yes"))
         self.assertIn("Drivers", sheets_sync.MODEL_TABS["Driver"])
         self.assertIn("Drivers", sheets_sync.MODEL_TABS["Vehicle"])  # changing a van's usual driver refreshes it
+
+
+class WeekendFillUpTests(TestCase):
+    def test_a_fill_up_on_a_saturday_or_sunday_is_worth_checking_but_a_card_fee_is_not(self):
+        from decimal import Decimal
+
+        from . import services
+        from .models import FuelLog
+
+        van = Vehicle.objects.create(make="Van 9", model="HiAce", rego="YLS91M")
+        for day, product in ((date(2026, 10, 9), "Diesel"), (date(2026, 10, 10), "Diesel"), (date(2026, 10, 11), ""), (date(2026, 10, 11), "Card fee")):
+            FuelLog.objects.create(vehicle=van, date=day, litres=Decimal("40"), cost=Decimal("90"), product=product, odometer=1000)
+        weekend = [f for f in services.fuel_insights(FuelLog.objects.all())["fuelFlags"] if f["kind"] == "Weekend fill-up"]
+        self.assertEqual([(f["date"], f["text"]) for f in weekend], [("2026-10-11", "40.00 L on a Sunday"), ("2026-10-10", "40.00 L on a Saturday")])

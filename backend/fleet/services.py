@@ -788,6 +788,8 @@ def fuel_insights(fuel_qs):
                 flag(v, f.date, "Big fill-up", f"{f.litres} L in one go — more than the tank holds")
             if "premium" in (f.product or f.notes).lower():
                 flag(v, f.date, "Premium diesel", f"{f.litres} L at ${f.price_per_litre}/L — regular diesel is cheaper")
+            if f.date.weekday() >= 5:
+                flag(v, f.date, "Weekend fill-up", f"{f.litres} L on a {f.date:%A}")
             if "looked wrong" in f.notes:
                 flag(v, f.date, "Odometer typo", "Odometer entered at the pump doesn't fit the van's other readings")
         for day, same in per_day.items():

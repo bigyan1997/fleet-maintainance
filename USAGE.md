@@ -105,6 +105,7 @@ Fill-ups, card fees and AdBlue are all imported, so each van's total matches the
 - One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups. Every date on the Fuel pages has the day of the week in front of it (for example **Tue 06-10-2026**).
 - **Filters ▾** has van, dates, search, and "Every line" for the full list.
 - **Log fill-up** adds one by hand (rarely needed).
+- A fill-up made on a **Saturday or Sunday** has an amber **Weekend** tag, and the van's row says how many of its fill-ups were on a weekend. They are also listed in Reports → Fuel under "worth checking". Card fees aren't tagged.
 
 ## Reports
 
