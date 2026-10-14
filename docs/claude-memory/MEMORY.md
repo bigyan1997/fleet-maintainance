@@ -8,6 +8,7 @@
 - [UI style preference](ui-style-preference.md) — classic blue bar + the seven tabs, simple; two redesigns rejected (SaaS 09-30, four-tab 10-08); picture first for big changes; no "Claude" in the app
 - [Don't wait for deploy](no-wait-for-deploy.md) — after a push, reply straight away; don't poll the orders PC
 - [Toll statement import](toll-statement-import.md) — Tolls tab, E-Toll PDF, fleet vans only (owner's cars left out), quirks
+- [This is the orders PC](this-is-the-orders-pc.md) — only for the orders PC: live folder, hand deploy after a push from there, never build into dist, backups, sign-in gap
 - [Repo copy of this memory](../../../../fleet-maintenance/docs/claude-memory/README.md) — a cleaned copy lives in the repo at docs/claude-memory (plus CLAUDE.md); refresh it after big memory changes, removing emails, sheet IDs, key names and local IPs first
 
 - [Simplify plan](simplify-plan.md) — 2026-10-08 four-tab redesign built then REJECTED and reverted (git stash only); insurance removal kept

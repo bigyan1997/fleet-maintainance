@@ -51,7 +51,7 @@ Change the job's status (on Home, the Services list or the van's page) to **Wait
 Don't have the figures yet? Click **Just change the status**, and fill them in later by opening the job.
 
 ### Statuses
-**Booked** → **At mechanic** → **Waiting for invoice** → **Done**.
+**Booked** (blue) → **At mechanic** (yellow) → **Waiting for invoice** (orange) → **Done** (green).
 
 ### The Services tab
 - **Services:** every service, newest first, with columns Van, What, **Mechanic** (who did it), Status and Cost. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
@@ -62,7 +62,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 
 - The list is in order of **next service, soonest first**. Overdue vans are at the top.
 - Under each van's km it says **as of** the date that km was last confirmed (a fill-up or a finished service). If that is more than 5 weeks ago it turns amber and says "km is N days old", and Home lists the van under **Km old**, because its next service countdown may be wrong.
-- **Next service** shows the km it's due at, with how far away it is underneath.
+- **Next service** shows the km it's due at, with how far away it is underneath. The small bar fills up as the van gets closer to its service: green, then amber under 2,000 km to go, then red once it is overdue.
 - Click a van to open its page:
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.
   - **Fuel:** that van's fill-ups and card charges.
@@ -149,9 +149,9 @@ The **Google Sheet** button opens a copy of all the data that updates by itself 
 1. **Wait 5 minutes and try again.** The app checks itself every 5 minutes and restarts if it has stopped.
 2. Check you're using the right address (see "Opening the app") and that Tailscale is on.
 3. Make sure the orders PC is on and plugged in.
-4. Still not working? Restart the orders PC and log in. The app starts by itself.
+4. Still not working? Restart the orders PC and **sign in to Windows**. The app starts by itself a few minutes after that.
 
-For the app to come back after a restart **without anyone logging in**, the "Fleet Maintenance keep-alive" task in Task Scheduler on the orders PC must be set to **"Run whether user is logged on or not"** (needs the Windows password once; redo it if the password changes).
+After a restart or a power cut the app (and the evening backup) only come back once someone signs in to Windows on the orders PC. That is how it is set up today. Changing it means setting the scheduled tasks "Fleet Maintenance Keep Alive" and "Fleet Maintenance Backup" to **"Run whether user is logged on or not"**, which needs the Microsoft account password for that PC (the screen PIN does not work for this).
 
 ## Backups
 

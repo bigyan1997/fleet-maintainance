@@ -22,3 +22,5 @@ On 2026-10-08 a four-tab, plain-words redesign was built and the user rejected i
 - See [[user-profile]] and [[open-items]].
 
 2026-10-12: asked for an honest "is it easy to read" opinion; I gave 5 small fixes (A-E) and he said do them all, picture/local first, then pushed. Pattern that works: small optional fixes one list at a time, run locally, screenshot, wait for "push". Prefers plain words over jargon ("tag didn't beep").
+
+2026-10-14: a visual refresh *inside* the classic layout was built in a preview worktree and the owner said "push the new design": slimmer blue bar that sticks to the top with the tabs, an icon on each tab, a "Your vans" strip of boxes on Home, Needs doing grouped Do first / Coming up / When there's time, a share bar in the Spent tile, a service progress bar on the Vans table, orange Waiting for invoice and green Done. So polish within the same bar and seven tabs is welcome; new navigation is not.

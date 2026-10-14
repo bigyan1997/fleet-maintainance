@@ -20,7 +20,7 @@ A fuller copy of Claude's memory for this project is in `docs/claude-memory/` (s
 - Never stage `backend/.env`, `backend/secrets/*`, `backend/media/*`, `backend/logs/*`, `samples/*`, `frontend/dist`, `backend/staticfiles`. The repo is public.
 - Never read another app's credential files (NPD Tracker's `secrets/`). Ask the owner to copy a file or set a path.
 - Everything is **Sydney time** and dates are **dd-mm-yyyy**. One shared login, on purpose.
-- Keep the classic blue bar and the tabs Home, Vans, Services, Washes, Fuel, Tolls, Reports. Add features inside existing tabs; the SaaS-style redesign was rejected.
+- Keep the classic blue bar and the tabs Home, Vans, Services, Washes, Fuel, Tolls, Reports. Add features inside existing tabs; the SaaS-style and four-tab redesigns were rejected. A visual refresh inside that layout (slimmer sticky bar, tab icons, van boxes on Home) was accepted on 2026-10-14.
 - Insurance is deliberately not tracked ("we dont need insurance"): no warnings, fields or columns for it.
 - Nothing on screen may say "Claude" or mention an AI.
 - Label every figure with what it includes, and show money that is checked against a statement to the cent.
@@ -30,6 +30,10 @@ A fuller copy of Claude's memory for this project is in `docs/claude-memory/` (s
 - **This (dev) PC has its own, older database.** Data entered or imported here never reaches the real app. Anything the owner needs to see for real (for example a toll statement import) must be done at the orders PC address.
 - Dev `.env` keeps `FLEET_SHEET_ID` blank (the real Google Sheet is a one-way mirror that is rewritten in full by whichever computer saves last) and uses a separate test Drive folder.
 - Photos, toll PDFs and documents go to Google Drive through `backend/secrets/drive-token.json` (one-time sign-in, made on the dev PC). Without it files stay on the server's disk and move to Drive by themselves later.
+
+- **Claude Code is also used on the orders PC itself**, in the live folder. If this folder is the one serving port 8002: the database is the real one, uncommitted changes pause auto-deploy, and a push from here is **not** deployed automatically (auto-deploy only acts when GitHub is ahead). Never run a plain `npx vite build` there (it overwrites the live `frontend/dist` and blanks the app); build with `--outDir dist-next --emptyOutDir`, swap it into `dist`, `migrate`, `collectstatic --noinput`, then stop waitress on 8002 so `run_server.bat` restarts it. Preview from a separate git worktree. Details: NOTES.md -> Infra.
+- **Backups**: the orders PC copies the database to Drive `Backups/` every evening (`manage.py backup_database`, task "Fleet Maintenance Backup", log `backend/logs/backup.log`). Nothing on screen reports a failed backup.
+- The orders PC's scheduled tasks run only while someone is signed in to Windows there (the owner chose to leave it that way on 2026-10-14).
 
 ## Working here
 - Backend tests: `set PYTHONPATH=<folder with a settings file using in-memory sqlite>;.` then `python manage.py test` (see `auto_deploy.ps1` for the exact command). Frontend: `npx vite build` in `frontend/`.
