@@ -36,6 +36,7 @@ const errorText = (err) => err?.response?.data?.detail || 'Something went wrong 
 // which van each card belongs to, then add every fill-up to the Fuel log.
 export function FuelImport({ onClose }) {
   const [file, setFile] = useState(null)
+  const [pdf, setPdf] = useState(null)
   const [preview, setPreview] = useState(null)
   const [assignments, setAssignments] = useState({})
   const [open, setOpen] = useState(null)
@@ -52,7 +53,7 @@ export function FuelImport({ onClose }) {
     },
   })
   const importMutation = useMutation({
-    mutationFn: () => uploadFuelStatement(file, assignments),
+    mutationFn: () => uploadFuelStatement(file, assignments, pdf),
     onSuccess: (data) => {
       setResult(data)
       queryClient.invalidateQueries({ queryKey: ['fuel-logs'] })
@@ -83,7 +84,7 @@ export function FuelImport({ onClose }) {
         <div className="border-b border-line px-6 py-4">
           <h3 className="text-base font-semibold text-ink">Import fuel statement</h3>
           <p className="mt-1 text-[13px] text-off">
-            Upload the <b>MPDATA….TXT</b> file that comes with the monthly Metro fuel card statement (not the PDF).
+            Upload the <b>MPDATA….TXT</b> file that comes with the monthly Metro fuel card statement. The figures are read from the TXT file; the PDF is only kept so you can open it later.
           </p>
         </div>
 
@@ -92,6 +93,7 @@ export function FuelImport({ onClose }) {
             <div className="rounded-lg bg-ok-bg px-4 py-3 text-[13.5px] text-ok">
               Added <b>{result.created}</b> fill-up{result.created === 1 ? '' : 's'} and <b>{result.charges}</b> fee{result.charges === 1 ? '' : 's'} / charge{result.charges === 1 ? '' : 's'} to the Fuel log
               {result.duplicates > 0 && <> ({result.duplicates} already logged, skipped)</>}.
+              <div className="mt-1">The statement file{pdf ? 's are' : ' is'} kept in Google Drive, in the Fuel folder.</div>
               {result.odometers?.length > 0 ? (
                 <div className="mt-2">
                   <b>Van km updated:</b>
@@ -114,12 +116,26 @@ export function FuelImport({ onClose }) {
             </div>
           ) : (
             <>
-              <input
-                type="file"
-                accept=".txt,.TXT"
-                onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                className="block text-[13px] file:mr-3 file:rounded-md file:border file:border-line file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-[#f5f5f5]"
-              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-[13px]">
+                  <span className="mb-1 block font-medium text-ink">1. The MPDATA….TXT file</span>
+                  <input
+                    type="file"
+                    accept=".txt,.TXT"
+                    onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                    className="block text-[13px] file:mr-3 file:rounded-md file:border file:border-line file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-[#f5f5f5]"
+                  />
+                </label>
+                <label className="block text-[13px]">
+                  <span className="mb-1 block font-medium text-ink">2. The statement PDF <span className="font-normal text-off">(optional, kept in Google Drive)</span></span>
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setPdf(e.target.files?.[0] ?? null)}
+                    className="block text-[13px] file:mr-3 file:rounded-md file:border file:border-line file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-[#f5f5f5]"
+                  />
+                </label>
+              </div>
               {previewMutation.isPending && <p className="mt-3 text-[13px] text-off">Reading the statement…</p>}
               {previewMutation.isError && <p className="mt-3 text-[13px] text-due">{errorText(previewMutation.error)}</p>}
 

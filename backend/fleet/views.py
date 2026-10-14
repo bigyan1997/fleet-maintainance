@@ -2,6 +2,7 @@ import re
 
 from django.conf import settings
 from django.db.models import Count, Sum
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -10,7 +11,7 @@ from rest_framework.views import APIView
 import json
 
 from . import activity, drive, fuel_import, services
-from .models import FuelLog, Incident, ServiceRecord, Vehicle
+from .models import FuelLog, FuelStatementFile, Incident, ServiceRecord, Vehicle
 from .pagination import FleetPagination
 from .serializers import (
     FuelLogSerializer,
@@ -218,20 +219,43 @@ class FuelLogViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+MAX_STATEMENT_PDF_BYTES = 20 * 1024 * 1024
+
+
+def _statement_pdf(upload):
+    """The uploaded statement PDF's bytes, or a message saying what's wrong with it."""
+    if upload.size > MAX_STATEMENT_PDF_BYTES:
+        return None, "That PDF is over 20 MB."
+    raw = upload.read()
+    if not raw.startswith(b"%PDF"):
+        return None, "That isn't a PDF. Choose the statement PDF, or leave it out."
+    return raw, ""
+
+
 class FuelImportView(APIView):
     """Monthly fuel statement upload. POST with just `file` returns a
     preview; with `assignments` too (JSON: card number -> vehicle id) it
-    imports."""
+    imports, and keeps the file (and the statement's `pdf`, if sent) in Drive."""
 
     def post(self, request):
         upload = request.FILES.get("file")
         if not upload:
             return Response({"detail": "Choose the statement file to upload."}, status=status.HTTP_400_BAD_REQUEST)
         raw = upload.read()
+        pdf = None
+        if request.FILES.get("pdf"):
+            pdf, problem = _statement_pdf(request.FILES["pdf"])
+            if problem:
+                return Response({"detail": problem}, status=status.HTTP_400_BAD_REQUEST)
         try:
             if "assignments" in request.data:
                 assignments = json.loads(request.data["assignments"])
                 result = fuel_import.import_statement(raw, assignments)
+                statement_date = parse_date(result["statementDate"] or "")
+                if statement_date:
+                    fuel_import.keep_file(statement_date, "txt", raw)
+                    if pdf:
+                        fuel_import.keep_file(statement_date, "pdf", pdf)
                 activity.log(
                     request.user, "Imported", "Fuel",
                     f"Fuel statement {upload.name}: {result['created']} fill-ups and {result['charges']} fees/charges added"
@@ -253,7 +277,43 @@ class FuelStatementsView(APIView):
             .annotate(lines=Count("id"), total=Sum("cost"))
             .order_by("-statement")
         )
-        return Response([{"date": r["statement"], "lines": r["lines"], "total": r["total"]} for r in rows])
+        drive.move_local_files()  # a file kept on this server's disk earlier goes to Drive now
+        pdfs = set(FuelStatementFile.objects.filter(kind="pdf").values_list("statement", flat=True))
+        return Response([
+            {"date": r["statement"], "lines": r["lines"], "total": r["total"],
+             "pdfUrl": f"/api/fuel-statements/{r['statement']}/pdf/" if r["statement"] in pdfs else ""}
+            for r in rows
+        ])
+
+
+class FuelStatementPdfView(APIView):
+    """A fuel statement's PDF: GET opens it (logged-in users only), POST adds
+    or replaces it for a statement that is already imported."""
+
+    def get(self, request, day):
+        f = FuelStatementFile.objects.filter(statement=parse_date(day), kind="pdf").first()
+        if not f or not (f.file or f.drive_file_id):
+            raise Http404
+        name = drive.fuel_file_name(f)
+        if f.drive_file_id:
+            response = HttpResponse(drive.DriveClient().download(f.drive_file_id), content_type="application/pdf")
+            response["Content-Disposition"] = f'inline; filename="{name}"'
+            return response
+        return FileResponse(f.file.open("rb"), filename=name, content_type="application/pdf")
+
+    def post(self, request, day):
+        statement_date = parse_date(day)
+        if not statement_date or not FuelLog.objects.filter(statement=statement_date).exists():
+            raise Http404
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "Choose the statement PDF."}, status=status.HTTP_400_BAD_REQUEST)
+        raw, problem = _statement_pdf(upload)
+        if problem:
+            return Response({"detail": problem}, status=status.HTTP_400_BAD_REQUEST)
+        fuel_import.keep_file(statement_date, "pdf", raw)
+        activity.log(request.user, "Added", "Fuel", f"PDF for the fuel statement to {statement_date:%d-%m-%Y}")
+        return Response({"pdfUrl": f"/api/fuel-statements/{statement_date}/pdf/"}, status=status.HTTP_201_CREATED)
 
 
 class DashboardView(APIView):

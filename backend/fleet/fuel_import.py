@@ -8,15 +8,23 @@ roadside assist, fees) with their `product` set, so each van's total matches
 the statement to the cent.
 """
 
+import logging
 import re
 from bisect import bisect_right
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from django.core.files.base import ContentFile
 from django.db import transaction
 
-from . import services, sheets_sync, signals
-from .models import FUEL_PRODUCT_WORDS, FuelLog, Vehicle
+from . import drive, services, sheets_sync, signals
+from .models import FUEL_PRODUCT_WORDS, FuelLog, FuelStatementFile, Vehicle
+
+logger = logging.getLogger(__name__)
+
+# The files kept for each statement: the data file that was imported and the
+# PDF a person reads.
+FILE_TYPES = {"txt": "text/plain", "pdf": "application/pdf"}
 
 CARD_RE = re.compile(r"^\d{4} \d{4}$")
 DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
@@ -328,4 +336,34 @@ def import_statement(raw, assignments):
         signals.suspended = False
     if created and sheets_sync.configured():
         transaction.on_commit(lambda: sheets_sync.push_model("Vehicle"))
-    return {"created": created - charges, "charges": charges, "duplicates": duplicates, "cards": touched_cards, "odometers": odometers, "odometerFlags": odometer_flags}
+    return {
+        "created": created - charges, "charges": charges, "duplicates": duplicates, "cards": touched_cards,
+        "odometers": odometers, "odometerFlags": odometer_flags, "statementDate": data["statementDate"],
+    }
+
+
+def keep_file(statement_date, kind, raw):
+    """Keep one of a statement's files in Drive's Fuel folder (on this
+    server's disk when Drive is off or fails; it moves to Drive later). A
+    newer upload replaces the earlier one, which goes to Drive's Bin only
+    after the new one is safely stored."""
+    record, _ = FuelStatementFile.objects.get_or_create(statement=statement_date, kind=kind)
+    old_drive_id, old_file = record.drive_file_id, record.file.name
+    stored = False
+    if drive.enabled():
+        try:
+            client = drive.DriveClient()
+            meta = client.upload(drive.ensure_path(client, "Fuel"), drive.fuel_file_name(record), raw, FILE_TYPES[kind])
+            record.drive_file_id, record.file = meta["id"], ""
+            record.save()
+            stored = True
+            if old_drive_id:
+                client.trash(old_drive_id)
+        except Exception:
+            logger.exception("Drive failed for the fuel statement %s", kind)
+    if not stored:
+        record.drive_file_id = ""
+        record.file.save(drive.fuel_file_name(record), ContentFile(raw), save=True)
+    if old_file and old_file != record.file.name:
+        record.file.storage.delete(old_file)
+    return record

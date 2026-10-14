@@ -19,6 +19,7 @@ PDFs and other documents go to Drive too:
 
     Fleet Maintenance Photos/
         Tolls/            TOL-29082026-28092026.pdf
+        Fuel/             FUE-08102026.txt, FUE-08102026.pdf (statement to 08-10-2026)
         Documents/<Van>/  DOC-VAN6-12102026 - <original file name>
         Drivers/<Name>/   LIC-SAMEXAMPLE-14102026.jpg                (licence photos)
 
@@ -289,7 +290,8 @@ def move_local_files(limit=10, force=False):
     call often: it does nothing when Drive isn't connected or there is
     nothing to move. Returns how many files were moved."""
     global _last_move
-    from .models import Attachment, DriverFile, TollStatement
+    from .fuel_import import FILE_TYPES
+    from .models import Attachment, DriverFile, FuelStatementFile, TollStatement
 
     if not enabled() or (not force and _time.monotonic() - _last_move < _MOVE_EVERY_SECONDS):
         return 0
@@ -297,7 +299,8 @@ def move_local_files(limit=10, force=False):
     atts = list(Attachment.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("vehicle", "service", "incident")[:limit])
     tolls = list(TollStatement.objects.filter(drive_file_id="").exclude(file="")[:limit])
     licences = list(DriverFile.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("driver")[:limit])
-    if not (atts or tolls or licences):
+    fuel = list(FuelStatementFile.objects.filter(drive_file_id="").exclude(file="")[:limit])
+    if not (atts or tolls or licences or fuel):
         return 0
     moved = 0
     client = DriveClient()
@@ -338,7 +341,22 @@ def move_local_files(limit=10, force=False):
             moved += 1
         except Exception:
             logger.exception("Couldn't move licence photo %s to Drive", lic.original_name)
+    for ff in fuel:
+        try:
+            with ff.file.open("rb") as f:
+                content = f.read()
+            meta = client.upload(ensure_path(client, "Fuel"), fuel_file_name(ff), content, FILE_TYPES[ff.kind])
+            ff.file.delete(save=False)
+            FuelStatementFile.objects.filter(pk=ff.pk).update(file="", drive_file_id=meta["id"])
+            moved += 1
+        except Exception:
+            logger.exception("Couldn't move fuel statement file %s to Drive", ff.pk)
     return moved
+
+
+def fuel_file_name(f):
+    """FUE-08102026.pdf: the fuel statement to 08-10-2026 (.txt is the data file)."""
+    return f"FUE-{f.statement:%d%m%Y}.{f.kind}"
 
 
 def toll_pdf_name(statement):

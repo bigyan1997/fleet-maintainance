@@ -761,3 +761,55 @@ class DatabaseBackupTests(TestCase):
         with self.assertRaises(backup_module.BackupError):
             self.run_backup(fake, dump)
         self.assertEqual((fake.trashed, fake.files), ([], {}))
+
+
+class FuelStatementFileTests(FuelStatementPeriodTests):
+    """The imported TXT and the statement's PDF are kept in Drive's Fuel folder."""
+
+    ROWS = [FuelStatementPeriodTests.ROW.format(d="07/09/2026", n=2, odo=183361, l="30.00", c="66.00")]
+
+    def pdf(self, content=b"%PDF-1.4 fuel"):
+        return SimpleUploadedFile("statement.pdf", content, content_type="application/pdf")
+
+    def names(self, fake):
+        return sorted(f"{fake.path(meta['parents'][0])}/{meta['name']}" for meta, _ in fake.files.values() if meta["id"] not in fake.trashed)
+
+    def test_import_keeps_the_txt_and_the_pdf_can_be_added_opened_and_replaced(self):
+        fake = FakeDrive()
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=fake):
+            self.statement("08 SEP 26", self.ROWS)
+            self.assertEqual(self.names(fake), ["Fuel/FUE-08092026.txt"])
+            self.assertEqual(self.api.get("/api/fuel-statements/").data[0]["pdfUrl"], "")
+
+            url = "/api/fuel-statements/2026-09-08/pdf/"
+            self.assertEqual(self.api.post(url, {"file": SimpleUploadedFile("x.pdf", b"not a pdf")}, format="multipart").status_code, 400)
+            self.assertEqual(self.api.post(url, {"file": self.pdf()}, format="multipart").status_code, 201)
+            self.assertEqual(self.api.get("/api/fuel-statements/").data[0]["pdfUrl"], url)
+            self.assertEqual(self.api.get(url).content, b"%PDF-1.4 fuel")
+            self.assertIn(APIClient().get(url).status_code, (401, 403))  # not without a login
+
+            # A second PDF replaces the first: one in the folder, the old one in the Bin.
+            self.assertEqual(self.api.post(url, {"file": self.pdf(b"%PDF-1.4 newer")}, format="multipart").status_code, 201)
+            self.assertEqual(self.names(fake), ["Fuel/FUE-08092026.pdf", "Fuel/FUE-08092026.txt"])
+            self.assertEqual(self.api.get(url).content, b"%PDF-1.4 newer")
+            # No PDF for a statement that was never imported.
+            self.assertEqual(self.api.post("/api/fuel-statements/2026-01-01/pdf/", {"file": self.pdf()}, format="multipart").status_code, 404)
+
+    def test_files_wait_on_disk_without_drive_then_move(self):
+        from .models import FuelStatementFile
+
+        text = "\n".join(["METRO PETROLEUM CARD", "VEHICLE REPORT AND STATEMENT TO 08 SEP 26", self.HEADER, "", "AAA111 HIACE\t1111 2222"] + self.ROWS)
+        res = self.api.post("/api/fuel-import/", {
+            "file": SimpleUploadedFile("MPDATA.TXT", text.encode(), content_type="text/plain"),
+            "pdf": self.pdf(), "assignments": json.dumps({"1111 2222": self.van.pk}),
+        }, format="multipart")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(sorted(FuelStatementFile.objects.exclude(file="").values_list("kind", flat=True)), ["pdf", "txt"])
+        self.assertEqual(self.api.get("/api/fuel-statements/2026-09-08/pdf/").getvalue(), b"%PDF-1.4 fuel")
+
+        fake = FakeDrive()
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=fake):
+            self.assertEqual(drive.move_local_files(force=True), 2)
+            self.assertEqual(self.names(fake), ["Fuel/FUE-08092026.pdf", "Fuel/FUE-08092026.txt"])
+            self.assertEqual(FuelStatementFile.objects.exclude(file="").count(), 0)
+            self.assertEqual(self.api.get("/api/fuel-statements/2026-09-08/pdf/").content, b"%PDF-1.4 fuel")

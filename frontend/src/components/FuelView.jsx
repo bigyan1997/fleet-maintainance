@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
-import { deleteFuelLog, fetchFuelLogs, fetchFuelStatements } from '../api/fuelLogs'
+import { deleteFuelLog, fetchFuelLogs, fetchFuelStatements, uploadFuelStatementPdf } from '../api/fuelLogs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { DetailModal } from './DetailModal'
 import { FuelByVan } from './FuelByVan'
@@ -47,6 +47,10 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
   const current = statements.length > 0 && period !== 'all' ? statements[Math.min(period, statements.length - 1)] : null
   // A statement period ends on the latest fuel date and starts the day after
   // the same date a month earlier (08-09 -> 09-08 to 08-09).
+  const pdfMutation = useMutation({
+    mutationFn: (file) => uploadFuelStatementPdf(current.date, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fuel-statements'] }),
+  })
   const ownDates = Boolean(dateFrom || dateTo)
   const periodTo = !current && latest && period !== 'all' ? shiftMonths(latest, -period) : null
   const periodFrom = periodTo ? addDays(shiftMonths(periodTo, -1), 1) : null
@@ -100,6 +104,22 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
               {!current && periodFrom && <span className="font-normal text-off"> · {fmtDate(periodFrom)} – {fmtDate(periodTo)}</span>}
             </span>
             <button disabled={period === 0} onClick={() => { setPeriod((p) => p - 1); setPage(1) }} className="rounded-md border border-line bg-white px-2.5 py-1 hover:bg-[#f5f5f5] disabled:opacity-40" title="Later statement">›</button>
+            {current?.pdfUrl && (
+              <a href={current.pdfUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">Open the PDF ↗</a>
+            )}
+            {current && !current.pdfUrl && (
+              <label className="cursor-pointer rounded-md px-2.5 py-1 font-medium text-primary hover:bg-[#e8f1fb]" title="Keep this statement's PDF in Google Drive so it can be opened from here">
+                {pdfMutation.isPending ? 'Saving the PDF…' : '+ Add the PDF'}
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  className="hidden"
+                  disabled={pdfMutation.isPending}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pdfMutation.mutate(f) }}
+                />
+              </label>
+            )}
+            {pdfMutation.isError && <span className="text-due">{pdfMutation.error?.response?.data?.detail || "That PDF couldn't be saved."}</span>}
           </>
         )}
         <button onClick={() => { setPeriod(period === 'all' ? 0 : 'all'); setDateFrom(''); setDateTo(''); setPage(1) }} className="rounded-md px-2.5 py-1 font-medium text-primary hover:bg-[#e8f1fb]">

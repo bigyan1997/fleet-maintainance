@@ -11,7 +11,7 @@ Vehicle fleet tracker for Achieve Cafe Provisions — vans, services, incidents,
 - **`backend/`** — Django project. Fleet data lives in **Postgres**, not Google Sheets. A background sync pushes every change to a Google Sheet as a read-only mirror, but the Sheet is not the source of truth — Postgres is.
 - **`frontend/`** — React + Vite + Tailwind SPA, plain JavaScript (no TypeScript), built and served by Django (whitenoise), same as NPD Tracker.
 - **Statement imports** — the monthly fuel card statement (`fleet/fuel_import.py`, MPDATA TXT file) and the monthly E-Toll statement (`fleet/toll_import.py`, PDF read with `pypdf`).
-- **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Toll statement PDFs and the documents attached to vans, services and incidents go to Google Drive too (`Tolls/`, `Documents/<van>/`). Without a Drive token (or if Drive fails) files are kept on the server's disk (`backend/media/`) and move to Drive by themselves once it is connected.
+- **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Toll statement PDFs, fuel statement files and the documents attached to vans, services and incidents go to Google Drive too (`Tolls/`, `Fuel/`, `Documents/<van>/`). Without a Drive token (or if Drive fails) files are kept on the server's disk (`backend/media/`) and move to Drive by themselves once it is connected.
 
 - **Backups** — `manage.py backup_database` (`fleet/backup.py`) writes a `pg_dump` file to `backend/logs/backups/` and copies it to Drive (`Backups/`), keeping 30 days. On the server a scheduled task runs it daily at 8 pm through `backup.vbs`. Restore with `pg_restore --clean --if-exists -d fleet_management <file>`.
 
@@ -77,7 +77,7 @@ Real Postgres tables with real foreign keys to `Vehicle` (the legacy app matched
 - **Mechanic** — the workshops used.
 - **ServiceRecord** — a service, repair, tyre change or wash logged against a van, with a status (Booked, In service, Completed awaiting invoice, Invoiced).
 - **Incident** and **IncidentUpdate** — an accident, breakdown or damage report and its follow-up notes.
-- **FuelLog** — a fill-up or card charge, usually from the monthly statement import.
+- **FuelLog** — a fill-up or card charge, usually from the monthly statement import. **FuelStatementFile** — the statement's TXT and PDF (stored in Google Drive).
 - **TollStatement** and **TollTrip** — a monthly E-Toll statement and its trips and fees.
 - **Attachment** — a photo or document on a van, service or incident (stored in Google Drive).
 - **ActivityLog** — who changed what and when (shown per van as change history).

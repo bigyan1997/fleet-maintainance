@@ -36,8 +36,11 @@ FLEET_SHEET_TAB = config('FLEET_SHEET_TAB', default='Fleet')
 import sys  # noqa: E402
 
 if sys.argv[1:2] == ['test']:
+    import tempfile
+
     FLEET_SHEET_ID = ''
     FLEET_DRIVE_TOKEN_FILE = 'secrets/no-drive-during-tests.json'
+    MEDIA_ROOT = tempfile.mkdtemp()  # uploads made by tests never land in the real media folder
 
 # One-time import source: the legacy fleet app's existing Google Sheet
 # (read-only access needed — see fleet/management/commands/import_from_sheet.py).

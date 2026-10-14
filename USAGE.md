@@ -93,9 +93,11 @@ The fuel card is billed once a month by Metro Petroleum (WEX Motorpass). The sta
 
 ### Importing the monthly statement
 1. Fuel tab → **Import statement**.
-2. Choose the **MPDATA….TXT** file (not the PDF).
+2. Choose the **MPDATA….TXT** file in the first box. In the second box you can also choose the statement **PDF**. The figures are always read from the TXT file; the PDF is only kept so you can open it later.
 3. Check the preview. Each fuel card is matched to its van, the total should match the statement, odd odometer readings are marked, and anything already imported is skipped. The **Van's km** column shows what each van's km will become (for example 233,741 → 234,512 km, with the date of the fill-up it comes from). A yellow or red line under a van is a **km warning**: for example no km was typed at the pump, a reading looks wrong and is ignored, the statement's km is lower than the app's, or the van's km is a long way behind its latest fill-up. Check those: they decide when the next service shows as due.
 4. Click **Import**.
+
+Both files are kept in Google Drive, in **Fleet Maintenance Photos › Fuel**, named by the statement's end date: **FUE-08102026.txt** and **FUE-08102026.pdf** (statement to 08-10-2026).
 
 After you click **Import**, each van's km becomes the km on its **newest believable reading**: the latest fill-up with a sensible km, or the last finished service if that is newer. The next service reminder (last scheduled service km + the van's interval) then counts from it. A km typed in when a job was only booked is a guess, so it is not used as a reading. The result box lists every van whose km changed, and repeats any warnings.
 
@@ -105,6 +107,7 @@ Fill-ups, card fees and AdBlue are all imported, so each van's total matches the
 - It opens on the **latest statement**, showing exactly the lines on that statement, so its total matches the statement to the cent (the fuel company's statements overlap by a day: a few late-posted fill-ups are dated the day the last one ended, and they belong to the newer one). Use **‹ ›** for earlier statements, or **All time**.
 - One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups. Every date on the Fuel pages has the day of the week in front of it (for example **Tue 06-10-2026**).
 - **Filters ▾** has van, dates, search, and "Every line" for the full list.
+- **Open the PDF ↗** beside the statement opens that statement's PDF. If it says **+ Add the PDF** instead, the PDF hasn't been saved for that statement yet: click it and choose the PDF (this is how to add the PDFs of statements imported before October 2026). Their TXT files were not kept.
 - **Log fill-up** adds one by hand (rarely needed).
 - A fill-up made on a **Saturday or Sunday** has an amber **Weekend** tag, and the van's row says how many of its fill-ups were on a weekend. They are also listed in Reports → Fuel under "worth checking". Card fees aren't tagged.
 

@@ -387,6 +387,25 @@ def toll_statement_path(instance, filename):
     return f"toll_statements/{secrets.token_hex(6)}-{filename}"
 
 
+def fuel_statement_path(instance, filename):
+    return f"fuel_statements/{secrets.token_hex(6)}-{filename}"
+
+
+class FuelStatementFile(models.Model):
+    """A file that came with a monthly fuel card statement: the MPDATA TXT
+    that was imported ("txt") or the PDF a person reads ("pdf"). Kept in
+    Google Drive under Fuel/; on the server's disk until Drive is connected."""
+
+    statement = models.DateField(db_index=True)  # the statement's "to" date, as on FuelLog.statement
+    kind = models.CharField(max_length=3)
+    file = models.FileField(upload_to=fuel_statement_path, blank=True)  # empty when kept in Google Drive
+    drive_file_id = models.CharField(max_length=128, blank=True, default="")
+    uploaded_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["statement", "kind"], name="one_fuel_file_per_kind")]
+
+
 class TollStatement(models.Model):
     """One monthly E-Toll statement (see toll_import.py)."""
 
