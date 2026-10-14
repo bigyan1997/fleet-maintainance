@@ -31,6 +31,14 @@ FLEET_DRIVE_TOKEN_FILE = config('FLEET_DRIVE_TOKEN_FILE', default='secrets/drive
 FLEET_DRIVE_ROOT_FOLDER = config('FLEET_DRIVE_ROOT_FOLDER', default='Fleet Maintenance Photos')
 FLEET_SHEET_TAB = config('FLEET_SHEET_TAB', default='Fleet')
 
+# Tests must never reach the real Google Sheet or Google Drive, whatever this
+# computer's .env says. (Tests that exercise Drive use a stand-in client.)
+import sys  # noqa: E402
+
+if sys.argv[1:2] == ['test']:
+    FLEET_SHEET_ID = ''
+    FLEET_DRIVE_TOKEN_FILE = 'secrets/no-drive-during-tests.json'
+
 # One-time import source: the legacy fleet app's existing Google Sheet
 # (read-only access needed — see fleet/management/commands/import_from_sheet.py).
 FLEET_LEGACY_SHEET_ID = config('FLEET_LEGACY_SHEET_ID', default='')
