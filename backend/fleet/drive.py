@@ -83,6 +83,17 @@ def folder_url(folder_id):
     return f"https://drive.google.com/drive/folders/{folder_id}" if folder_id else ""
 
 
+def root_folder_url():
+    """Link to the top Drive folder ("Fleet Maintenance Photos"), or "" when
+    Drive is off or can't be reached. The folder id is looked up once."""
+    if not enabled():
+        return ""
+    try:
+        return folder_url(_root_id or DriveClient().root_folder_id())
+    except Exception:
+        return ""
+
+
 def parse_time(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
 

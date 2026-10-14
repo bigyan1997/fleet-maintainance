@@ -17,7 +17,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 
 ## The screen at a glance
 
-- **Blue bar:** Google Sheet (a read-only copy of everything) and Log out.
+- **Blue bar:** **Google Sheet** (a read-only copy of everything), **Google Drive** (opens the **Fleet Maintenance Photos** folder: photos, documents, toll PDFs, licence photos and backups; you need to be signed in to the office Google account to see it) and Log out. On a phone these two buttons are hidden to save room.
 - **Tabs:** Home · Vans · Services · Washes · Fuel · Tolls · Reports, each with a small picture. On a computer the blue bar and the tabs stay at the top while you scroll.
 - **Two buttons beside the tabs:** **Log wash** and **+ Log service**, the two things you do most. On a van's own page they sit beside **Report incident** instead, already set to that van.
 - Dates on Home, Services, Washes and the van pages show the day of the week too (for example Tue 06-10-2026).

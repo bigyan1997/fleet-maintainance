@@ -15,6 +15,11 @@ export function TopBar({ username, links, onLogout }) {
               Google Sheet ↗
             </a>
           )}
+          {links?.driveFolder && (
+            <a href={links.driveFolder} target="_blank" rel="noopener noreferrer" className={linkClass + ' hidden sm:inline-block'}>
+              Google Drive ↗
+            </a>
+          )}
           <span title={username} className="hidden max-w-[220px] items-center gap-1.5 rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] text-primary sm:inline-flex">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" />
             <span className="truncate">{username}</span>

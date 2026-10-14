@@ -303,8 +303,8 @@ class AnalyticsView(APIView):
 
 
 class QuickLinksView(APIView):
-    """Header shortcut: the Google Sheet mirror (no Drive/photos link — this
-    app has no image uploads)."""
+    """Header shortcuts: the Google Sheet mirror and the Drive folder that
+    holds the photos, documents, toll PDFs and backups."""
 
     def get(self, request):
         sheet = (
@@ -312,7 +312,7 @@ class QuickLinksView(APIView):
             if settings.FLEET_SHEET_ID
             else None
         )
-        return Response({"sheet": sheet, "drive": drive.enabled()})
+        return Response({"sheet": sheet, "drive": drive.enabled(), "driveFolder": drive.root_folder_url() or None})
 
 
 class AppVersionView(APIView):

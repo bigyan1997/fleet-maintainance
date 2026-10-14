@@ -370,9 +370,11 @@ class PdfAndDocumentDriveTests(TestCase):
 
     def test_links_say_whether_drive_is_connected(self):
         with mock.patch.object(drive, "enabled", return_value=False):
-            self.assertIs(self.api.get("/api/links/").data["drive"], False)
-        with self.on:
+            self.assertEqual(self.api.get("/api/links/").data["driveFolder"], None)
+        with self.on, self.client_patch:
             self.assertIs(self.api.get("/api/links/").data["drive"], True)
+            # The blue bar's Google Drive button opens the top folder.
+            self.assertEqual(self.api.get("/api/links/").data["driveFolder"], "https://drive.google.com/drive/folders/root-folder")
 
 
 class InsuranceIgnoredTests(TestCase):
