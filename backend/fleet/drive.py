@@ -138,7 +138,10 @@ class DriveClient:
             raise
 
     def list_images(self, folder_id):
-        q = f"'{folder_id}' in parents and trashed = false and mimeType contains 'image/'"
+        return self.list_files(folder_id, " and mimeType contains 'image/'")
+
+    def list_files(self, folder_id, extra=""):
+        q = f"'{folder_id}' in parents and trashed = false" + extra
         out, token = [], None
         while True:
             page = self.files.list(q=q, fields=f"nextPageToken,files({FILE_FIELDS})", pageSize=1000, pageToken=token).execute()

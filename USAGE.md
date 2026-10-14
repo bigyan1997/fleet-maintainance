@@ -152,3 +152,11 @@ The **Google Sheet** button opens a copy of all the data that updates by itself 
 4. Still not working? Restart the orders PC and log in. The app starts by itself.
 
 For the app to come back after a restart **without anyone logging in**, the "Fleet Maintenance keep-alive" task in Task Scheduler on the orders PC must be set to **"Run whether user is logged on or not"** (needs the Windows password once; redo it if the password changes).
+
+## Backups
+
+Every evening at 8 pm the orders PC saves a copy of everything typed into the app (vans, services, fuel, tolls, drivers, history) to Google Drive, in **Fleet Maintenance Photos › Backups**, as a file named like **BACKUP-14102026.dump**. The last 30 days are kept. Photos and PDFs are not in that file because they are already in Drive.
+
+- Nothing shows in the app. To check it is working, open that Drive folder: the newest file should be from yesterday or today.
+- If the PC was off at 8 pm, the copy is made when it is next on and signed in.
+- Don't rename or move the files. Getting data back from one is a job for whoever looks after the app.

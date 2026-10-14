@@ -705,3 +705,57 @@ class WeekendFillUpTests(TestCase):
             FuelLog.objects.create(vehicle=van, date=day, litres=Decimal("40"), cost=Decimal("90"), product=product, odometer=1000)
         weekend = [f for f in services.fuel_insights(FuelLog.objects.all())["fuelFlags"] if f["kind"] == "Weekend fill-up"]
         self.assertEqual([(f["date"], f["text"]) for f in weekend], [("2026-10-11", "40.00 L on a Sunday"), ("2026-10-10", "40.00 L on a Saturday")])
+
+
+class DatabaseBackupTests(TestCase):
+    """The nightly backup keeps 30 days in Drive and never clears old copies
+    unless today's copy was made."""
+
+    def run_backup(self, fake, dump):
+        from . import backup
+
+        folder = tempfile.mkdtemp()
+        with mock.patch.object(backup, "local_folder", return_value=backup.Path(folder)), \
+             mock.patch.object(backup, "dump_database", side_effect=dump), \
+             mock.patch.object(drive, "enabled", return_value=True), \
+             mock.patch.object(drive, "DriveClient", return_value=fake):
+            return backup, backup.run()
+
+    def drive_with_old_copies(self):
+        from datetime import timedelta
+
+        fake = FakeDrive()
+        folder_id = fake.get_or_create_folder("Backups", "root-folder")
+        fake.list_files = lambda fid: [
+            {"id": "old", "name": "BACKUP-01092026.dump", "createdTime": (timezone.now() - timedelta(days=40)).isoformat()},
+            {"id": "recent", "name": "BACKUP-10102026.dump", "createdTime": (timezone.now() - timedelta(days=4)).isoformat()},
+            {"id": "notours", "name": "holiday.jpg", "createdTime": (timezone.now() - timedelta(days=400)).isoformat()},
+        ] if fid == folder_id else []
+        fake.trash = fake.trashed.append
+        return fake
+
+    def test_todays_copy_goes_to_drive_and_only_copies_past_30_days_are_binned(self):
+        fake = self.drive_with_old_copies()
+
+        def dump(dest):
+            dest.write_bytes(b"x" * 2048)
+            return 24
+
+        backup, message = self.run_backup(fake, dump)
+        (meta, content), = fake.files.values()
+        self.assertEqual((meta["name"], len(content)), (backup.backup_name(), 2048))
+        self.assertEqual(fake.path(meta["parents"][0]), "Backups")
+        self.assertEqual(fake.trashed, ["old"])
+        self.assertIn("24 tables", message)
+
+    def test_a_failed_backup_removes_nothing(self):
+        from . import backup as backup_module
+
+        fake = self.drive_with_old_copies()
+
+        def dump(dest):
+            raise backup_module.BackupError("pg_dump failed")
+
+        with self.assertRaises(backup_module.BackupError):
+            self.run_backup(fake, dump)
+        self.assertEqual((fake.trashed, fake.files), ([], {}))
