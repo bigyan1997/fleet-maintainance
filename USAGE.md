@@ -61,7 +61,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 ## Vans
 
 - The list is in order of **next service, soonest first**. Overdue vans are at the top.
-- Under each van's km it says **as of** the date that km was last confirmed (a fill-up or a finished service). If that is more than 5 weeks ago it turns amber and says "km is N days old", and Home lists the van under **Km old**, because its next service countdown may be wrong.
+- Under each van's km it says **as of** the date that km was last confirmed: a fill-up, a finished service, or the day you typed the km in yourself (van → **Details → Edit details → Odometer**, for example from the driver's photo of the dash). A km you type in is kept until a newer, higher reading arrives; a fuel statement with older fill-ups does not undo it. If that is more than 5 weeks ago it turns amber and says "km is N days old", and Home lists the van under **Km old**, because its next service countdown may be wrong.
 - **Next service** shows the km it's due at, with how far away it is underneath. The small bar fills up as the van gets closer to its service: green, then amber under 2,000 km to go, then red once it is overdue.
 - Click a van to open its page:
   - **History:** services, fuel, washes and incidents in one list. Use the buttons to show just one kind.

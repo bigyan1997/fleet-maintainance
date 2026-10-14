@@ -39,6 +39,8 @@ class VehicleViewSet(viewsets.ViewSet):
         serializer = VehicleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         vehicle = serializer.save()
+        if vehicle.odometer:
+            services.record_typed_km(vehicle)
         activity.log(request.user, "Added", "Van", f"{vehicle} ({vehicle.rego or 'no rego'})", vehicle)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -47,9 +49,12 @@ class VehicleViewSet(viewsets.ViewSet):
             vehicle = services.get_vehicle(pk)
         except services.NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        km_before = vehicle.odometer
         serializer = VehicleSerializer(vehicle, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         vehicle = serializer.save()
+        if vehicle.odometer != km_before:
+            services.record_typed_km(vehicle)
         changed = ", ".join(k.replace("_", " ") for k in request.data.keys()) if partial else "details"
         activity.log(request.user, "Changed", "Van", f"{vehicle}: {changed}", vehicle)
         return Response(serializer.data)

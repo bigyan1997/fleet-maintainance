@@ -227,9 +227,9 @@ def _rising_run(points):
 
 def latest_reading(vehicle, extra=()):
     """The van's current km as (date, km): its newest believable reading,
-    from fuel fill-ups and from services that have actually happened (a
-    booked job's km is only a guess). `extra` adds readings not saved yet.
-    None if there are no readings."""
+    from fuel fill-ups, services that have actually happened (a booked job's
+    km is only a guess) and km typed in on the van's form. `extra` adds
+    readings not saved yet. None if there are no readings."""
     today = timezone.localdate()
     points = set(FuelLog.objects.filter(vehicle=vehicle, odometer__isnull=False, date__lte=today).values_list("date", "odometer"))
     points |= set(
@@ -237,9 +237,18 @@ def latest_reading(vehicle, extra=()):
         .exclude(status="Booked")
         .values_list("date", "odometer")
     )
+    points |= set(vehicle.odometer_readings.filter(date__lte=today).values_list("date", "km"))
     points |= {(d, km) for d, km in extra if km}
     run = _rising_run(sorted(points))
     return run[-1] if run else None
+
+
+def record_typed_km(vehicle):
+    """The van's km was just typed in by hand: keep it as today's reading, so
+    "as of" shows today and the next fuel statement doesn't undo it."""
+    from .models import OdometerReading
+
+    OdometerReading.objects.update_or_create(vehicle=vehicle, date=timezone.localdate(), defaults={"km": vehicle.odometer})
 
 
 def _bump_odometer_if_higher(vehicle, odometer):

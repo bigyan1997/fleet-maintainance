@@ -813,3 +813,42 @@ class FuelStatementFileTests(FuelStatementPeriodTests):
             self.assertEqual(self.names(fake), ["Fuel/FUE-08092026.pdf", "Fuel/FUE-08092026.txt"])
             self.assertEqual(FuelStatementFile.objects.exclude(file="").count(), 0)
             self.assertEqual(self.api.get("/api/fuel-statements/2026-09-08/pdf/").content, b"%PDF-1.4 fuel")
+
+
+class TypedKmTests(TestCase):
+    """A km typed on the van's form counts as today's reading."""
+
+    def setUp(self):
+        from .models import FuelLog
+
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.van = Vehicle.objects.create(make="Van 11", model="HiAce", rego="KKK111", odometer=126156)
+        FuelLog.objects.create(vehicle=self.van, date=date(2026, 10, 1), litres=40, cost=90, odometer=126156)
+
+    def as_of(self):
+        return self.api.get(f"/api/vehicles/{self.van.pk}/").data["odometerAsOf"]
+
+    def test_typing_the_km_moves_as_of_to_today_but_other_edits_do_not(self):
+        self.assertEqual(self.as_of(), "2026-10-01")
+        self.assertEqual(self.api.patch(f"/api/vehicles/{self.van.pk}/", {"notes": "new tyres soon"}, format="json").status_code, 200)
+        self.assertEqual(self.as_of(), "2026-10-01")
+        self.assertEqual(self.api.patch(f"/api/vehicles/{self.van.pk}/", {"odometer": 127126}, format="json").status_code, 200)
+        self.assertEqual(self.as_of(), timezone.localdate().isoformat())
+        # Typed again the same day: still one reading, with the newer km.
+        self.api.patch(f"/api/vehicles/{self.van.pk}/", {"odometer": 127200}, format="json")
+        self.assertEqual(list(self.van.odometer_readings.values_list("km", flat=True)), [127200])
+
+    def test_a_statement_with_an_older_fill_up_does_not_undo_the_typed_km(self):
+        from . import fuel_import
+
+        self.api.patch(f"/api/vehicles/{self.van.pk}/", {"odometer": 127126}, format="json")
+        older = (timezone.localdate() - __import__("datetime").timedelta(days=3)).strftime("%d/%m/%Y")
+        text = "\n".join([
+            "METRO PETROLEUM CARD", "VEHICLE REPORT AND STATEMENT TO 08 OCT 26", FuelStatementPeriodTests.HEADER, "", "KKK111 HIACE\t1111 2222",
+            FuelStatementPeriodTests.ROW.format(d=older, n=9, odo=126900, l="30.00", c="66.00").replace("AAA111", "KKK111"),
+        ])
+        fuel_import.import_statement(text.encode(), {"1111 2222": self.van.pk})
+        self.van.refresh_from_db()
+        self.assertEqual(self.van.odometer, 127126)
+        self.assertEqual(self.as_of(), timezone.localdate().isoformat())

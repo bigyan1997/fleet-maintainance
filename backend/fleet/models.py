@@ -188,6 +188,20 @@ class Vehicle(models.Model):
         return self.short_name
 
 
+class OdometerReading(models.Model):
+    """A km typed in by hand on the van's own form (for example from the
+    driver's photo of the dash), dated the day it was typed. Fill-ups and
+    services carry their own readings; this is the third kind."""
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="odometer_readings")
+    date = models.DateField()
+    km = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["vehicle", "date"], name="one_typed_km_per_van_per_day")]
+
+
 class Mechanic(models.Model):
     """A mechanic or workshop that services the vans."""
 
