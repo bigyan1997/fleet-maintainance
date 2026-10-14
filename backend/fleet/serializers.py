@@ -12,6 +12,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     nextServiceDue = serializers.SerializerMethodField()
     nextTyreDue = serializers.SerializerMethodField()
     odometerAsOf = serializers.SerializerMethodField()
+    lastFillUp = serializers.SerializerMethodField()
     lastWashed = serializers.SerializerMethodField()
     openJob = serializers.SerializerMethodField()
     driverName = serializers.CharField(source="driver.name", read_only=True, default="")
@@ -23,7 +24,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "toll_tag_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "off_road", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastWashed", "openJob",
+            "wash_needed", "off_road", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastFillUp", "lastWashed", "openJob",
         ]
 
         read_only_fields = ["report_token"]
@@ -51,6 +52,11 @@ class VehicleSerializer(serializers.ModelSerializer):
 
     def get_nextTyreDue(self, obj):
         return services.next_tyre_due(obj)
+
+    def get_lastFillUp(self, obj):
+        # The km typed at the pump on the newest fill-up that has one.
+        row = obj.fuel_logs.filter(odometer__isnull=False).order_by("-date", "-id").values("date", "odometer").first()
+        return {"date": row["date"].isoformat(), "km": row["odometer"]} if row else None
 
     def get_odometerAsOf(self, obj):
         # The date of the newest believable km reading (fill-up or finished

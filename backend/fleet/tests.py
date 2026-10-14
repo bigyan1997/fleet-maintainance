@@ -852,3 +852,9 @@ class TypedKmTests(TestCase):
         self.van.refresh_from_db()
         self.assertEqual(self.van.odometer, 127126)
         self.assertEqual(self.as_of(), timezone.localdate().isoformat())
+
+    def test_the_van_says_the_km_at_its_last_fill_up(self):
+        from .models import FuelLog
+
+        FuelLog.objects.create(vehicle=self.van, date=date(2026, 10, 5), litres=0, cost=5, product="Card fee")  # no km: not a reading
+        self.assertEqual(self.api.get(f"/api/vehicles/{self.van.pk}/").data["lastFillUp"], {"date": "2026-10-01", "km": 126156})

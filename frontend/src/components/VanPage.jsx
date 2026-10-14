@@ -294,6 +294,17 @@ export function VanPage({ id }) {
             <DetailRow label="Fuel card">{v.fuel_card_number || '— (filled in by the first statement import)'}</DetailRow>
             <DetailRow label="Toll tag">{v.toll_tag_number || '— (filled in by the toll statement import)'}</DetailRow>
             <DetailRow label="Odometer">{v.odometer ? km(v.odometer) : '—'}<KmAsOf van={v} /></DetailRow>
+            <DetailRow label="Km at last fill-up">
+              {v.lastFillUp ? (
+                <>
+                  {km(v.lastFillUp.km)}
+                  <div className="text-[11px] text-off">
+                    typed at the pump on {fmtDayDate(v.lastFillUp.date)}
+                    {v.odometer > v.lastFillUp.km && ` · ${km(v.odometer - v.lastFillUp.km)} driven since`}
+                  </div>
+                </>
+              ) : '— (no fill-up with a km yet)'}
+            </DetailRow>
             <DetailRow label="Service interval">every {km(v.service_interval_km || 10000)}</DetailRow>
             <DetailRow label="Tyre interval">{v.tyre_interval_km ? `every ${km(v.tyre_interval_km)}` : 'not set'}</DetailRow>
             <DetailRow label="Next new tyres">{tyre ? `${km(tyre.due_at)} (${serviceText(tyre)})` : v.tyre_interval_km ? 'no tyre change logged yet' : 'tyre interval not set'}</DetailRow>
