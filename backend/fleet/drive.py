@@ -21,7 +21,7 @@ PDFs and other documents go to Drive too:
         Tolls/            TOL-29082026-28092026.pdf
         Fuel/             FUE-08102026.txt, FUE-08102026.pdf (statement to 08-10-2026)
         Documents/<Van>/  DOC-VAN6-12102026 - <original file name>
-        Drivers/<Name>/   LIC-SAMEXAMPLE-14102026.jpg                (licence photos)
+        Licences/<Name>/  Sam Example - licence.jpg, Sam Example - licence (2).jpg   (licence photos)
 
 Drive is the source of truth for photos: a photo dropped into a van's folder in the
 Drive app, named with a job's date, shows up on that job the next time it's
@@ -266,12 +266,12 @@ def upload_for(client, *, vehicle, job, kind, filename, content, content_type):
 
 
 def upload_driver_file(client, driver, filename, content, content_type):
-    """A licence photo or scan: Drivers/<name>/LIC-<NAME>-<today>.jpg, then
-    "(2)" and so on. Returns (Drive's file info, the name it was given)."""
+    """A licence photo or scan: Licences/<name>/<name> - licence.jpg, then
+    "(2)" for the next one (front, back). Returns (Drive's file info, the name it was given)."""
     ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
-    folder = ensure_path(client, "Drivers", driver.name)
+    folder = ensure_path(client, "Licences", driver.name)
     taken = {f["name"].lower() for f in client.list_images(folder)}
-    base = f"LIC-{re.sub(r'[^A-Za-z0-9]', '', driver.name).upper()}-{timezone.localdate():%d%m%Y}"
+    base = f"{driver.name} - licence"
     name, n = f"{base}{ext}", 1
     while name.lower() in taken:
         n += 1

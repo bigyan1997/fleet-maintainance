@@ -649,10 +649,9 @@ class DriverDetailsTests(TestCase):
             first = self.api.post("/api/driver-files/", {"file": self.photo(), "driver": self.driver.pk}, format="multipart")
             second = self.api.post("/api/driver-files/", {"file": self.photo("back.jpg"), "driver": self.driver.pk}, format="multipart")
             self.assertEqual((first.status_code, second.status_code), (201, 201))
-            stamp = f"{timezone.localdate():%d%m%Y}"
-            self.assertEqual([first.data["original_name"], second.data["original_name"]], [f"LIC-SAMEXAMPLE-{stamp}.jpg", f"LIC-SAMEXAMPLE-{stamp} (2).jpg"])
+            self.assertEqual([first.data["original_name"], second.data["original_name"]], ["Sam Example - licence.jpg", "Sam Example - licence (2).jpg"])
             meta = self.fake.files[self.driver.files.first().drive_file_id][0]
-            self.assertEqual(self.fake.path(meta["parents"][0]), "Drivers/Sam Example")
+            self.assertEqual(self.fake.path(meta["parents"][0]), "Licences/Sam Example")
             self.assertEqual(len(self.api.get("/api/driver-files/", {"driver": self.driver.pk}).data), 2)
             self.assertEqual(self.api.get(first.data["url"]).content, JPEG)
             self.assertEqual(self.api.delete(f"/api/driver-files/{first.data['id']}/").status_code, 204)

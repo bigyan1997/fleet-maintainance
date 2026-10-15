@@ -381,7 +381,7 @@ def driver_file_path(instance, filename):
 
 class DriverFile(models.Model):
     """A photo or scan of a driver's licence (front, back). Kept in Google
-    Drive under Drivers/<name>/; on the server's disk until Drive is connected."""
+    Drive under Licences/<name>/; on the server's disk until Drive is connected."""
 
     driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="files")
     file = models.FileField(upload_to=driver_file_path, blank=True)  # empty when kept in Google Drive
