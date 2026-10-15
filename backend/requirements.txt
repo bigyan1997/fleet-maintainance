@@ -25,6 +25,7 @@ pyasn1_modules==0.4.2
 pycparser==3.0
 pyparsing==3.3.3
 pypdf==6.19.0
+Pillow>=11.3
 python-decouple==3.8
 requests==2.34.2
 requests-oauthlib==2.0.0

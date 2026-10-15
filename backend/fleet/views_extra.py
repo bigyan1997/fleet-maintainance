@@ -11,10 +11,11 @@ from django.db.models.functions import TruncMonth
 from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import activity, drive, services, toll_import
+from . import activity, drive, licence_pdf, services, toll_import
 from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
 from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
 
@@ -114,6 +115,39 @@ class DriverFileViewSet(viewsets.ViewSet):
             saved = DriverFile.objects.create(file=upload, **fields)
         activity.log(request.user, "Added", "Driver", f"Licence photo for {driver.name}")
         return Response(DriverFileSerializer(saved).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="combined")
+    def combined(self, request):
+        """The licence's front and back together on one A4 page, as a PDF."""
+        driver = Driver.objects.filter(pk=request.query_params.get("driver") or 0).first()
+        if not driver:
+            return Response({"detail": "Driver not found."}, status=status.HTTP_404_NOT_FOUND)
+        drive.move_local_files()
+        pictures = []
+        for f in DriverFile.objects.filter(driver=driver):
+            if f.content_type == "application/pdf" or f.original_name.lower().endswith(".pdf"):
+                continue  # a PDF scan can't be placed on the page; its photo-only sides can
+            try:
+                if f.drive_file_id:
+                    data, _ = drive.full(f)
+                else:
+                    with f.file.open("rb") as fh:
+                        data = fh.read()
+                pictures.append(data)
+            except Exception:
+                logger.exception("Couldn't read licence photo %s", f.pk)
+        if not pictures:
+            return Response({"detail": "Add the front and back photos of the licence first (photos, not PDFs)."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            pdf = licence_pdf.build(driver.name, pictures[:2])
+        except Exception:
+            logger.exception("Couldn't build the licence PDF for %s", driver.pk)
+            return Response({"detail": "Couldn't put those photos on one page."}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response = HttpResponse(pdf, content_type="application/pdf")
+        safe = "".join(c for c in driver.name if c.isalnum() or c in " -_") or "driver"
+        response["Content-Disposition"] = f'attachment; filename="{safe} - licence.pdf"'
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     def destroy(self, request, pk=None):
         f = DriverFile.objects.select_related("driver").filter(pk=pk).first()

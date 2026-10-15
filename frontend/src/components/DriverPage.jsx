@@ -52,6 +52,23 @@ function Row({ label, children }) {
 }
 
 // Photos or scans of the licence card, kept in Google Drive under Drivers/<name>.
+// Front and back together on one A4 page, for printing or sending.
+function CombinedPdfButton({ driver }) {
+  const files = useQuery({ queryKey: ['driver-files', driver.id], queryFn: () => fetchDriverFiles(driver.id) })
+  const photos = (files.data ?? []).filter((f) => f.content_type !== 'application/pdf')
+  if (photos.length === 0) return null
+  return (
+    <a
+      href={`/api/driver-files/combined/?driver=${driver.id}`}
+      download
+      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink no-underline hover:bg-[#f5f5f5]"
+      title="Front and back of the licence together on one page"
+    >
+      Download front + back (PDF)
+    </a>
+  )
+}
+
 function LicencePhotos({ driver }) {
   const queryClient = useQueryClient()
   const { toast } = useActions()
@@ -194,7 +211,7 @@ export function DriverPage({ id }) {
             <Row label="Notes">{d.notes ? <span className="whitespace-pre-wrap">{d.notes}</span> : <span className="text-off">none</span>}</Row>
           </div>
         </Card>
-        <Card title="Licence photos" description={`Kept in Google Drive: Fleet Maintenance Photos › Drivers › ${d.name}`} padded={false}>
+        <Card title="Licence photos" description={`Kept in Google Drive: Fleet Maintenance Photos › Licences › ${d.name}`} actions={<CombinedPdfButton driver={d} />} padded={false}>
           <LicencePhotos driver={d} />
         </Card>
       </div>

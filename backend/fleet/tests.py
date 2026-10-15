@@ -660,6 +660,27 @@ class DriverDetailsTests(TestCase):
             self.assertEqual(self.api.delete(f"/api/drivers/{self.driver.pk}/").status_code, 204)
             self.assertEqual(len(self.fake.trashed), 2)
 
+    def test_front_and_back_download_as_one_pdf_page(self):
+        import io
+
+        from PIL import Image
+        from pypdf import PdfReader
+
+        def png(color):
+            buf = io.BytesIO()
+            Image.new("RGB", (600, 380), color).save(buf, format="PNG")
+            return SimpleUploadedFile("lic.png", buf.getvalue(), content_type="image/png")
+
+        with mock.patch.object(drive, "enabled", return_value=False):
+            self.assertEqual(self.api.get("/api/driver-files/combined/", {"driver": self.driver.pk}).status_code, 400)  # nothing yet
+            for color in ("red", "blue"):
+                self.api.post("/api/driver-files/", {"file": png(color), "driver": self.driver.pk}, format="multipart")
+            res = self.api.get("/api/driver-files/combined/", {"driver": self.driver.pk})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/pdf")
+        self.assertIn("Sam Example - licence.pdf", res["Content-Disposition"])
+        self.assertEqual(len(PdfReader(io.BytesIO(res.content)).pages), 1)
+
     def test_without_drive_the_photo_waits_on_disk_then_moves(self):
         from .models import DriverFile
 
