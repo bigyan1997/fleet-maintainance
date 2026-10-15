@@ -129,14 +129,15 @@ export function Pill({ tone = 'info', children }) {
 }
 
 // Centred pop-up. Clicking the dimmed background or pressing Esc closes it.
+// A pop-up form. A click outside it does nothing, so a stray click never
+// throws away what was typed: it closes with its ✕, Cancel or Esc.
 export function Modal({ onClose, children, width = 'max-w-[760px]' }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(15,23,42,.5)] px-4 py-[6vh]"
-      onClick={onClose}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
-      <div className={`w-full ${width} rounded-xl bg-white shadow-[0_24px_64px_rgba(15,23,42,.3)]`} onClick={(e) => e.stopPropagation()}>
+      <div className={`w-full ${width} rounded-xl bg-white shadow-[0_24px_64px_rgba(15,23,42,.3)]`}>
         {children}
       </div>
     </div>

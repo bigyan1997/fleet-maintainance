@@ -79,7 +79,7 @@ export function FuelImport({ onClose }) {
   const unmatched = cards.filter((c) => !assignments[c.card]).length
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,.45)] px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,.45)] px-4">
       <div className="flex max-h-[92vh] w-full max-w-[900px] flex-col rounded-xl bg-white" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-line px-6 py-4">
           <h3 className="text-base font-semibold text-ink">Import fuel statement</h3>

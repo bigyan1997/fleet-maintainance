@@ -31,6 +31,8 @@ Read this first; the dated entries below are the history of how it got here.
 
 ## History
 
+**A click outside a form no longer closes it** (2026-10-16, "accidently clicked outside of the form ... the data entered is all lost"): `Modal` in `ui.jsx` (every form opened with `openForm`: service, fuel, incident, van, wash, finish job, driver) and the fuel and toll import pop-ups no longer close on a backdrop click; they close with ✕, Cancel or Esc. The read-only detail pop-up (`DetailModal`) still closes on an outside click, since nothing is lost.
+
 **Drivers list: photos tick, download, Updated; one file with both sides** (2026-10-15): Drivers list shows Licence photos (tick + file count) and a PDF/Word download button per row, and Updated (driver.updated_at, bumped when a licence photo is added or removed) replaces Joined. Licence uploads accept .doc/.docx as well as photos and PDFs. `licence_pdf.download_mode`: photos -> A4 page (one or two), else a PDF scan, else a Word file, handed back as stored. Word files are not converted (no Word/LibreOffice on the server). 42 tests pass.
 
 **Licence PDF** (2026-10-15): `GET /api/driver-files/combined/?driver=<id>` puts a driver's first two licence photos (front, back) on one A4 page and returns a PDF (`licence_pdf.py`, Pillow, added to requirements). The Download button sits in the top right of the driver page's Licence photos box. PDF scans can't be placed on the page and are skipped. Drive folder wording on that page corrected to Licences > name. 40 tests pass.

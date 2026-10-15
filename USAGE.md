@@ -21,7 +21,7 @@ Every page has its own address, so you can bookmark a page or send a link to it,
 - **Tabs:** Home · Vans · Services · Washes · Fuel · Tolls · Reports, each with a small picture. On a computer the blue bar and the tabs stay at the top while you scroll.
 - **Two buttons beside the tabs:** **Log wash** and **+ Log service**, the two things you do most. On a van's own page they sit beside **Report incident** instead, already set to that van.
 - Dates on Home, Services, Washes and the van pages show the day of the week too (for example Tue 06-10-2026).
-- Every form opens as a pop-up over the page you're on. Close it with ✕ or Cancel.
+- Every form opens as a pop-up over the page you're on. Close it with ✕, Cancel or the Esc key. Clicking outside it does nothing, so a stray click never loses what you've typed.
 
 ## Home
 
