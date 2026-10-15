@@ -74,6 +74,7 @@ function LicencePhotos({ driver }) {
   const { toast } = useActions()
   const [removing, setRemoving] = useState(null)
   const [broken, setBroken] = useState({})
+  const [dragging, setDragging] = useState(false)
   const links = useQuery({ queryKey: ['links'], queryFn: fetchLinks, staleTime: Infinity })
   const files = useQuery({ queryKey: ['driver-files', driver.id], queryFn: () => fetchDriverFiles(driver.id) })
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['driver-files', driver.id] })
@@ -89,8 +90,22 @@ function LicencePhotos({ driver }) {
   })
   const saved = files.data ?? []
   const tile = 'group relative h-[110px] w-[170px] overflow-hidden rounded-lg border border-line bg-[#f4f6f9]'
+  // Photos can be dragged anywhere onto this box (from the desktop or a folder).
+  const dropped = (e) => {
+    e.preventDefault()
+    setDragging(false)
+    if (upload.isPending) return
+    const list = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf' || /\.(heic|jpe?g|png|webp|pdf)$/i.test(f.name))
+    if (list.length === 0) { toast('Drop a photo or a PDF of the licence.', true); return }
+    upload.mutate(list)
+  }
   return (
-    <div className="p-4">
+    <div
+      className={'p-4 transition-colors ' + (dragging ? 'bg-[#eef5fc] outline-2 -outline-offset-8 outline-dashed outline-primary' : '')}
+      onDragOver={(e) => { e.preventDefault(); if (!dragging) setDragging(true) }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false) }}
+      onDrop={dropped}
+    >
       <div className="flex flex-wrap gap-3">
         {saved.map((f) => (
           <div key={f.id} className={tile}>
@@ -108,7 +123,7 @@ function LicencePhotos({ driver }) {
           </div>
         ))}
         <label className="flex h-[110px] w-[170px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-[#c9d3df] bg-white text-center text-xs font-medium text-primary hover:bg-[#f5f8fc]">
-          {upload.isPending ? 'Uploading…' : <><span className="text-xl leading-none">+</span>Add photo or scan</>}
+          {upload.isPending ? 'Uploading…' : <><span className="text-xl leading-none">+</span>Drag photos here<span className="font-normal text-off">or click to choose</span></>}
           <input
             type="file"
             accept="image/*,.heic,application/pdf"
@@ -119,7 +134,7 @@ function LicencePhotos({ driver }) {
           />
         </label>
       </div>
-      <p className="mt-2 text-xs text-off">Front and back of the licence card. A photo from a phone or a PDF scan, up to 20 MB each. Click one to see it full size.</p>
+      <p className="mt-2 text-xs text-off">Front and back of the licence card. A photo from a phone or a PDF scan, up to 20 MB each. Drag them onto this box, or click the dashed square. Click one to see it full size.</p>
       {links.data?.drive === false && (
         <div className="mt-2 rounded bg-warn-bg px-2 py-1 text-[11px] text-warn">
           Google Drive isn't connected on this server yet, so photos are saved on the server for now. They move to Drive by themselves once it's connected.
