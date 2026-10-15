@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 ALLOWED_UPLOAD_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
-LICENCE_FILE_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic"}
+LICENCE_FILE_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx"}
 
 
 # ── Drivers ────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ LICENCE_FILE_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic"}
 
 class DriverViewSet(viewsets.ViewSet):
     def list(self, request):
-        return Response(DriverSerializer(Driver.objects.prefetch_related("vehicles"), many=True).data)
+        return Response(DriverSerializer(Driver.objects.prefetch_related("vehicles", "files"), many=True).data)
 
     def create(self, request):
         serializer = DriverSerializer(data=request.data)
@@ -113,6 +113,7 @@ class DriverFileViewSet(viewsets.ViewSet):
                 upload.seek(0)
         if saved is None:
             saved = DriverFile.objects.create(file=upload, **fields)
+        Driver.objects.filter(pk=driver.pk).update(updated_at=timezone.now())  # "Updated" on the Drivers list
         activity.log(request.user, "Added", "Driver", f"Licence photo for {driver.name}")
         return Response(DriverFileSerializer(saved).data, status=status.HTTP_201_CREATED)
 
@@ -123,29 +124,33 @@ class DriverFileViewSet(viewsets.ViewSet):
         if not driver:
             return Response({"detail": "Driver not found."}, status=status.HTTP_404_NOT_FOUND)
         drive.move_local_files()
-        pictures = []
-        for f in DriverFile.objects.filter(driver=driver):
-            if f.content_type == "application/pdf" or f.original_name.lower().endswith(".pdf"):
-                continue  # a PDF scan can't be placed on the page; its photo-only sides can
-            try:
-                if f.drive_file_id:
-                    data, _ = drive.full(f)
-                else:
-                    with f.file.open("rb") as fh:
-                        data = fh.read()
-                pictures.append(data)
-            except Exception:
-                logger.exception("Couldn't read licence photo %s", f.pk)
-        if not pictures:
-            return Response({"detail": "Add the front and back photos of the licence first (photos, not PDFs)."}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            pdf = licence_pdf.build(driver.name, pictures[:2])
-        except Exception:
-            logger.exception("Couldn't build the licence PDF for %s", driver.pk)
-            return Response({"detail": "Couldn't put those photos on one page."}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        response = HttpResponse(pdf, content_type="application/pdf")
+        files = list(DriverFile.objects.filter(driver=driver))
+        mode = licence_pdf.download_mode(files)
+        if not mode:
+            return Response({"detail": "Add the licence photos first."}, status=status.HTTP_400_BAD_REQUEST)
+        wanted = {"combined": "image", "pdf": "pdf", "word": "word"}[mode]
+        chosen = [f for f in files if licence_pdf.kind_of(f) == wanted]
+
+        def read(f):
+            if f.drive_file_id:
+                return drive.full(f)[0]
+            with f.file.open("rb") as fh:
+                return fh.read()
+
         safe = "".join(c for c in driver.name if c.isalnum() or c in " -_") or "driver"
-        response["Content-Disposition"] = f'attachment; filename="{safe} - licence.pdf"'
+        try:
+            if mode == "combined":
+                data, ext, content_type = licence_pdf.build(driver.name, [read(f) for f in chosen[:2]]), "pdf", "application/pdf"
+            else:  # one PDF scan or Word file: it already holds both sides, so hand it back as it is
+                f = chosen[0]
+                ext = f.original_name.rsplit(".", 1)[-1].lower() if "." in f.original_name else mode
+                data = read(f)
+                content_type = "application/pdf" if mode == "pdf" else (mimetypes.guess_type(f.original_name)[0] or "application/octet-stream")
+        except Exception:
+            logger.exception("Couldn't build the licence download for %s", driver.pk)
+            return Response({"detail": "Couldn't prepare that file."}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        response = HttpResponse(data, content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="{safe} - licence.{ext}"'
         response["Cache-Control"] = "private, no-store"
         return response
 
@@ -156,6 +161,7 @@ class DriverFileViewSet(viewsets.ViewSet):
         if not _remove_driver_file(f):
             return Response({"detail": "Couldn't remove it from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
         activity.log(request.user, "Deleted", "Driver", f"Licence photo for {f.driver.name}")
+        Driver.objects.filter(pk=f.driver_id).update(updated_at=timezone.now())
         f.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

@@ -55,8 +55,12 @@ function Row({ label, children }) {
 // Front and back together on one A4 page, for printing or sending.
 function CombinedPdfButton({ driver }) {
   const files = useQuery({ queryKey: ['driver-files', driver.id], queryFn: () => fetchDriverFiles(driver.id) })
-  const photos = (files.data ?? []).filter((f) => f.content_type !== 'application/pdf')
-  if (photos.length === 0) return null
+  const list = files.data ?? []
+  const isPdf = (f) => f.content_type === 'application/pdf' || /\.pdf$/i.test(f.original_name)
+  const isWord = (f) => /\.docx?$/i.test(f.original_name)
+  const images = list.filter((f) => !isPdf(f) && !isWord(f))
+  const label = images.length > 1 ? 'Download front + back (PDF)' : images.length === 1 ? 'Download as a PDF page' : list.some(isPdf) ? 'Download the PDF' : list.some(isWord) ? 'Download the Word file' : ''
+  if (!label) return null
   return (
     <a
       href={`/api/driver-files/combined/?driver=${driver.id}`}
@@ -64,7 +68,7 @@ function CombinedPdfButton({ driver }) {
       className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-white px-3 text-xs font-semibold text-ink no-underline hover:bg-[#f5f5f5]"
       title="Front and back of the licence together on one page"
     >
-      Download front + back (PDF)
+      {label}
     </a>
   )
 }
@@ -95,8 +99,8 @@ function LicencePhotos({ driver }) {
     e.preventDefault()
     setDragging(false)
     if (upload.isPending) return
-    const list = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf' || /\.(heic|jpe?g|png|webp|pdf)$/i.test(f.name))
-    if (list.length === 0) { toast('Drop a photo or a PDF of the licence.', true); return }
+    const list = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/') || f.type === 'application/pdf' || /\.(heic|jpe?g|png|webp|pdf|docx?)$/i.test(f.name))
+    if (list.length === 0) { toast('Drop a photo, a PDF or a Word file of the licence.', true); return }
     upload.mutate(list)
   }
   return (
@@ -110,9 +114,9 @@ function LicencePhotos({ driver }) {
         {saved.map((f) => (
           <div key={f.id} className={tile}>
             <a href={f.url} target="_blank" rel="noopener noreferrer" title={f.original_name} className="block h-full w-full">
-              {f.content_type === 'application/pdf' || broken[f.id] ? (
+              {f.content_type === 'application/pdf' || /\.docx?$/i.test(f.original_name) || broken[f.id] ? (
                 <span className="flex h-full w-full flex-col items-center justify-center p-2 text-center">
-                  <span className="text-[13px] font-bold text-primary">{f.content_type === 'application/pdf' ? 'PDF' : 'Photo'}</span>
+                  <span className="text-[13px] font-bold text-primary">{f.content_type === 'application/pdf' ? 'PDF' : /\.docx?$/i.test(f.original_name) ? 'Word' : 'Photo'}</span>
                   <span className="line-clamp-2 text-[10px] break-all text-off">{f.original_name}</span>
                 </span>
               ) : (
@@ -126,7 +130,7 @@ function LicencePhotos({ driver }) {
           {upload.isPending ? 'Uploading…' : <><span className="text-xl leading-none">+</span>Drag photos here<span className="font-normal text-off">or click to choose</span></>}
           <input
             type="file"
-            accept="image/*,.heic,application/pdf"
+            accept="image/*,.heic,.doc,.docx,application/pdf"
             multiple
             className="hidden"
             disabled={upload.isPending}
@@ -134,7 +138,7 @@ function LicencePhotos({ driver }) {
           />
         </label>
       </div>
-      <p className="mt-2 text-xs text-off">Front and back of the licence card. A photo from a phone or a PDF scan, up to 20 MB each. Drag them onto this box, or click the dashed square. Click one to see it full size.</p>
+      <p className="mt-2 text-xs text-off">Front and back of the licence card. A photo from a phone, a PDF scan or a Word file, up to 20 MB each. One file with both sides on it is fine. Drag them onto this box, or click the dashed square. Click one to see it full size.</p>
       {links.data?.drive === false && (
         <div className="mt-2 rounded bg-warn-bg px-2 py-1 text-[11px] text-warn">
           Google Drive isn't connected on this server yet, so photos are saved on the server for now. They move to Drive by themselves once it's connected.

@@ -681,6 +681,56 @@ class DriverDetailsTests(TestCase):
         self.assertIn("Sam Example - licence.pdf", res["Content-Disposition"])
         self.assertEqual(len(PdfReader(io.BytesIO(res.content)).pages), 1)
 
+    def test_adding_a_licence_photo_bumps_the_drivers_updated_time(self):
+        from datetime import timedelta
+
+        from .models import Driver
+
+        old = timezone.now() - timedelta(days=30)
+        Driver.objects.filter(pk=self.driver.pk).update(updated_at=old)
+        with mock.patch.object(drive, "enabled", return_value=False):
+            self.api.post("/api/driver-files/", {"file": self.photo(), "driver": self.driver.pk}, format="multipart")
+        data = [d for d in self.api.get("/api/drivers/").data if d["id"] == self.driver.pk][0]
+        self.assertIn("updated_at", data)
+        self.driver.refresh_from_db()
+        self.assertGreater(self.driver.updated_at, old + timedelta(days=29))
+
+    def test_one_file_with_both_sides_downloads_as_it_is_or_on_one_page(self):
+        import io
+
+        from PIL import Image
+        from pypdf import PdfReader
+
+        def png():
+            buf = io.BytesIO()
+            Image.new("RGB", (800, 500), "green").save(buf, format="PNG")
+            return SimpleUploadedFile("both.png", buf.getvalue(), content_type="image/png")
+
+        with mock.patch.object(drive, "enabled", return_value=False):
+            def post(upload):
+                return self.api.post("/api/driver-files/", {"file": upload, "driver": self.driver.pk}, format="multipart")
+
+            def listed():
+                return [d for d in self.api.get("/api/drivers/").data if d["id"] == self.driver.pk][0]
+
+            self.assertEqual((listed()["licenceFileCount"], listed()["licenceDownload"]), (0, ""))
+            # A Word file is accepted and handed back unchanged.
+            docx = b"PK-fake-word"
+            self.assertEqual(post(SimpleUploadedFile("licence.docx", docx, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")).status_code, 201)
+            self.assertEqual(listed()["licenceDownload"], "word")
+            res = self.api.get("/api/driver-files/combined/", {"driver": self.driver.pk})
+            self.assertEqual((res.status_code, res.content), (200, docx))
+            self.assertIn("Sam Example - licence.docx", res["Content-Disposition"])
+            # A PDF scan is handed back unchanged and wins over Word.
+            post(SimpleUploadedFile("scan.pdf", b"%PDF-1.4 scan", content_type="application/pdf"))
+            self.assertEqual(listed()["licenceDownload"], "pdf")
+            self.assertEqual(self.api.get("/api/driver-files/combined/", {"driver": self.driver.pk}).content, b"%PDF-1.4 scan")
+            # One photo goes on its own page.
+            post(png())
+            self.assertEqual((listed()["licenceFileCount"], listed()["licenceDownload"]), (3, "combined"))
+            res = self.api.get("/api/driver-files/combined/", {"driver": self.driver.pk})
+            self.assertEqual(len(PdfReader(io.BytesIO(res.content)).pages), 1)
+
     def test_without_drive_the_photo_waits_on_disk_then_moves(self):
         from .models import DriverFile
 

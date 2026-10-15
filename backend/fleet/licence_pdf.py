@@ -10,6 +10,29 @@ MARGIN = 90
 HEADER = 120
 
 
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".heic")
+
+
+def kind_of(f):
+    """"image", "pdf" or "word" for a stored licence file."""
+    name = (f.original_name or "").lower()
+    if (f.content_type or "") == "application/pdf" or name.endswith(".pdf"):
+        return "pdf"
+    if name.endswith((".doc", ".docx")):
+        return "word"
+    return "image"
+
+
+def download_mode(files):
+    """What the download button gives for these files: "combined" (the photos
+    on one A4 page), "pdf" or "word" (the original file), or "" (nothing)."""
+    kinds = [kind_of(f) for f in files]
+    for mode, kind in (("combined", "image"), ("pdf", "pdf"), ("word", "word")):
+        if kind in kinds:
+            return mode
+    return ""
+
+
 def _open(data):
     img = Image.open(io.BytesIO(data))
     img = ImageOps.exif_transpose(img)  # phone photos carry their rotation
@@ -32,7 +55,7 @@ def build(driver_name, pictures):
 
     count = max(1, len(pictures))
     slot_h = (PAGE_H - MARGIN - HEADER - MARGIN) // count
-    labels = ["Front", "Back"]
+    labels = ["Front", "Back"] if len(pictures) > 1 else ["Licence"]
     for i, data in enumerate(pictures):
         img = _open(data)
         box_w, box_h = PAGE_W - 2 * MARGIN, slot_h - 60

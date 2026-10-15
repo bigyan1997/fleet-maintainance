@@ -171,17 +171,29 @@ class DriverSerializer(serializers.ModelSerializer):
     vans = serializers.SerializerMethodField()
     licenceStatus = serializers.CharField(source="licence_status", read_only=True)
     licenceDaysLeft = serializers.IntegerField(source="licence_days_left", read_only=True)
+    licenceFileCount = serializers.SerializerMethodField()
+    licenceDownload = serializers.SerializerMethodField()
 
     class Meta:
         model = Driver
         fields = [
             "id", "name", "phone", "notes", "active", "vans",
             "date_of_birth", "date_joined", "licence_number", "licence_class", "licence_state", "licence_expiry",
-            "demerit_points", "points_checked", "licenceStatus", "licenceDaysLeft",
+            "demerit_points", "points_checked", "licenceStatus", "licenceDaysLeft", "updated_at",
+            "licenceFileCount", "licenceDownload",
         ]
+        read_only_fields = ["updated_at"]
 
     def get_vans(self, obj):
         return [{"id": v.pk, "label": str(v)} for v in obj.vehicles.all()]
+
+    def get_licenceFileCount(self, obj):
+        return len(obj.files.all())
+
+    def get_licenceDownload(self, obj):
+        from .licence_pdf import download_mode
+
+        return download_mode(obj.files.all())
 
     def _real_date(self, value, what, earliest=1930):
         # A half-typed year (the browser reads "2" as 0002) must never be saved.

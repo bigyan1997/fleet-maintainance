@@ -5,7 +5,7 @@ import { fetchDrivers, patchVehicle } from '../api/extra'
 import { fetchServices } from '../api/services'
 import { fetchVehicles } from '../api/vehicles'
 import { useActions } from '../lib/actions'
-import { daysFromToday, fmtAgo, fmtDate } from '../lib/formatDate'
+import { daysFromToday, fmtAgo, fmtDate, fmtDateTime } from '../lib/formatDate'
 import { href, navigate } from '../lib/router'
 import { LicencePill } from './DriverPage'
 import { Button, Card, Empty, Pill } from './ui'
@@ -55,7 +55,7 @@ export function DriversView() {
           <Empty>No drivers yet. Add the first one with the button above.</Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-[13px]">
+            <table className="w-full min-w-[980px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-line bg-[#f8fafc] text-left text-xs text-off">
                   <th className="px-4 py-2 font-medium">Driver</th>
@@ -63,7 +63,9 @@ export function DriversView() {
                   <th className="px-2 py-2 font-medium">Licence</th>
                   <th className="px-2 py-2 font-medium">Licence expires</th>
                   <th className="px-2 py-2 font-medium">Demerit points</th>
-                  <th className="px-2 py-2 font-medium">Joined</th>
+                  <th className="px-2 py-2 font-medium">Licence photos</th>
+                  <th className="px-4 py-2 text-right font-medium">Updated</th>
+                  <th className="px-2 py-2 pr-4 font-medium"><span className="sr-only">Download</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -88,7 +90,27 @@ export function DriversView() {
                       {d.demerit_points === null ? <span className="text-off">—</span> : <span className="tabular-nums">{d.demerit_points}</span>}
                       {d.points_checked && <div className="text-xs text-off">checked {fmtDate(d.points_checked)}</div>}
                     </td>
-                    <td className="px-2 py-2.5 whitespace-nowrap tabular-nums">{d.date_joined ? fmtDate(d.date_joined) : <span className="text-off">—</span>}</td>
+                    <td className="px-2 py-2.5 whitespace-nowrap">
+                      {d.licenceFileCount > 0
+                        ? <span className="font-medium text-ok">✓ Uploaded <span className="font-normal text-off">({d.licenceFileCount} file{d.licenceFileCount === 1 ? '' : 's'})</span></span>
+                        : <span className="text-off">None yet</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums" title="The last time this driver's details or licence photos were changed">
+                      {d.updated_at ? <>{fmtDateTime(d.updated_at).slice(0, 10)}<div className="text-xs text-off">{fmtDateTime(d.updated_at).slice(11)}</div></> : <span className="text-off">—</span>}
+                    </td>
+                    <td className="px-2 py-2.5 pr-4 text-right whitespace-nowrap">
+                      {d.licenceDownload && (
+                        <a
+                          href={`/api/driver-files/combined/?driver=${d.id}`}
+                          download
+                          onClick={(e) => e.stopPropagation()}
+                          title={d.licenceDownload === 'combined' ? 'Front and back together on one page (PDF)' : d.licenceDownload === 'pdf' ? 'Download the licence PDF' : 'Download the licence Word file'}
+                          className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-semibold text-ink no-underline hover:bg-[#f5f5f5]"
+                        >
+                          {d.licenceDownload === 'word' ? 'Word' : 'PDF'} ↓
+                        </a>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
