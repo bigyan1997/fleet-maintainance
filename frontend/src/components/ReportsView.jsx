@@ -5,7 +5,7 @@ import { BudgetView, FuelTrends } from './ReportsExtras'
 import { Tabs } from './ui'
 
 const TABS = [
-  { key: 'spending', label: 'Spending' },
+  { key: 'spending', label: 'Money' },
   { key: 'fuel', label: 'Fuel' },
   { key: 'tolls', label: 'Tolls' },
   { key: 'budget', label: 'Budget' },

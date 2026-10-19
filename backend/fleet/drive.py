@@ -303,7 +303,13 @@ def move_local_files(limit=10, force=False):
     if not (atts or tolls or licences or fuel):
         return 0
     moved = 0
-    client = DriveClient()
+    try:
+        client = DriveClient()
+    except Exception:
+        # An expired or revoked Google sign-in must never break the page that
+        # asked; the files simply stay where they are until Drive works again.
+        logger.exception("Couldn't connect to Google Drive to move waiting files")
+        return 0
     for att in atts:
         try:
             with att.file.open("rb") as f:

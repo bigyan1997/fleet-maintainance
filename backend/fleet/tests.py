@@ -443,6 +443,22 @@ class TollSheetTabTests(TestCase):
         self.assertEqual(sheets_sync.MODEL_TABS["TollStatement"], ["Tolls"])
 
 
+class DriveDownTests(TestCase):
+    def test_a_revoked_drive_sign_in_does_not_break_the_tolls_page(self):
+        from . import drive as drive_module
+        from .models import TollStatement
+
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        TollStatement.objects.create(
+            invoice_number="D1", period_start=date(2026, 8, 29), period_end=date(2026, 9, 28), total=1,
+            file=SimpleUploadedFile("t.pdf", b"%PDF-1.4", content_type="application/pdf"),
+        )
+        with mock.patch.object(drive_module, "enabled", return_value=True), mock.patch.object(drive_module, "DriveClient", side_effect=RuntimeError("invalid_grant")):
+            self.assertEqual(drive_module.move_local_files(force=True), 0)
+            self.assertEqual(api.get("/api/tolls/").status_code, 200)
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

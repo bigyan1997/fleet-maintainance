@@ -675,6 +675,7 @@ const VIEWS = [
 
 export function TollsView() {
   const [view, setView] = useState('vans')
+  const [more, setMore] = useState(false) // the extra views (double charges, days, ...) stay tucked away until asked for
   const [chosen, setChosen] = useState('')
   const [importing, setImporting] = useState(false)
   const [open, setOpen] = useState(null) // { id, filter } of the van being looked at
@@ -772,7 +773,14 @@ export function TollsView() {
 
       <Todo items={data.todo} onShow={showTrips} onTick={(key, done) => tick.mutate({ key, done })} />
 
-      <div className="mb-3 flex flex-wrap gap-1">
+      {!more && view === 'vans' ? (
+        <button onClick={() => setMore(true)} className="mb-3 rounded-md bg-white px-3 py-1.5 text-[13px] font-medium text-primary ring-1 ring-line hover:bg-[#f5f8fc]">
+          More detail ▾
+          <span className="ml-2 font-normal text-off">double charges, late &amp; weekend trips, usual runs, days, compare months</span>
+          {(data.doubles.length > 0 || oddCount > 0) && <span className="ml-2 rounded-full bg-due-bg px-1.5 text-[11px] text-due">{data.doubles.length + oddCount}</span>}
+        </button>
+      ) : (
+      <div className="mb-3 flex flex-wrap items-center gap-1">
         {VIEWS.map((v) => {
           const count = v.key === 'doubles' ? data.doubles.length : v.key === 'odd' ? oddCount : 0
           return (
@@ -785,7 +793,9 @@ export function TollsView() {
             </button>
           )
         })}
+        {view === 'vans' && <button onClick={() => setMore(false)} className="ml-1 px-2 py-1.5 text-[13px] text-off hover:text-ink">Hide ▴</button>}
       </div>
+      )}
 
       {view === 'doubles' && <Doubles rows={data.doubles} onShow={showTrips} />}
       {view === 'odd' && <OddTimes vans={data.vans} />}

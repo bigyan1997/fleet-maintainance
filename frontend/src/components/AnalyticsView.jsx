@@ -62,14 +62,6 @@ export function AnalyticsView({ section = 'spending' }) {
         <button onClick={clearFilters} className="h-[34px] rounded-md border border-line bg-white px-3 text-xs font-medium hover:bg-[#f5f5f5]">Clear</button>
       </div>
 
-      {section === 'spending' && (<>
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label={`Maintenance only — ${rangeLabel}`} value={money(data.totalSpend)} sub="services, repairs and incidents (no fuel or tolls: see the table below for the full cost)" />
-        <Metric label="This month's maintenance" value={money(data.monthSpend)} />
-        <Metric label="Average service cost" value={money(data.avgService)} />
-        <Metric label="Open incident cost" value={money(data.openIncidentCost)} color="text-due" />
-      </div>
-      </>)}
       {section === 'fuel' && (
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Metric
@@ -86,7 +78,19 @@ export function AnalyticsView({ section = 'spending' }) {
       )}
 
       {section === 'spending' && (<>
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric label={`All money spent — ${rangeLabel}`} value={cents((data.runningCost ?? []).reduce((t, r) => t + r.total, 0))} sub="maintenance + fuel card + tolls, every van" />
+        <Metric label="Maintenance" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.maintenance, 0))} sub="services, repairs and incidents" />
+        <Metric label="Fuel card" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.fuel, 0))} sub="fuel + card fees, as on the statements" />
+        <Metric label="Tolls" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.tolls, 0))} sub="trips + fees, from the toll statements" />
+      </div>
       <RunningCost rows={data.runningCost ?? []} rangeLabel={rangeLabel} />
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric label={`Maintenance only — ${rangeLabel}`} value={money(data.totalSpend)} sub="services, repairs and incidents (no fuel or tolls: see the table below for the full cost)" />
+        <Metric label="This month's maintenance" value={money(data.monthSpend)} />
+        <Metric label="Average service cost" value={money(data.avgService)} />
+        <Metric label="Open incident cost" value={money(data.openIncidentCost)} color="text-due" />
+      </div>
 
       <div className="mb-4 rounded-lg border border-line bg-white p-4">
         <h2 className="mb-3 text-[15px] font-semibold text-ink">Monthly maintenance spend — {rangeLabel}</h2>
