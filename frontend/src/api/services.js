@@ -5,6 +5,11 @@ export async function fetchServices(filters = {}) {
   return res.data
 }
 
+export async function fetchService(id) {
+  const res = await api.get(`/services/${id}/`)
+  return res.data
+}
+
 export async function createService(data) {
   const res = await api.post('/services/', data)
   return res.data

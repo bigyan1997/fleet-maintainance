@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { todayIso } from '../lib/formatDate'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createMechanic, fetchMechanics, uploadAttachment } from '../api/extra'
 import { fetchVehicles } from '../api/vehicles'
-import { createService, updateService } from '../api/services'
+import { createService, fetchService, updateService } from '../api/services'
+import { fetchAttachments } from '../api/extra'
 import { Documents } from './Documents'
 import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
@@ -29,7 +30,17 @@ function fromService(s) {
   }
 }
 
-export function ServiceForm({ service, onDone, onSaved, onError }) {
+// Opening an existing job always loads the whole record first, so the form is
+// complete (issues, notes, cost, photos) whichever page it was opened from.
+// Some pages only know a few fields of the job.
+export function ServiceForm(props) {
+  const id = props.service?.id
+  const full = useQuery({ queryKey: ['service', id], queryFn: () => fetchService(id), enabled: Boolean(id), staleTime: 0, gcTime: 0 })
+  if (id && full.isLoading) return <div className="p-6 text-sm text-off">Loading the job…</div>
+  return <ServiceFormInner {...props} service={id && full.data ? { ...props.service, ...full.data } : props.service} />
+}
+
+function ServiceFormInner({ service, onDone, onSaved, onError }) {
   const isEdit = Boolean(service && service.id)
   const [form, setForm] = useState(() => (isEdit ? fromService(service) : { ...blankForm(), ...(service ?? {}) }))
   const queryClient = useQueryClient()
@@ -44,6 +55,11 @@ export function ServiceForm({ service, onDone, onSaved, onError }) {
   const [showMore, setShowMore] = useState(() => Boolean(service?.issues || service?.notes))
   // Issue photos picked on a new record, uploaded once it's saved.
   const [pendingPhotos, setPendingPhotos] = useState([])
+  // A job that already has photos opens them too, even if the issues box is empty.
+  const savedPhotos = useQuery({ queryKey: ['service-photos', service?.id], queryFn: () => fetchAttachments({ service: service.id }), enabled: isEdit })
+  useEffect(() => {
+    if ((savedPhotos.data ?? []).some((p) => p.kind === ISSUE_PHOTO)) setShowMore(true)
+  }, [savedPhotos.data])
 
   // "Next due" for a scheduled service = odometer + the van's service
   // interval (usually 10,000 km). It follows the odometer as you type, also

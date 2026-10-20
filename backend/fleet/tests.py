@@ -459,6 +459,17 @@ class DriveDownTests(TestCase):
             self.assertEqual(api.get("/api/tolls/").status_code, 200)
 
 
+class ServiceRetrieveTests(TestCase):
+    def test_one_job_can_be_fetched_whole_for_the_edit_form(self):
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+        job = ServiceRecord.objects.create(vehicle=van, service_type="Brake service", date=date(2026, 10, 21), status="In service", issues="squealing", notes="pads", cost=120)
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        data = api.get(f"/api/services/{job.pk}/").data
+        self.assertEqual((data["issues"], data["notes"], data["vehicle"]), ("squealing", "pads", van.pk))
+        self.assertEqual(api.get("/api/services/99999/").status_code, 404)
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

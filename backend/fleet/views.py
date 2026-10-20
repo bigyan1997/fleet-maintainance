@@ -108,6 +108,13 @@ class ServiceRecordViewSet(viewsets.ViewSet):
         )
         return _paginated(request, rows, ServiceRecordSerializer)
 
+    def retrieve(self, request, pk=None):
+        """One whole job (issues, notes, cost...), for the edit form."""
+        record = ServiceRecord.objects.select_related("vehicle", "mechanic").filter(pk=pk).first()
+        if not record:
+            return Response({"detail": "Service record not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(ServiceRecordSerializer(record).data)
+
     def create(self, request):
         serializer = ServiceRecordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
