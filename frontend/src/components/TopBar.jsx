@@ -4,10 +4,10 @@ const linkClass =
 export function TopBar({ username, links, onLogout }) {
   return (
     <div className="bg-primary text-white">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2.5 lg:px-8">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-          <h1 className="m-0 text-[18px] font-bold tracking-wide whitespace-nowrap">Fleet Maintenance</h1>
-          <div className="text-[11px] tracking-widest whitespace-nowrap text-[#cfe0f2] uppercase">Achieve Cafe Provisions</div>
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3 px-4 py-2 lg:px-8">
+        <div className="min-w-0">
+          <h1 className="m-0 text-[18px] leading-tight font-bold tracking-wide whitespace-nowrap">Fleet Maintenance</h1>
+          <div className="text-[10.5px] leading-tight tracking-widest whitespace-nowrap text-[#cfe0f2] uppercase">Achieve Cafe Provisions</div>
         </div>
         <div className="flex shrink-0 items-center justify-end gap-2">
           {links?.sheet && (
