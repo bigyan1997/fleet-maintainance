@@ -70,8 +70,8 @@ function VanStrip({ vans }) {
                 <span className="text-[14px] font-semibold text-ink">{v.label}</span>
                 <StatusBadge status={v.statusBadge} />
               </div>
-              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && kmColour(svc.km_left)) || 'text-off')}>
-                {v.off_road ? 'not being driven' : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
+              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && kmColour(svc.km_left)) || (svc?.booked ? 'text-primary' : 'text-off'))}>
+                {v.off_road ? 'not being driven' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
               </div>
             </a>
           )

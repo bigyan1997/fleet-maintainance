@@ -8,7 +8,7 @@ from fleet import backup
 class Command(BaseCommand):
     help = (
         "Save a copy of the whole database to backend/logs/backups/ and to Google Drive "
-        f"(Backups folder), keeping the last {backup.KEEP_DAYS} days. Run every evening by the "
+        f"(Backups folder), keeping the last {backup.KEEP_DAILY} days and one a week for {backup.KEEP_WEEKS} more weeks. Run every evening by the "
         "scheduled task 'Fleet Maintenance Backup'. Log: backend/logs/backup.log"
     )
 

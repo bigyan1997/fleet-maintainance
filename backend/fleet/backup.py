@@ -3,18 +3,20 @@
 `manage.py backup_database` (run each evening by the scheduled task
 "Fleet Maintenance Backup", through backup.vbs) writes one pg_dump file per
 day to backend/logs/backups/ and puts a copy in Google Drive under
-"<root>/Backups". Copies older than KEEP_DAYS are removed from both places,
-but only after today's copy has been made and checked, so a run of failures
-can never empty the folder. Photos and PDFs are not in the file: they already
+"<root>/Backups". Only the last KEEP_DAILY days are kept one by one, plus the
+newest copy of each of the KEEP_WEEKS weeks before that; the rest are removed
+from both places, but only after today's copy has been made and checked, so a
+run of failures can never empty the folder. Photos and PDFs are not in the file: they already
 live in Drive.
 
 To get the data back:  pg_restore --clean --if-exists -d <database> <file>
 """
 import glob
 import os
+import re
 import shutil
 import subprocess
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -22,7 +24,8 @@ from django.utils import timezone
 
 from . import drive
 
-KEEP_DAYS = 30
+KEEP_DAILY = 7  # every one of the last 7 days
+KEEP_WEEKS = 4  # then the newest of each week, for 4 more weeks
 DRIVE_FOLDER = "Backups"
 PREFIX = "BACKUP-"
 
@@ -36,8 +39,39 @@ def local_folder():
 
 
 def backup_name(day=None):
-    """BACKUP-14102026.dump, the same day-month-year style as the other Drive files."""
-    return f"{PREFIX}{day or timezone.localdate():%d%m%Y}.dump"
+    """BACKUP-2026-10-14.dump: year first, so the files sort with the newest last."""
+    return f"{PREFIX}{day or timezone.localdate():%Y-%m-%d}.dump"
+
+
+def date_from_name(name):
+    """The day a backup was made, from either naming style (BACKUP-2026-10-14 or
+    the older BACKUP-14102026); None if the name has no date."""
+    m = re.match(rf"{PREFIX}(\d{{4}})-(\d{{2}})-(\d{{2}})", name)
+    if m:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    m = re.match(rf"{PREFIX}(\d{{2}})(\d{{2}})(\d{{4}})", name)
+    if m:
+        try:
+            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return None
+    return None
+
+
+def to_remove(items, today):
+    """Which backups to delete. `items` is [(key, day)]. Kept: the last
+    KEEP_DAILY days, and the newest copy of each of the KEEP_WEEKS weeks
+    before them. Anything older than that goes."""
+    newest_in_week = {}
+    for key, day in items:
+        age = (today - day).days
+        if KEEP_DAILY <= age < KEEP_DAILY + KEEP_WEEKS * 7:
+            week = day.isocalendar()[:2]
+            if week not in newest_in_week or day > newest_in_week[week][1]:
+                newest_in_week[week] = (key, day)
+    newest_first = sorted(newest_in_week.values(), key=lambda kd: kd[1], reverse=True)
+    weekly_keepers = {key for key, _ in newest_first[:KEEP_WEEKS]}
+    return [key for key, day in items if (today - day).days >= KEEP_DAILY and key not in weekly_keepers]
 
 
 def find_tool(name):
@@ -77,29 +111,35 @@ def dump_database(dest):
     return tables
 
 
-def prune_local(folder, cutoff):
-    removed = 0
+def prune_local(folder, today):
+    items = []
     for path in folder.glob(f"{PREFIX}*.dump"):
-        if path.stat().st_mtime < cutoff.timestamp():
-            path.unlink()
-            removed += 1
-    return removed
+        day = date_from_name(path.name) or datetime.fromtimestamp(path.stat().st_mtime).date()
+        items.append((path, day))
+    gone = to_remove(items, today)
+    for path in gone:
+        path.unlink()
+    return len(gone)
 
 
-def send_to_drive(path, cutoff):
+def send_to_drive(path, today):
     """Upload today's file (replacing an earlier one from the same day) and
-    bin the copies older than the cutoff. Returns how many were binned."""
+    bin the copies the keep rule no longer wants. Returns how many were binned."""
     client = drive.DriveClient()
     folder_id = drive.ensure_path(client, DRIVE_FOLDER)
     existing = [f for f in client.list_files(folder_id) if f["name"].startswith(PREFIX)]
     client.upload(folder_id, path.name, path.read_bytes(), "application/octet-stream")
     removed = 0
+    older = []
     for f in existing:
         if f["name"] == path.name:
             client.trash(f["id"])
-        elif drive.parse_time(f.get("createdTime")) < cutoff:
-            client.trash(f["id"])
-            removed += 1
+        else:
+            day = date_from_name(f["name"]) or drive.parse_time(f.get("createdTime")).astimezone(timezone.get_current_timezone()).date()
+            older.append((f["id"], day))
+    for key in to_remove(older, today):
+        client.trash(key)
+        removed += 1
     return removed
 
 
@@ -109,13 +149,13 @@ def run():
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / backup_name()
     tables = dump_database(dest)
-    cutoff = timezone.now() - timedelta(days=KEEP_DAYS)
-    prune_local(folder, cutoff)
+    today = timezone.localdate()
+    prune_local(folder, today)
     summary = f"{dest.name}: {tables} tables, {dest.stat().st_size / 1024:,.0f} KB"
     if not drive.enabled():
         return summary + ". Saved on this computer only: Google Drive isn't connected."
     try:
-        removed = send_to_drive(dest, cutoff)
+        removed = send_to_drive(dest, today)
     except Exception as exc:  # the local copy is still good; say so rather than fail
         raise BackupError(f"{summary}. Saved on this computer, but the copy to Google Drive failed: {exc}")
     return summary + f". Copied to Google Drive ({DRIVE_FOLDER})" + (f", {removed} old copy(ies) removed." if removed else ".")

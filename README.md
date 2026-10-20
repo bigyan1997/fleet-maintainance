@@ -13,7 +13,7 @@ Vehicle fleet tracker for Achieve Cafe Provisions — vans, services, incidents,
 - **Statement imports** — the monthly fuel card statement (`fleet/fuel_import.py`, MPDATA TXT file) and the monthly E-Toll statement (`fleet/toll_import.py`, PDF read with `pypdf`).
 - **Photos** — issue and damage photos are kept in Google Drive (`Fleet Maintenance Photos/Services|Incidents/<van>/`), through the shared Google account's OAuth token (`backend/fleet/drive.py`; one-time sign-in with `drive_sign_in.bat`). Toll statement PDFs, fuel statement files and the documents attached to vans, services and incidents go to Google Drive too (`Tolls/`, `Fuel/`, `Documents/<van>/`). Without a Drive token (or if Drive fails) files are kept on the server's disk (`backend/media/`) and move to Drive by themselves once it is connected.
 
-- **Backups** — `manage.py backup_database` (`fleet/backup.py`) writes a `pg_dump` file to `backend/logs/backups/` and copies it to Drive (`Backups/`), keeping 30 days. On the server a scheduled task runs it daily at 8 pm through `backup.vbs`. Restore with `pg_restore --clean --if-exists -d fleet_management <file>`.
+- **Backups** — `manage.py backup_database` (`fleet/backup.py`) writes a `pg_dump` file to `backend/logs/backups/` and copies it to Drive (`Backups/`), keeping the last 7 days plus one a week for 4 weeks. On the server a scheduled task runs it daily at 8 pm through `backup.vbs`. Restore with `pg_restore --clean --if-exists -d fleet_management <file>`.
 
 ## One-time setup
 

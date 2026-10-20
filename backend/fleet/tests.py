@@ -470,6 +470,22 @@ class ServiceRetrieveTests(TestCase):
         self.assertEqual(api.get("/api/services/99999/").status_code, 404)
 
 
+class BookedServiceBadgeTests(TestCase):
+    def test_a_van_already_at_the_mechanic_is_not_due_soon(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE", odometer=118000, rego_expiry=today + timedelta(days=400))
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today - timedelta(days=200), status="Invoiced", odometer=108000)
+        self.assertEqual(services.vehicle_status_badge(van), "due_soon")  # 2,000 km to go
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today, status="In service")
+        self.assertEqual(services.vehicle_status_badge(van), "ok")  # being serviced now
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
@@ -807,8 +823,8 @@ class WeekendFillUpTests(TestCase):
 
 
 class DatabaseBackupTests(TestCase):
-    """The nightly backup keeps 30 days in Drive and never clears old copies
-    unless today's copy was made."""
+    """The nightly backup keeps the last 7 days plus one a week for 4 weeks, and
+    never clears old copies unless today's copy was made."""
 
     def run_backup(self, fake, dump):
         from . import backup
@@ -833,7 +849,23 @@ class DatabaseBackupTests(TestCase):
         fake.trash = fake.trashed.append
         return fake
 
-    def test_todays_copy_goes_to_drive_and_only_copies_past_30_days_are_binned(self):
+    def test_the_keep_rule_is_seven_daily_then_one_a_week(self):
+        from datetime import date, timedelta
+
+        from . import backup
+
+        today = date(2026, 10, 14)
+        items = [(i, today - timedelta(days=i)) for i in range(1, 45)]  # one backup for each of the last 44 days
+        kept = sorted(set(k for k, _ in items) - set(backup.to_remove(items, today)))
+        self.assertEqual(kept[:6], [1, 2, 3, 4, 5, 6])  # with today's, that is the last 7 days
+        weekly = kept[6:]
+        self.assertEqual(len(weekly), 4)  # one for each of the 4 weeks before
+        self.assertTrue(all(7 <= k < 35 for k in weekly))
+        self.assertEqual(backup.date_from_name("BACKUP-14102026.dump"), date(2026, 10, 14))  # older name style still read
+        self.assertEqual(backup.date_from_name("BACKUP-2026-10-14.dump"), date(2026, 10, 14))
+        self.assertEqual(backup.backup_name(date(2026, 10, 4)), "BACKUP-2026-10-04.dump")
+
+    def test_todays_copy_goes_to_drive_and_only_copies_past_the_keep_rule_are_binned(self):
         fake = self.drive_with_old_copies()
 
         def dump(dest):

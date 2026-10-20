@@ -149,7 +149,10 @@ def vehicle_status_badge(vehicle):
     def is_soon(d):
         return d is not None and not is_over(d) and (d - today).days < EXPIRY_DUE_SOON_DAYS
 
-    km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due and not vehicle.off_road]
+    # A service or tyre change that is already booked or at the mechanic is being
+    # dealt with, so it doesn't make the van "due soon" (the countdown only resets
+    # once the job is finished with its km).
+    km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due and not due["booked"] and not vehicle.off_road]
     if is_over(vehicle.rego_expiry) or any(k < 0 for k in km_left):
         return "attention"
     if is_soon(vehicle.rego_expiry) or any(k < DUE_SOON_KM_THRESHOLD for k in km_left):
