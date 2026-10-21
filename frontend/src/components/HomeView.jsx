@@ -47,6 +47,7 @@ const VAN_EDGE = {
 // (blue / purple) in place of the green "OK", unless something else needs attention.
 const JOB_LOOK = {
   booked: { label: 'Booked', edge: 'border-l-[#2f7fd0]', pill: 'bg-[#dbeafe] text-[#1e4fa3]', text: 'text-[#1e4fa3]' },
+  kmmissing: { label: 'Km missing', edge: 'border-l-[#d9a400]', pill: 'bg-warn-bg text-warn', text: 'text-warn' },
   mechanic: { label: 'At mechanic', edge: 'border-l-[#7c3aed]', pill: 'bg-[#ede9fe] text-[#5b21b6]', text: 'text-[#5b21b6]' },
 }
 const vanNo = (v) => Number((v.label.match(/\d+/) ?? [9999])[0])
@@ -66,7 +67,9 @@ function VanStrip({ vans }) {
         {[...vans].sort((a, b) => vanNo(a) - vanNo(b)).map((v) => {
           const svc = v.nextServiceDue
           const n = svc ? Math.abs(svc.km_left).toLocaleString() : ''
-          const job = !v.off_road && v.statusBadge === 'ok' && svc?.booked ? JOB_LOOK[svc.booked.status === 'Booked' ? 'booked' : 'mechanic'] : null
+          const job = !v.off_road && v.statusBadge === 'ok'
+            ? svc?.booked ? JOB_LOOK[svc.booked.status === 'Booked' ? 'booked' : 'mechanic'] : svc?.km_missing ? JOB_LOOK.kmmissing : null
+            : null
           return (
             <a
               key={v.id}
@@ -78,7 +81,7 @@ function VanStrip({ vans }) {
                 {job ? <span className={'rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ' + job.pill}>{job.label}</span> : <StatusBadge status={v.statusBadge} />}
               </div>
               <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && kmColour(svc.km_left)) || (job ? job.text : svc?.booked ? 'text-primary' : 'text-off'))}>
-                {v.off_road ? 'not being driven' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
+                {v.off_road ? 'not being driven' : svc?.km_missing && !svc.booked ? 'service done, km not entered' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
               </div>
             </a>
           )
@@ -222,6 +225,20 @@ export function HomeView() {
           }]
         : []
     })()),
+    // A scheduled service finished without its km: the next service can't be worked out until it is typed in.
+    ...(vehicles.data ?? [])
+      .filter((v) => !v.off_road && v.nextServiceDue?.km_missing && !v.nextServiceDue.booked)
+      .map((v) => ({
+        key: `kmmiss-${v.id}`,
+        van: v.label, vanId: v.id,
+        text: `Scheduled service done ${fmtDayDate(v.nextServiceDue.km_missing.date)}, but no km was entered, so the next service can't be worked out`,
+        pill: ['amber', 'Km missing'],
+        action: (
+          <button onClick={() => openForm('service', { id: v.nextServiceDue.km_missing.id })} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-dark">
+            Enter km
+          </button>
+        ),
+      })),
     ...((() => {
       const old = (vehicles.data ?? []).filter(kmIsOld)
       if (!old.length) return []

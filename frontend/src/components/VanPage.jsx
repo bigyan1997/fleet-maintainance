@@ -195,8 +195,8 @@ export function VanPage({ id }) {
         <Fact label="Odometer">{v.odometer ? km(v.odometer) : '—'}</Fact>
         <Fact
           label="Next service"
-          tone={svc && svc.km_left < 0 ? 'due' : svc && svc.km_left < 2000 ? 'warn' : undefined}
-          sub={svc ? (svc.km_left < 0 ? serviceText(svc) : `${svc.km_left.toLocaleString()} km to go`) + (svc.booked ? ` · booked ${fmtDate(svc.booked.date)}` : '') : 'no service logged yet'}
+          tone={svc?.km_missing ? 'warn' : svc && svc.km_left < 0 ? 'due' : svc && svc.km_left < 2000 ? 'warn' : undefined}
+          sub={svc?.km_missing ? 'latest service done but its km was not entered, so this may be out of date' : svc ? (svc.km_left < 0 ? serviceText(svc) : `${svc.km_left.toLocaleString()} km to go`) + (svc.booked ? ` · booked ${fmtDate(svc.booked.date)}` : '') : 'no service logged yet'}
         >
           {svc ? km(svc.due_at) : '—'}
         </Fact>

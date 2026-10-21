@@ -31,6 +31,8 @@ Read this first; the dated entries below are the history of how it got here.
 
 ## History
 
+**Service done without its km** (2026-10-22, "why does it say due soon again, I haven't entered the latest km"): the next-service countdown only moves when a finished Scheduled service has a km. `next_service_due` now also returns `km_missing` (a finished Scheduled service since the last one with km, saved without km). Then the van is not "due soon" (status badge, alerts), Home's Your vans tile says "service done, km not entered" with a yellow "Km missing" pill, Needs doing gets a "Scheduled service done ..., but no km was entered" line with an **Enter km** button (opens the job), and the van page's Next service box says it may be out of date. Typing the km clears it. `ServiceDoneWithoutKmTests`; 47 tests pass.
+
 **Colours for booked and at-the-mechanic vans** (2026-10-21): on Home's Your vans strip a van whose service is booked gets a blue edge, a blue "Booked" pill and blue text; one at the mechanic gets purple ("At mechanic"). Shown only when nothing else needs attention for that van; otherwise the Due soon / Attention pill still wins. Frontend only (`JOB_LOOK` in HomeView.jsx).
 
 **A van being serviced is no longer "Due soon"** (2026-10-21, "van 2 is in service, why does it still show due soon"): `vehicle_status_badge` ignores a service or tyre change that already has an open (booked / at the mechanic) job, and Home's Your vans tile says "service at the mechanic" (or "booked dd-mm") instead of the km countdown. The countdown itself still only resets when the job is finished with its km. `BookedServiceBadgeTests`; 46 tests pass.

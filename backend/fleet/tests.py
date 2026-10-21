@@ -486,6 +486,30 @@ class BookedServiceBadgeTests(TestCase):
         self.assertEqual(services.vehicle_status_badge(van), "ok")  # being serviced now
 
 
+class ServiceDoneWithoutKmTests(TestCase):
+    def test_a_finished_service_without_km_says_so_instead_of_due_soon(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE", odometer=118000, rego_expiry=today + timedelta(days=400))
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today - timedelta(days=200), status="Invoiced", odometer=108000)
+        self.assertIsNone(services.next_service_due(van)["km_missing"])
+        self.assertEqual(services.vehicle_status_badge(van), "due_soon")  # 2,000 km to go
+        job = ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today, status="Completed, awaiting invoice")
+        due = services.next_service_due(van)
+        self.assertEqual(due["km_missing"]["id"], job.pk)
+        self.assertEqual(services.vehicle_status_badge(van), "ok")  # not "due soon" again
+        self.assertEqual([a["title"] for a in services.alerts()], [])
+        job.odometer = 118200  # once the km is typed in, the countdown moves on
+        job.save()
+        due = services.next_service_due(van)
+        self.assertEqual((due["km_missing"], due["due_at"]), (None, 128200))
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
@@ -554,7 +578,7 @@ class FuelStatementOdometerTests(TestCase):
         # Van A: last service at 175,000 + 10,000 = due at 185,000, so 1,639 km to go. With the guessed km it looked 3,000 km overdue.
         self.assertEqual((before, services.next_service_due(self.a)["km_left"]), (-3000, 1639))
         # Van B: its own last service km (61,218) is what the reminder counts from.
-        self.assertEqual(services.next_service_due(self.b), {"due_at": 71218, "km_left": 10000, "booked": None})
+        self.assertEqual(services.next_service_due(self.b), {"due_at": 71218, "km_left": 10000, "booked": None, "km_missing": None})
 
     def test_anything_odd_about_the_km_is_flagged(self):
         flags = {c["label"].split()[0]: [(f[0], f[1]) for f in c["odometer"]["flags"]] for c in self.upload().data["cards"]}
