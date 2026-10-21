@@ -8,7 +8,7 @@ import { DetailModal } from './DetailModal'
 import { IssuePhotoStrip } from './IssuePhotos'
 import { StatusSelect } from './StatusSelect'
 import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
-import { fmtDate, fmtDayDate } from '../lib/formatDate'
+import { fmtDayDate } from '../lib/formatDate'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',

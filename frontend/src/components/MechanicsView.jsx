@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { createMechanic, deleteMechanic, fetchMechanics, updateMechanic } from '../api/extra'
 import { useActions } from '../lib/actions'
-import { fmtAgo, fmtDate, fmtDayDate } from '../lib/formatDate'
+import { fmtAgo, fmtDayDate } from '../lib/formatDate'
 import { href } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
 

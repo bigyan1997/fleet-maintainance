@@ -80,7 +80,7 @@ def report_page(request, token):
             activity.log(None, "Added", "Wash", activity.describe_service(record), vehicle, who_label=who)
         return _page(vehicle, '<div class="ok">Thanks! The wash is logged for today.</div>')
 
-    description = (request.POST.get("description") or "").strip()
+    description = (request.POST.get("description") or "").strip()[:2000]
     if not description or not name:
         return _page(vehicle, _forms(request, vehicle, name, "Please describe the problem and give your name."))
     kind = request.POST.get("type") if request.POST.get("type") in PROBLEM_TYPES else "Other"

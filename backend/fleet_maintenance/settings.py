@@ -10,7 +10,7 @@ FRONTEND_DIST = BASE_DIR.parent / 'frontend' / 'dist'
 
 SECRET_KEY = config('DJANGO_SECRET_KEY', default='dev-only-secret-key-change-me')
 
-DEBUG = config('DJANGO_DEBUG', default=True, cast=bool)
+DEBUG = config('DJANGO_DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 # Extra names this PC answers to, e.g. its Tailscale address for remote access.

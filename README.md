@@ -95,7 +95,7 @@ What each screen does is described in [USAGE.md](USAGE.md). In short:
 - **Washes**: a two-weekly wash list.
 - **Fuel**: monthly fuel card statement import, matching the statement to the cent, with checks worth asking about.
 - **Tolls**: monthly E-Toll PDF import with double charges, weekend and late trips, and big toll days flagged.
-- **Reports**: spending, fuel, tolls, budgets, and an Excel/CSV download. Charts are hand-rolled inline SVG, no charting library.
+- **Reports**: money (everything added up per van), fuel, tolls, budgets, and an Excel/CSV download. Charts are hand-rolled inline SVG, no charting library.
 - **Google Sheet mirror**: a read-only copy of the data, rewritten after every change.
 - **Shared login**: email + password via Django sessions, one login for the office, on purpose.
 
