@@ -31,6 +31,8 @@ Read this first; the dated entries below are the history of how it got here.
 
 ## History
 
+**Colours for booked and at-the-mechanic vans** (2026-10-21): on Home's Your vans strip a van whose service is booked gets a blue edge, a blue "Booked" pill and blue text; one at the mechanic gets purple ("At mechanic"). Shown only when nothing else needs attention for that van; otherwise the Due soon / Attention pill still wins. Frontend only (`JOB_LOOK` in HomeView.jsx).
+
 **A van being serviced is no longer "Due soon"** (2026-10-21, "van 2 is in service, why does it still show due soon"): `vehicle_status_badge` ignores a service or tyre change that already has an open (booked / at the mechanic) job, and Home's Your vans tile says "service at the mechanic" (or "booked dd-mm") instead of the km countdown. The countdown itself still only resets when the job is finished with its km. `BookedServiceBadgeTests`; 46 tests pass.
 
 **Fewer backups, year-first names** (2026-10-21, "why are there so many backups"): the nightly backup used to keep 30 daily files in Drive `Backups/` and on the orders PC. `backup.to_remove` now keeps every one of the last 7 days plus the newest of each of the 4 weeks before (about 11 files); files are named `BACKUP-2026-10-14.dump` so Drive sorts them in date order, and the older `BACKUP-14102026` names are still understood and aged out by the same rule. Nothing is removed unless today's copy was made and checked. 45 tests pass.

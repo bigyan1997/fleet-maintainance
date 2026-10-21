@@ -43,6 +43,12 @@ const VAN_EDGE = {
   attention: 'border-l-[#d23b3b]',
   off_road: 'border-l-[#b6bec8]',
 }
+// A van with a service already booked or at the mechanic gets its own colour
+// (blue / purple) in place of the green "OK", unless something else needs attention.
+const JOB_LOOK = {
+  booked: { label: 'Booked', edge: 'border-l-[#2f7fd0]', pill: 'bg-[#dbeafe] text-[#1e4fa3]', text: 'text-[#1e4fa3]' },
+  mechanic: { label: 'At mechanic', edge: 'border-l-[#7c3aed]', pill: 'bg-[#ede9fe] text-[#5b21b6]', text: 'text-[#5b21b6]' },
+}
 const vanNo = (v) => Number((v.label.match(/\d+/) ?? [9999])[0])
 
 // Every van at a glance: its status and how far it is from the next service.
@@ -60,17 +66,18 @@ function VanStrip({ vans }) {
         {[...vans].sort((a, b) => vanNo(a) - vanNo(b)).map((v) => {
           const svc = v.nextServiceDue
           const n = svc ? Math.abs(svc.km_left).toLocaleString() : ''
+          const job = !v.off_road && v.statusBadge === 'ok' && svc?.booked ? JOB_LOOK[svc.booked.status === 'Booked' ? 'booked' : 'mechanic'] : null
           return (
             <a
               key={v.id}
               href={href('vans', v.id)}
-              className={'rounded-lg border border-l-4 border-line bg-white px-3 py-2 no-underline shadow-[0_1px_2px_rgba(16,24,40,.04)] hover:bg-[#f7fafd] ' + (VAN_EDGE[v.statusBadge] ?? VAN_EDGE.ok)}
+              className={'rounded-lg border border-l-4 border-line bg-white px-3 py-2 no-underline shadow-[0_1px_2px_rgba(16,24,40,.04)] hover:bg-[#f7fafd] ' + (job ? job.edge : VAN_EDGE[v.statusBadge] ?? VAN_EDGE.ok)}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[14px] font-semibold text-ink">{v.label}</span>
-                <StatusBadge status={v.statusBadge} />
+                {job ? <span className={'rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ' + job.pill}>{job.label}</span> : <StatusBadge status={v.statusBadge} />}
               </div>
-              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && kmColour(svc.km_left)) || (svc?.booked ? 'text-primary' : 'text-off'))}>
+              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && kmColour(svc.km_left)) || (job ? job.text : svc?.booked ? 'text-primary' : 'text-off'))}>
                 {v.off_road ? 'not being driven' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
               </div>
             </a>
