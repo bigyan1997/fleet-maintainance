@@ -16,8 +16,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import activity, drive, licence_pdf, services, toll_import
-from .models import StockItem, StockMove, ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
-from .serializers import StockItemSerializer, StockMoveSerializer, ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
+from .models import Fine, FINE_KINDS, StockItem, StockMove, ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
+from .serializers import FineSerializer, StockItemSerializer, StockMoveSerializer, ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ class AttachmentViewSet(viewsets.ViewSet):
             if job:
                 drive.sync_job(job)
         qs = Attachment.objects.select_related("vehicle", "service", "incident", "uploaded_by")
-        for key in ("vehicle", "service", "incident"):
+        for key in ("vehicle", "service", "incident", "fine"):
             if request.query_params.get(key):
                 qs = qs.filter(**{f"{key}_id": request.query_params[key]})
         return Response(AttachmentSerializer(qs[:500], many=True).data)
@@ -262,9 +262,11 @@ class AttachmentViewSet(viewsets.ViewSet):
 
         service = ServiceRecord.objects.filter(pk=request.data.get("service") or 0).first()
         incident = Incident.objects.filter(pk=request.data.get("incident") or 0).first()
+        fine = Fine.objects.select_related("vehicle").filter(pk=request.data.get("fine") or 0).first()
         vehicle = (
             (service and service.vehicle)
             or (incident and incident.vehicle)
+            or (fine and fine.vehicle)
             or Vehicle.objects.filter(pk=request.data.get("vehicle") or 0).first()
         )
         if not vehicle:
@@ -274,14 +276,14 @@ class AttachmentViewSet(viewsets.ViewSet):
         content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
         fields = dict(
             original_name=upload.name[:255], content_type=content_type, size=upload.size, kind=kind,
-            vehicle=vehicle, service=service, incident=incident, uploaded_by=request.user,
+            vehicle=vehicle, service=service, incident=incident, fine=fine, uploaded_by=request.user,
         )
         att = None
         if drive.enabled():
             try:
                 meta, name = drive.upload_for(
                     drive.DriveClient(), vehicle=vehicle, job=service or incident, kind=kind,
-                    filename=upload.name, content=upload.read(), content_type=content_type,
+                    filename=upload.name, content=upload.read(), content_type=content_type, fine=fine,
                 )
                 att = Attachment.objects.create(
                     **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
@@ -672,3 +674,61 @@ class StockViewSet(viewsets.ViewSet):
         if not item:
             return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
         return Response(StockMoveSerializer(item.moves.all()[:50], many=True).data)
+
+
+# ── Fines ──────────────────────────────────────────────────────────────────
+
+
+def _fine_summary(fine):
+    return f"{fine.kind} fine ${fine.amount} for {fine.vehicle} ({fine.date:%d-%m-%Y})"
+
+
+class FineViewSet(viewsets.ViewSet):
+    """Fines and infringement notices, newest first."""
+
+    def list(self, request):
+        qs = Fine.objects.select_related("vehicle", "driver").prefetch_related("attachments")
+        if request.query_params.get("vehicle"):
+            qs = qs.filter(vehicle_id=request.query_params["vehicle"])
+        return Response(FineSerializer(qs, many=True).data)
+
+    def create(self, request):
+        serializer = FineSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        fine = serializer.save()
+        activity.log(request.user, "Added", "Fine", _fine_summary(fine), fine.vehicle)
+        return Response(FineSerializer(fine).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        fine = Fine.objects.filter(pk=pk).first()
+        if not fine:
+            return Response({"detail": "Fine not found."}, status=status.HTTP_404_NOT_FOUND)
+        before = fine.status
+        serializer = FineSerializer(fine, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        fine = serializer.save()
+        words = {"paid": "marked paid", "to_name": "reopened: driver still to be named", "to_pay": "driver named, still to pay"}
+        summary = f"{_fine_summary(fine)} {words[fine.status]}" if fine.status != before else _fine_summary(fine)
+        activity.log(request.user, "Changed", "Fine", summary, fine.vehicle)
+        return Response(FineSerializer(fine).data)
+
+    def destroy(self, request, pk=None):
+        fine = Fine.objects.select_related("vehicle").filter(pk=pk).first()
+        if not fine:
+            return Response({"detail": "Fine not found."}, status=status.HTTP_404_NOT_FOUND)
+        for att in fine.attachments.all():
+            if att.drive_file_id:
+                try:
+                    drive.DriveClient().trash(att.drive_file_id)
+                except Exception:
+                    logger.exception("Drive trash failed for %s", att.drive_file_id)
+                    return Response({"detail": "Couldn't remove the notice from Google Drive. Try again in a minute."}, status=status.HTTP_502_BAD_GATEWAY)
+            elif att.file:
+                att.file.delete(save=False)
+        activity.log(request.user, "Deleted", "Fine", _fine_summary(fine), fine.vehicle)
+        fine.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"], url_path="kinds")
+    def kinds(self, request):
+        return Response(FINE_KINDS)

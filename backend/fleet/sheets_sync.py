@@ -159,6 +159,25 @@ def _stock_rows():
     return header, rows
 
 
+def _fine_rows():
+    from .models import Fine
+
+    header = [
+        "ID", "Vehicle ID", "Vehicle", "Rego", "Date", "Time", "Type", "Amount ($)", "Name the driver by", "Pay by",
+        "Driver", "Driver named on", "Paid on", "Status", "Reference", "Notes",
+    ]
+    words = {"paid": "Paid", "to_name": "Name the driver", "to_pay": "To pay"}
+    rows = [
+        [
+            f.pk, f.vehicle_id, str(f.vehicle), f.vehicle.rego, _date(f.date), f.time.strftime("%H:%M") if f.time else "", f.kind,
+            _num(f.amount), _date(f.name_driver_by), _date(f.pay_by), f.driver.name if f.driver else "", _date(f.named_on),
+            _date(f.paid_on), words[f.status], f.reference, f.notes,
+        ]
+        for f in Fine.objects.select_related("vehicle", "driver").order_by("date", "pk")
+    ]
+    return header, rows
+
+
 # Tab name -> row builder. Service/incident/fuel rows show the vehicle's
 # label and rego, so a vehicle edit also refreshes those tabs (Tolls too).
 TABS = {
@@ -169,6 +188,7 @@ TABS = {
     "Tolls": _toll_rows,
     "Drivers": _driver_rows,
     "Stock": _stock_rows,
+    "Fines": _fine_rows,
 }
 MODEL_TABS = {
     "Vehicle": list(TABS),
@@ -182,6 +202,7 @@ MODEL_TABS = {
     "TollStatement": ["Tolls"],
     "Driver": ["Drivers"],
     "StockItem": ["Stock"],
+    "Fine": ["Fines"],
 }
 
 

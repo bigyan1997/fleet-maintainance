@@ -78,11 +78,12 @@ export function AnalyticsView({ section = 'spending' }) {
       )}
 
       {section === 'spending' && (<>
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label={`All money spent — ${rangeLabel}`} value={cents((data.runningCost ?? []).reduce((t, r) => t + r.total, 0))} sub="maintenance + fuel card + tolls, every van" />
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Metric label={`All money spent — ${rangeLabel}`} value={cents((data.runningCost ?? []).reduce((t, r) => t + r.total, 0))} sub="maintenance + fuel card + tolls + fines, every van" />
         <Metric label="Maintenance" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.maintenance, 0))} sub="services, repairs and incidents" />
         <Metric label="Fuel card" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.fuel, 0))} sub="fuel + card fees, as on the statements" />
         <Metric label="Tolls" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.tolls, 0))} sub="trips + fees, from the toll statements" />
+        <Metric label="Fines" value={cents((data.runningCost ?? []).reduce((t, r) => t + r.fines, 0))} sub="speeding, parking, camera and toll fines" />
       </div>
       <RunningCost rows={data.runningCost ?? []} rangeLabel={rangeLabel} />
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -166,19 +167,20 @@ function RunningCost({ rows, rangeLabel }) {
     <div className="mb-4 overflow-hidden rounded-lg border border-line bg-white">
       <div className="px-4 pt-4 pb-3">
         <h2 className="text-[15px] font-semibold text-ink">Full running cost by van — {rangeLabel}</h2>
-        <p className="mt-0.5 text-xs text-off">Services, repairs and incidents + the fuel card + tolls, from what's been entered and imported. <b>km driven</b> comes from each van's fill-up and service km readings in this period; <b>$ per km</b> = Total ÷ km driven (shown as — when there are fewer than 200 km of readings). Amber = costs 30% or more than the fleet's average per km.</p>
+        <p className="mt-0.5 text-xs text-off">Services, repairs and incidents + the fuel card + tolls + fines, from what's been entered and imported. <b>km driven</b> comes from each van's fill-up and service km readings in this period; <b>$ per km</b> = Total ÷ km driven (shown as — when there are fewer than 200 km of readings). Amber = costs 30% or more than the fleet's average per km.</p>
       </div>
       {rows.length === 0 ? (
         <div className="px-4 pb-6 text-center text-sm text-off">Nothing in this range.</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] border-collapse text-[13px]">
+          <table className="w-full min-w-[760px] border-collapse text-[13px]">
             <thead>
               <tr className="border-y border-line bg-[#fafafa] text-xs text-off">
                 <th className="px-4 py-2 text-left font-medium">Van</th>
                 <th className="px-3 py-2 text-right font-medium">Maintenance</th>
                 <th className="px-3 py-2 text-right font-medium">Fuel card</th>
                 <th className="px-3 py-2 text-right font-medium">Tolls</th>
+                <th className="px-3 py-2 text-right font-medium">Fines</th>
                 <th className="px-3 py-2 text-right font-medium">Total</th>
                 <th className="px-3 py-2 text-right font-medium">km driven</th>
                 <th className="px-3 py-2 text-right font-medium">$ per km</th>
@@ -191,6 +193,7 @@ function RunningCost({ rows, rangeLabel }) {
                   <td className={cell}>{cents(r.maintenance)}</td>
                   <td className={cell}>{cents(r.fuel)}</td>
                   <td className={cell}>{cents(r.tolls)}</td>
+                  <td className={cell}>{cents(r.fines)}</td>
                   <td className={`${cell} font-semibold`}>{cents(r.total)}</td>
                   <td className={cell}>{km(r.km)}</td>
                   <td className={cell + ' font-semibold ' + (fleetPerKm && r.perKm && r.perKm >= fleetPerKm * 1.3 ? 'rounded bg-warn-bg text-warn' : '')}>{perKm(r.perKm)}</td>
@@ -203,6 +206,7 @@ function RunningCost({ rows, rangeLabel }) {
                 <td className={cell}>{cents(sum('maintenance'))}</td>
                 <td className={cell}>{cents(sum('fuel'))}</td>
                 <td className={cell}>{cents(sum('tolls'))}</td>
+                <td className={cell}>{cents(sum('fines'))}</td>
                 <td className={cell}>{cents(sum('total'))}</td>
                 <td className={cell}>{fleetKm ? km(fleetKm) : '—'}</td>
                 <td className={cell} title="All the vans that have a per-km figure, added together">{perKm(fleetPerKm)}</td>

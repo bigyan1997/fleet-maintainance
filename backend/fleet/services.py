@@ -6,7 +6,7 @@ from django.db.models import Count, Max, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
-from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, FuelLog, Incident, ServiceRecord, TollTrip, Vehicle, fuel_only_q
+from .models import SERVICE_STATUS_CHOICES, SERVICE_STATUS_DONE, Fine, FuelLog, Incident, ServiceRecord, TollTrip, Vehicle, fuel_only_q
 
 
 class ValidationError(Exception):
@@ -210,7 +210,7 @@ def get_vehicle(pk):
 
 def delete_vehicle(pk):
     vehicle = get_vehicle(pk)
-    related = vehicle.services.count() + vehicle.incidents.count() + vehicle.fuel_logs.count()
+    related = vehicle.services.count() + vehicle.incidents.count() + vehicle.fuel_logs.count() + vehicle.fines.count()
     if related:
         raise HasRelatedRecordsError(
             f"This vehicle has {related} linked service/incident/fuel record"
@@ -703,14 +703,17 @@ def analytics(vehicle=None, date_from=None, date_to=None):
     # The running cost covers the chosen dates, or the same 12 months the charts show.
     cost_start = date_from or months[0]
     cost_end = date_to or today
+    fines_qs = Fine.objects.all()
+    if vehicle:
+        fines_qs = fines_qs.filter(vehicle_id=vehicle)
     running = {}
     for key, qs, field in (
         ("maintenance", services_qs, "cost"), ("maintenance", incidents_qs, "cost"),
-        ("fuel", fuel_qs, "cost"), ("tolls", tolls_qs, "amount"),
+        ("fuel", fuel_qs, "cost"), ("tolls", tolls_qs, "amount"), ("fines", fines_qs, "amount"),
     ):
         qs = qs.filter(date__gte=cost_start, date__lte=cost_end)
         for r in qs.values("vehicle").annotate(total=Sum(field)):
-            row = running.setdefault(r["vehicle"], {"maintenance": 0.0, "fuel": 0.0, "tolls": 0.0})
+            row = running.setdefault(r["vehicle"], {"maintenance": 0.0, "fuel": 0.0, "tolls": 0.0, "fines": 0.0})
             row[key] += float(r["total"] or 0)
     vans_in_cost = {v.pk: v for v in Vehicle.objects.filter(pk__in=running)}
     running_cost = []

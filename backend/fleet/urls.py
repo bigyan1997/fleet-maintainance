@@ -32,6 +32,7 @@ from .views_extra import (
     DriverViewSet,
     MechanicViewSet,
     StockViewSet,
+    FineViewSet,
     FuelTrendsView,
 )
 
@@ -44,6 +45,7 @@ router.register("drivers", DriverViewSet, basename="driver")
 router.register("driver-files", DriverFileViewSet, basename="driver-file")
 router.register("mechanics", MechanicViewSet, basename="mechanic")
 router.register("stock", StockViewSet, basename="stock")
+router.register("fines", FineViewSet, basename="fine")
 router.register("attachments", AttachmentViewSet, basename="attachment")
 
 urlpatterns = [

@@ -3,6 +3,7 @@ import { fetchAlerts } from '../api/alerts'
 import { fetchDashboard } from '../api/dashboard'
 import { fetchDrivers } from '../api/extra'
 import { useStock } from '../api/stock'
+import { useFines } from '../api/fines'
 import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
@@ -126,6 +127,7 @@ export function HomeView() {
   const vehicles = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
   const stock = useStock()
+  const fines = useFines()
   const sub = Object.fromEntries((vehicles.data ?? []).map((v) => [v.id, v.subtitle]))
 
 
@@ -227,6 +229,16 @@ export function HomeView() {
           }]
         : []
     })()),
+    // Fines whose next deadline (name the driver, or pay) is within a week or already past.
+    ...(fines.data ?? [])
+      .filter((f) => f.status !== 'paid' && f.deadline && f.daysLeft <= 7)
+      .map((f) => ({
+        key: `fine-${f.id}`,
+        van: f.vehicleLabel, vanId: f.vehicle,
+        text: `${f.kind} fine $${Number(f.amount).toFixed(2)}: ${f.status === 'to_name' ? 'name the driver' : 'pay'} by ${fmtDayDate(f.deadline)} (${f.daysLeft < 0 ? `overdue by ${-f.daysLeft} day${f.daysLeft === -1 ? '' : 's'}` : f.daysLeft === 0 ? 'today' : `${f.daysLeft} day${f.daysLeft === 1 ? '' : 's'} left`})`,
+        pill: [f.daysLeft < 0 ? 'red' : f.daysLeft <= 3 ? 'red' : 'amber', f.status === 'to_name' ? 'Name driver' : 'Pay fine'],
+        action: <a href={href('services', 'fines')} className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-white no-underline hover:bg-primary-dark">Open</a>,
+      })),
     // Spare parts that dropped below their order level (or ran out).
     ...(stock.data ?? [])
       .filter((i) => i.status !== 'ok')

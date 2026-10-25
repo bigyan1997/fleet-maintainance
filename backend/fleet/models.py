@@ -346,6 +346,7 @@ ATTACHMENT_KIND_CHOICES = [
     ("Insurance", "Insurance"),
     ("Photo", "Photo"),
     ("Issue photo", "Issue photo"),
+    ("Fine notice", "Fine notice"),
     ("Other", "Other"),
 ]
 
@@ -366,6 +367,7 @@ class Attachment(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="attachments")
     service = models.ForeignKey(ServiceRecord, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
     incident = models.ForeignKey(Incident, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
+    fine = models.ForeignKey("Fine", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     drive_file_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
@@ -525,3 +527,50 @@ class StockMove(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+
+FINE_KINDS = ["Speeding", "Parking", "Camera / red light", "Toll", "Other"]
+FINE_SOON_DAYS = 7  # a fine deadline closer than this shows on Home
+
+
+class Fine(models.Model):
+    """A fine or infringement notice for a van. Some must be paid, and many
+    must also name the driver by a date; both dates are watched on Home."""
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="fines")
+    date = models.DateField()  # when it happened
+    time = models.TimeField(null=True, blank=True)
+    kind = models.CharField(max_length=30, default="Other")
+    amount = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    name_driver_by = models.DateField(null=True, blank=True)  # blank when the notice doesn't ask who was driving
+    pay_by = models.DateField(null=True, blank=True)
+    driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True, related_name="fines")
+    named_on = models.DateField(null=True, blank=True)  # the day the driver was named to the authority
+    paid_on = models.DateField(null=True, blank=True)
+    reference = models.CharField(max_length=60, blank=True)
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+        indexes = [models.Index(fields=["vehicle", "date"])]
+
+    @property
+    def status(self):
+        """"paid", else "to_name" (a driver must still be named), else "to_pay"."""
+        if self.paid_on:
+            return "paid"
+        if self.name_driver_by and not self.named_on:
+            return "to_name"
+        return "to_pay"
+
+    @property
+    def deadline(self):
+        """The next date that matters, or None once paid (or no date was given)."""
+        if self.status == "to_name":
+            return self.name_driver_by
+        if self.status == "to_pay":
+            return self.pay_by
+        return None

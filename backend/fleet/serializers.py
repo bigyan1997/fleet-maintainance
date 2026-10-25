@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from . import services
 from . import drive
-from .models import StockItem, StockMove, ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
+from .models import Fine, StockItem, StockMove, ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -249,7 +249,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
         model = Attachment
         fields = [
             "id", "original_name", "content_type", "size", "kind", "vehicle", "vehicleLabel",
-            "service", "incident", "uploadedBy", "created_at", "url", "linkedTo", "thumb", "driveFolderUrl",
+            "service", "incident", "fine", "uploadedBy", "created_at", "url", "linkedTo", "thumb", "driveFolderUrl",
         ]
 
     def get_uploadedBy(self, obj):
@@ -308,3 +308,38 @@ class StockMoveSerializer(serializers.ModelSerializer):
     class Meta:
         model = StockMove
         fields = ["id", "change", "quantity_after", "note", "who_label", "created_at"]
+
+
+class FineSerializer(serializers.ModelSerializer):
+    vehicleLabel = serializers.CharField(source="vehicle.__str__", read_only=True)
+    driverName = serializers.CharField(source="driver.name", read_only=True, default="")
+    status = serializers.CharField(read_only=True)
+    deadline = serializers.DateField(read_only=True)
+    daysLeft = serializers.SerializerMethodField()
+    noticeCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Fine
+        fields = [
+            "id", "vehicle", "vehicleLabel", "date", "time", "kind", "amount", "name_driver_by", "pay_by",
+            "driver", "driverName", "named_on", "paid_on", "reference", "notes",
+            "status", "deadline", "daysLeft", "noticeCount",
+        ]
+
+    def get_daysLeft(self, obj):
+        return (obj.deadline - timezone.localdate()).days if obj.deadline else None
+
+    def get_noticeCount(self, obj):
+        return len(obj.attachments.all())
+
+    def validate_amount(self, value):
+        if value < 0:
+            raise serializers.ValidationError("The amount can't be negative.")
+        return value
+
+    def validate(self, attrs):
+        for field in ("date", "name_driver_by", "pay_by", "named_on", "paid_on"):
+            value = attrs.get(field)
+            if value and not 2000 <= value.year <= 2099:
+                raise serializers.ValidationError({field: f"That date has the year {value.year}. Check the date."})
+        return attrs

@@ -21,13 +21,14 @@ export const patchVehicle = async (id, data) => (await api.patch(`/vehicles/${id
 
 // Documents
 export const fetchAttachments = async (filters) => (await api.get('/attachments/', { params: filters })).data
-export async function uploadAttachment({ file, kind, vehicle, service, incident }) {
+export async function uploadAttachment({ file, kind, vehicle, service, incident, fine }) {
   const form = new FormData()
   form.append('file', file)
   form.append('kind', kind)
   if (vehicle) form.append('vehicle', vehicle)
   if (service) form.append('service', service)
   if (incident) form.append('incident', incident)
+  if (fine) form.append('fine', fine)
   return (await api.post('/attachments/', form)).data
 }
 export const deleteAttachment = async (id) => api.delete(`/attachments/${id}/`)

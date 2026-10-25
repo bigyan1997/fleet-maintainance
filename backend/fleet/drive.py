@@ -19,6 +19,7 @@ PDFs and other documents go to Drive too:
 
     Fleet Maintenance Photos/
         Tolls/            TOL-29082026-28092026.pdf
+        Fines/<Van>/      FIN-VAN4-14102026.jpg  (a photo of the fine notice)
         Fuel/             FUE-08102026.txt, FUE-08102026.pdf (statement to 08-10-2026)
         Documents/<Van>/  DOC-VAN6-12102026 - <original file name>
         Licences/<Name>/  Sam Example - licence.jpg, Sam Example - licence (2).jpg   (licence photos)
@@ -250,13 +251,28 @@ def ensure_path(client, *names):
         return folder
 
 
-def upload_for(client, *, vehicle, job, kind, filename, content, content_type):
+def fine_name(client, folder_id, fine, original_name):
+    """FIN-VAN4-14102026.jpg, then FIN-VAN4-14102026 (2).jpg for more pages."""
+    ext = ("." + original_name.rsplit(".", 1)[-1].lower()) if "." in original_name else ""
+    taken = {f["name"].lower() for f in client.list_images(folder_id)}
+    base, n = f"FIN-{van_code(fine.vehicle)}-{fine.date:%d%m%Y}", 1
+    name = f"{base}{ext}"
+    while name.lower() in taken:
+        n += 1
+        name = f"{base} ({n}){ext}"
+    return name
+
+
+def upload_for(client, *, vehicle, job, kind, filename, content, content_type, fine=None):
     """Put a file where it belongs in Drive: issue/damage photos in their
     van's Incidents/Services folder (named by date), everything else in
     Documents/<van>. Returns (Drive's file info, the name it was given)."""
     from .models import ISSUE_PHOTO
 
-    if job is not None and kind == ISSUE_PHOTO:
+    if fine is not None:
+        folder = ensure_path(client, "Fines", str(vehicle))
+        name = fine_name(client, folder, fine, filename)
+    elif job is not None and kind == ISSUE_PHOTO:
         folder = ensure_folder(client, job)
         name = photo_name(client, folder, job, filename)
     else:
@@ -296,7 +312,7 @@ def move_local_files(limit=10, force=False):
     if not enabled() or (not force and _time.monotonic() - _last_move < _MOVE_EVERY_SECONDS):
         return 0
     _last_move = _time.monotonic()
-    atts = list(Attachment.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("vehicle", "service", "incident")[:limit])
+    atts = list(Attachment.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("vehicle", "service", "incident", "fine")[:limit])
     tolls = list(TollStatement.objects.filter(drive_file_id="").exclude(file="")[:limit])
     licences = list(DriverFile.objects.filter(drive_file_id__isnull=True).exclude(file="").select_related("driver")[:limit])
     fuel = list(FuelStatementFile.objects.filter(drive_file_id="").exclude(file="")[:limit])
@@ -315,7 +331,7 @@ def move_local_files(limit=10, force=False):
             with att.file.open("rb") as f:
                 content = f.read()
             meta, name = upload_for(
-                client, vehicle=att.vehicle, job=att.service or att.incident, kind=att.kind,
+                client, vehicle=att.vehicle, job=att.service or att.incident, kind=att.kind, fine=att.fine,
                 filename=att.original_name, content=content, content_type=att.content_type,
             )
             att.file.delete(save=False)

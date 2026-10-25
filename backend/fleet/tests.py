@@ -590,6 +590,75 @@ class CostPerKmTests(TestCase):
         self.assertAlmostEqual(row["perKm"], row["total"] / row["km"], places=3)
         self.assertEqual(row["total"], 300 + 500)  # three fill-ups inside the 12 months (the 500-day-old one is outside) plus the service
 
+class FineTests(TestCase):
+    def setUp(self):
+        from .models import Driver
+
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.driver = Driver.objects.create(name="Sam Example")
+        self.van = Vehicle.objects.create(make="Van 4", model="HiAce", rego="YKG89N", driver=self.driver)
+
+    def post(self, **extra):
+        data = {"vehicle": self.van.pk, "date": "2026-10-14", "kind": "Speeding", "amount": "277.00", **extra}
+        res = self.api.post("/api/fines/", data, format="json")
+        self.assertEqual(res.status_code, 201, res.data)
+        return res.data
+
+    def test_status_follows_naming_the_driver_then_paying(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        fine = self.post(name_driver_by=str(today + timedelta(days=6)), pay_by=str(today + timedelta(days=30)))
+        self.assertEqual((fine["status"], fine["daysLeft"]), ("to_name", 6))  # the earlier deadline is the one that matters
+        named = self.api.patch(f"/api/fines/{fine['id']}/", {"driver": self.driver.pk, "named_on": str(today)}, format="json").data
+        self.assertEqual((named["status"], named["daysLeft"], named["driverName"]), ("to_pay", 30, "Sam Example"))
+        paid = self.api.patch(f"/api/fines/{fine['id']}/", {"paid_on": str(today)}, format="json").data
+        self.assertEqual((paid["status"], paid["deadline"], paid["daysLeft"]), ("paid", None, None))
+        reopened = self.api.patch(f"/api/fines/{fine['id']}/", {"paid_on": None}, format="json").data
+        self.assertEqual(reopened["status"], "to_pay")  # undo a paid tick by mistake
+
+    def test_a_parking_fine_with_no_naming_date_only_needs_paying(self):
+        fine = self.post(kind="Parking", amount="110", pay_by="2026-10-30")
+        self.assertEqual((fine["status"], fine["deadline"]), ("to_pay", "2026-10-30"))
+
+    def test_bad_input_and_a_van_with_fines_cannot_be_deleted(self):
+        res = self.api.post("/api/fines/", {"vehicle": self.van.pk, "date": "2026-10-14", "amount": "-5"}, format="json")
+        self.assertEqual(res.status_code, 400)
+        res = self.api.post("/api/fines/", {"vehicle": self.van.pk, "date": "0026-10-14", "amount": "5"}, format="json")
+        self.assertEqual(res.status_code, 400)  # a half-typed year
+        self.post()
+        self.assertEqual(self.api.delete(f"/api/vehicles/{self.van.pk}/").status_code, 409)
+
+    def test_fine_notice_goes_to_the_fines_folder_in_drive_and_fines_count_in_the_money_table(self):
+        fine = self.post()
+        fake = FakeDrive()
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=fake):
+            photo = SimpleUploadedFile("scan.jpg", JPEG, content_type="image/jpeg")
+            res = self.api.post("/api/attachments/", {"file": photo, "kind": "Fine notice", "fine": fine["id"]}, format="multipart")
+            self.assertEqual(res.status_code, 201, res.data)
+            meta = fake.files[Attachment.objects.get().drive_file_id][0]
+            self.assertEqual(fake.path(meta["parents"][0]), f"Fines/{self.van}")
+            self.assertRegex(Attachment.objects.get().original_name, r"^FIN-.+-14102026\.jpg$")
+        self.assertEqual(len(self.api.get("/api/attachments/", {"fine": fine["id"]}).data), 1)
+        self.assertEqual(self.api.get("/api/fines/").data[0]["noticeCount"], 1)
+        from . import services
+
+        self.post(date=str(__import__("django").utils.timezone.localdate()), amount="100.00")
+        row = [r for r in services.analytics()["runningCost"] if r["id"] == self.van.pk][0]
+        self.assertEqual((row["fines"], row["total"]), (377.0, 377.0))  # both fines are inside the last 12 months
+
+    def test_fines_tab_in_the_sheet_mirror(self):
+        from . import sheets_sync
+
+        self.post(reference="INF-123")
+        header, rows = sheets_sync.TABS["Fines"]()
+        self.assertEqual((rows[0][2], rows[0][6], rows[0][13], rows[0][14]), ("Van 4", "Speeding", "To pay", "INF-123"))
+        self.assertEqual(sheets_sync.MODEL_TABS["Fine"], ["Fines"])
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

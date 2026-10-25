@@ -14,6 +14,7 @@ import { DriverForm } from './components/DriverForm'
 import { HistoryView } from './components/HistoryView'
 import { MechanicsView } from './components/MechanicsView'
 import { StockView } from './components/StockView'
+import { FinesView } from './components/FinesView'
 import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
 import { FuelView } from './components/FuelView'
@@ -51,6 +52,7 @@ const SERVICE_TABS = [
   { key: 'incidents', label: 'Incidents' },
   { key: 'mechanics', label: 'Mechanics' },
   { key: 'stock', label: 'Stock' },
+  { key: 'fines', label: 'Fines' },
 ]
 
 const FLEET_TABS = [
@@ -172,7 +174,7 @@ function MainApp({ username }) {
     // #/services, #/services/Booked (a status), #/services/mechanic/3,
     // #/services/mechanics, #/services/incidents
     const byMechanic = path[1] === 'mechanic' ? path[2] : ''
-    const subTab = ['mechanics', 'incidents', 'stock'].includes(path[1]) ? path[1] : ''
+    const subTab = ['mechanics', 'incidents', 'stock', 'fines'].includes(path[1]) ? path[1] : ''
     const status = path[1] && path[1] !== 'mechanic' && !subTab ? path[1] : ''
     page = (
       <div>
@@ -181,6 +183,8 @@ function MainApp({ username }) {
           <MechanicsView />
         ) : subTab === 'stock' ? (
           <StockView />
+        ) : subTab === 'fines' ? (
+          <FinesView />
         ) : subTab === 'incidents' ? (
           <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />
         ) : (

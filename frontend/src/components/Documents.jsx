@@ -7,7 +7,7 @@ import { fmtDate } from '../lib/formatDate'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Button, Icon } from './ui'
 
-const KINDS = ['Invoice', 'Quote', 'Registration', 'Photo', 'Other']
+const KINDS = ['Invoice', 'Quote', 'Registration', 'Photo', 'Fine notice', 'Other']
 
 function size(bytes) {
   if (bytes > 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -17,18 +17,18 @@ function size(bytes) {
 // Files kept with a van, a service or an incident. Pass exactly the one it
 // belongs to; a van shows every file for that van, including ones added
 // against its services and incidents.
-export function Documents({ vehicle, service, incident, compact = false }) {
-  const filters = service ? { service } : incident ? { incident } : { vehicle }
+export function Documents({ vehicle, service, incident, fine, compact = false }) {
+  const filters = fine ? { fine } : service ? { service } : incident ? { incident } : { vehicle }
   const queryClient = useQueryClient()
   const { toast } = useActions()
   const input = useRef(null)
-  const [kind, setKind] = useState(service ? 'Invoice' : incident ? 'Photo' : 'Registration')
+  const [kind, setKind] = useState(fine ? 'Fine notice' : service ? 'Invoice' : incident ? 'Photo' : 'Registration')
   const [removing, setRemoving] = useState(null)
   const docs = useQuery({ queryKey: ['attachments', filters], queryFn: () => fetchAttachments(filters) })
   const links = useQuery({ queryKey: ['links'], queryFn: fetchLinks, staleTime: Infinity })
 
   const upload = useMutation({
-    mutationFn: (files) => Promise.all([...files].map((file) => uploadAttachment({ file, kind, vehicle, service, incident }))),
+    mutationFn: (files) => Promise.all([...files].map((file) => uploadAttachment({ file, kind, vehicle, service, incident, fine }))),
     onSuccess: (added) => {
       queryClient.invalidateQueries({ queryKey: ['attachments'] })
       toast(`${added.length} file${added.length === 1 ? '' : 's'} attached.`)
@@ -59,8 +59,10 @@ export function Documents({ vehicle, service, incident, compact = false }) {
           accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt,image/*"
           className="hidden"
           onChange={(e) => {
-            if (e.target.files?.length) upload.mutate(e.target.files)
+            // Copy the chosen files first: clearing the box empties the list it hands out.
+            const list = [...(e.target.files ?? [])]
             e.target.value = ''
+            if (list.length) upload.mutate(list)
           }}
         />
         <Button icon="upload" disabled={upload.isPending} onClick={() => input.current?.click()}>
