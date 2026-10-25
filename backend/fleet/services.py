@@ -257,6 +257,39 @@ def latest_reading(vehicle, extra=()):
     return run[-1] if run else None
 
 
+MIN_KM_FOR_PER_KM = 200  # fewer km than this in the period and a per-km figure would mislead
+
+
+def km_driven(vehicle, start, end):
+    """How far the van went between two dates, from its believable km readings
+    (fuel fill-ups, services that happened, km typed in): the last reading on or
+    before `end` minus the km on the start date (worked out between the last
+    reading before `start` and the first one inside, or the first one inside
+    when there is none before). None if there is not enough to say."""
+    points = set(FuelLog.objects.filter(vehicle=vehicle, odometer__isnull=False, date__lte=end).values_list("date", "odometer"))
+    points |= set(
+        ServiceRecord.objects.filter(vehicle=vehicle, odometer__isnull=False, date__lte=end)
+        .exclude(status="Booked")
+        .values_list("date", "odometer")
+    )
+    points |= set(vehicle.odometer_readings.filter(date__lte=end).values_list("date", "km"))
+    run = _rising_run(sorted(p for p in points if p[1]))
+    inside = [p for p in run if p[0] >= start]
+    if not inside:
+        return None
+    before = [p for p in run if p[0] < start]
+    if before:
+        # The earlier reading may be long before the period starts, so place the
+        # km on the start date itself (steady driving between the two readings).
+        (d0, k0), (d1, k1) = before[-1], inside[0]
+        gap = (d1 - d0).days
+        first = k0 + (k1 - k0) * ((start - d0).days / gap) if gap > 0 else k1
+    else:
+        first = inside[0][1]
+    km = round(inside[-1][1] - first)
+    return km if km > 0 else None
+
+
 def record_typed_km(vehicle):
     """The van's km was just typed in by hand: keep it as today's reading, so
     "as of" shows today and the next fuel statement doesn't undo it."""
@@ -667,19 +700,30 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         tolls_qs = tolls_qs.filter(date__gte=date_from)
     if date_to:
         tolls_qs = tolls_qs.filter(date__lte=date_to)
+    # The running cost covers the chosen dates, or the same 12 months the charts show.
+    cost_start = date_from or months[0]
+    cost_end = date_to or today
     running = {}
     for key, qs, field in (
         ("maintenance", services_qs, "cost"), ("maintenance", incidents_qs, "cost"),
         ("fuel", fuel_qs, "cost"), ("tolls", tolls_qs, "amount"),
     ):
+        qs = qs.filter(date__gte=cost_start, date__lte=cost_end)
         for r in qs.values("vehicle").annotate(total=Sum(field)):
             row = running.setdefault(r["vehicle"], {"maintenance": 0.0, "fuel": 0.0, "tolls": 0.0})
             row[key] += float(r["total"] or 0)
-    names = {v.pk: str(v) for v in Vehicle.objects.filter(pk__in=running)}
-    running_cost = sorted(
-        ({"id": pk, "label": names.get(pk, "?"), **row, "total": sum(row.values())} for pk, row in running.items() if sum(row.values()) > 0),
-        key=lambda r: -r["total"],
-    )
+    vans_in_cost = {v.pk: v for v in Vehicle.objects.filter(pk__in=running)}
+    running_cost = []
+    for pk, row in running.items():
+        total = sum(row.values())
+        if total <= 0:
+            continue
+        km = km_driven(vans_in_cost[pk], cost_start, cost_end) if pk in vans_in_cost else None
+        running_cost.append({
+            "id": pk, "label": str(vans_in_cost[pk]) if pk in vans_in_cost else "?", **row, "total": total,
+            "km": km, "perKm": round(total / km, 4) if km and km >= MIN_KM_FOR_PER_KM else None,
+        })
+    running_cost.sort(key=lambda r: -r["total"])
 
     # Each van, month by month: fuel (dollars + litres) and tolls (dollars + trips).
     month_info = [{"key": k, "label": m.strftime("%b %y")} for k, m in zip(month_keys, months)]

@@ -557,6 +557,39 @@ class StockTests(TestCase):
         self.assertEqual(sheets_sync.MODEL_TABS["StockItem"], ["Stock"])
 
 
+class CostPerKmTests(TestCase):
+    def test_km_driven_and_cost_per_km_for_the_period(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from . import services
+        from .models import FuelLog
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 4", model="HiAce", rego="YKG89N", odometer=102000)
+        # Readings: 100,000 a long time ago (before the window), then 101,000 and 102,000 inside it.
+        FuelLog.objects.create(vehicle=van, date=today - timedelta(days=500), litres=50, cost=100, odometer=100000)
+        FuelLog.objects.create(vehicle=van, date=today - timedelta(days=60), litres=50, cost=100, odometer=101000)
+        FuelLog.objects.create(vehicle=van, date=today - timedelta(days=5), litres=50, cost=100, odometer=102000)
+        # A mistyped reading (10,000 instead of 101,500) is ignored.
+        FuelLog.objects.create(vehicle=van, date=today - timedelta(days=30), litres=50, cost=100, odometer=10000)
+        start = today - timedelta(days=330)
+        # 100,000 was 500 days ago and 101,000 was 60 days ago, so on the start date (330 days ago)
+        # the van was at about 100,000 + 1,000 x 170/440 = 100,386.
+        self.assertEqual(services.km_driven(van, start, today), 102000 - 100386)
+        only_recent = today - timedelta(days=20)
+        # 101,000 was 60 days ago and 102,000 5 days ago: about 101,727 on the start date.
+        self.assertEqual(services.km_driven(van, only_recent, today), 273)
+        self.assertIsNone(services.km_driven(van, today + timedelta(days=1), today + timedelta(days=30)))
+        # The Money table carries both figures.
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today - timedelta(days=10), status="Invoiced", cost=500, odometer=101900)
+        row = [r for r in services.analytics()["runningCost"] if r["id"] == van.pk][0]
+        window_start = services._month_range(None, None)[0]  # the same 12 months the charts show
+        self.assertEqual(row["km"], services.km_driven(van, window_start, today))
+        self.assertAlmostEqual(row["perKm"], row["total"] / row["km"], places=3)
+        self.assertEqual(row["total"], 300 + 500)  # three fill-ups inside the 12 months (the 500-day-old one is outside) plus the service
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
