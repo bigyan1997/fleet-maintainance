@@ -147,6 +147,18 @@ def _driver_rows():
     return header, rows
 
 
+def _stock_rows():
+    from .models import StockItem
+
+    header = ["ID", "Part", "In stock", "Order when below", "Status", "Notes", "Last changed"]
+    words = {"ok": "OK", "low": "Order now", "out": "Out of stock"}
+    rows = [
+        [i.pk, i.name, i.quantity, i.order_below, words[i.status], i.notes, timezone.localtime(i.updated_at).strftime("%d-%m-%Y %H:%M")]
+        for i in StockItem.objects.order_by("name")
+    ]
+    return header, rows
+
+
 # Tab name -> row builder. Service/incident/fuel rows show the vehicle's
 # label and rego, so a vehicle edit also refreshes those tabs (Tolls too).
 TABS = {
@@ -156,6 +168,7 @@ TABS = {
     "Fuel Log": _fuel_rows,
     "Tolls": _toll_rows,
     "Drivers": _driver_rows,
+    "Stock": _stock_rows,
 }
 MODEL_TABS = {
     "Vehicle": list(TABS),
@@ -168,6 +181,7 @@ MODEL_TABS = {
     # follow it when the push runs after the commit.
     "TollStatement": ["Tolls"],
     "Driver": ["Drivers"],
+    "StockItem": ["Stock"],
 }
 
 

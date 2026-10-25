@@ -16,8 +16,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import activity, drive, licence_pdf, services, toll_import
-from .models import ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
-from .serializers import ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
+from .models import StockItem, StockMove, ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
+from .serializers import StockItemSerializer, StockMoveSerializer, ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -567,3 +567,108 @@ class FuelTrendsView(APIView):
                 key=lambda r: r["avgPrice"],
             ),
         })
+
+
+# ── Stock ──────────────────────────────────────────────────────────────────
+
+
+def _stock_move(request, item, change, note=""):
+    """Save the new quantity and a line in the item's history."""
+    item.quantity = max(0, item.quantity + change)
+    item.save(update_fields=["quantity", "updated_at"])
+    who = activity._who(request.user)[1]
+    StockMove.objects.create(item=item, change=change, quantity_after=item.quantity, note=note[:200], who_label=who)
+
+
+def _whole_number(value, default=None, minimum=0, maximum=100000):
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return number if minimum <= number <= maximum else default
+
+
+class StockViewSet(viewsets.ViewSet):
+    """Spare parts in stock: add an item, use some, add more."""
+
+    def list(self, request):
+        return Response(StockItemSerializer(StockItem.objects.all(), many=True).data)
+
+    def create(self, request):
+        name = (request.data.get("name") or "").strip()[:100]
+        if not name:
+            return Response({"detail": "Type the name of the part, for example Headlight bulb H4 12V."}, status=status.HTTP_400_BAD_REQUEST)
+        if StockItem.objects.filter(name__iexact=name).exists():
+            return Response({"detail": f"{name} is already in the stock list."}, status=status.HTTP_400_BAD_REQUEST)
+        quantity = _whole_number(request.data.get("quantity"), 0)
+        order_below = _whole_number(request.data.get("order_below"), 2)
+        item = StockItem.objects.create(name=name, quantity=0, order_below=order_below, notes=(request.data.get("notes") or "").strip())
+        if quantity:
+            _stock_move(request, item, quantity, "Starting stock")
+        activity.log(request.user, "Added", "Stock", f"{item.name}: {item.quantity} in stock")
+        return Response(StockItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        item = StockItem.objects.filter(pk=pk).first()
+        if not item:
+            return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
+        if "name" in request.data:
+            name = (request.data.get("name") or "").strip()[:100]
+            if not name:
+                return Response({"detail": "The name can't be empty."}, status=status.HTTP_400_BAD_REQUEST)
+            if StockItem.objects.filter(name__iexact=name).exclude(pk=item.pk).exists():
+                return Response({"detail": f"{name} is already in the stock list."}, status=status.HTTP_400_BAD_REQUEST)
+            item.name = name
+        if "order_below" in request.data:
+            item.order_below = _whole_number(request.data.get("order_below"), item.order_below)
+        if "notes" in request.data:
+            item.notes = (request.data.get("notes") or "").strip()
+        item.save()
+        if "quantity" in request.data:  # a correction after counting the shelf
+            wanted = _whole_number(request.data.get("quantity"), None)
+            if wanted is None:
+                return Response({"detail": "Type the quantity as a whole number."}, status=status.HTTP_400_BAD_REQUEST)
+            if wanted != item.quantity:
+                _stock_move(request, item, wanted - item.quantity, "Corrected after a count")
+        activity.log(request.user, "Changed", "Stock", f"{item.name}: {item.quantity} in stock")
+        return Response(StockItemSerializer(item).data)
+
+    def destroy(self, request, pk=None):
+        item = StockItem.objects.filter(pk=pk).first()
+        if not item:
+            return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
+        activity.log(request.user, "Deleted", "Stock", item.name)
+        item.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="use")
+    def use(self, request, pk=None):
+        item = StockItem.objects.filter(pk=pk).first()
+        if not item:
+            return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
+        amount = _whole_number(request.data.get("amount"), 1, minimum=1)
+        if amount is None or item.quantity == 0:
+            return Response({"detail": f"There is none of {item.name} left to use. Order more."}, status=status.HTTP_400_BAD_REQUEST)
+        amount = min(amount, item.quantity)
+        _stock_move(request, item, -amount, (request.data.get("note") or "")[:200])
+        activity.log(request.user, "Changed", "Stock", f"Used {amount} {item.name}; {item.quantity} left")
+        return Response(StockItemSerializer(item).data)
+
+    @action(detail=True, methods=["post"], url_path="add")
+    def add(self, request, pk=None):
+        item = StockItem.objects.filter(pk=pk).first()
+        if not item:
+            return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
+        amount = _whole_number(request.data.get("amount"), None, minimum=1)
+        if amount is None:
+            return Response({"detail": "Type how many were added, as a whole number."}, status=status.HTTP_400_BAD_REQUEST)
+        _stock_move(request, item, amount, (request.data.get("note") or "")[:200])
+        activity.log(request.user, "Changed", "Stock", f"Added {amount} {item.name}; {item.quantity} in stock")
+        return Response(StockItemSerializer(item).data)
+
+    @action(detail=True, methods=["get"], url_path="moves")
+    def moves(self, request, pk=None):
+        item = StockItem.objects.filter(pk=pk).first()
+        if not item:
+            return Response({"detail": "That part isn't in the list."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(StockMoveSerializer(item.moves.all()[:50], many=True).data)

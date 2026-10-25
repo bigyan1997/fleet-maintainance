@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from . import services
 from . import drive
-from .models import ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
+from .models import StockItem, StockMove, ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -293,3 +293,18 @@ class MechanicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mechanic
         fields = ["id", "name", "phone", "address", "notes", "active", "jobs", "spend", "lastJob"]
+
+
+class StockItemSerializer(serializers.ModelSerializer):
+    status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = StockItem
+        fields = ["id", "name", "quantity", "order_below", "notes", "status", "updated_at"]
+        read_only_fields = ["updated_at"]
+
+
+class StockMoveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockMove
+        fields = ["id", "change", "quantity_after", "note", "who_label", "created_at"]

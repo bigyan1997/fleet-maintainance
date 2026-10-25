@@ -5,7 +5,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from . import sheets_sync
-from .models import Driver, FuelLog, Incident, IncidentUpdate, ServiceRecord, TollStatement, Vehicle
+from .models import StockItem, Driver, FuelLog, Incident, IncidentUpdate, ServiceRecord, TollStatement, Vehicle
 
 # Set by bulk jobs (the legacy import) that push once at the end instead of
 # once per row.
@@ -18,6 +18,7 @@ suspended = False
 @receiver([post_save, post_delete], sender=IncidentUpdate)
 @receiver([post_save, post_delete], sender=FuelLog)
 @receiver([post_save, post_delete], sender=TollStatement)
+@receiver([post_save, post_delete], sender=StockItem)
 @receiver([post_save, post_delete], sender=Driver)
 def mirror_change(sender, **kwargs):
     if suspended:

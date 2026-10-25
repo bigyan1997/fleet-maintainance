@@ -510,6 +510,53 @@ class ServiceDoneWithoutKmTests(TestCase):
         self.assertEqual((due["km_missing"], due["due_at"]), (None, 128200))
 
 
+class StockTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+
+    def make(self, name="Headlight bulb H4 12V", quantity=5, **extra):
+        res = self.api.post("/api/stock/", {"name": name, "quantity": quantity, **extra}, format="json")
+        self.assertEqual(res.status_code, 201, res.data)
+        return res.data
+
+    def test_add_use_and_the_order_now_status(self):
+        item = self.make(quantity=3)
+        self.assertEqual((item["quantity"], item["order_below"], item["status"]), (3, 2, "ok"))
+        used = self.api.post(f"/api/stock/{item['id']}/use/", {}, format="json").data
+        self.assertEqual((used["quantity"], used["status"]), (2, "ok"))  # 2 is not below 2
+        used = self.api.post(f"/api/stock/{item['id']}/use/", {}, format="json").data
+        self.assertEqual((used["quantity"], used["status"]), (1, "low"))  # below 2: order now
+        used = self.api.post(f"/api/stock/{item['id']}/use/", {}, format="json").data
+        self.assertEqual((used["quantity"], used["status"]), (0, "out"))
+        again = self.api.post(f"/api/stock/{item['id']}/use/", {}, format="json")
+        self.assertEqual(again.status_code, 400)  # never goes below zero
+        added = self.api.post(f"/api/stock/{item['id']}/add/", {"amount": 10}, format="json").data
+        self.assertEqual((added["quantity"], added["status"]), (10, "ok"))
+        moves = self.api.get(f"/api/stock/{item['id']}/moves/").data
+        self.assertEqual([m["change"] for m in moves], [10, -1, -1, -1, 3])  # newest first, with the starting stock
+        self.assertEqual(moves[0]["quantity_after"], 10)
+
+    def test_name_rules_edit_and_correction(self):
+        item = self.make("Wiper blades", 2, order_below=4)
+        self.assertEqual(item["status"], "low")  # 2 is below 4
+        self.assertEqual(self.api.post("/api/stock/", {"name": "wiper BLADES", "quantity": 1}, format="json").status_code, 400)  # no duplicates
+        self.assertEqual(self.api.post("/api/stock/", {"name": "  ", "quantity": 1}, format="json").status_code, 400)
+        fixed = self.api.patch(f"/api/stock/{item['id']}/", {"quantity": 9, "order_below": 3, "name": "Wiper blades (front)"}, format="json").data
+        self.assertEqual((fixed["quantity"], fixed["order_below"], fixed["name"], fixed["status"]), (9, 3, "Wiper blades (front)", "ok"))
+        self.assertEqual(self.api.post(f"/api/stock/{item['id']}/add/", {"amount": "x"}, format="json").status_code, 400)
+        self.assertEqual(self.api.delete(f"/api/stock/{item['id']}/").status_code, 204)
+        self.assertEqual(self.api.get("/api/stock/").data, [])
+
+    def test_stock_tab_in_the_sheet_mirror(self):
+        from . import sheets_sync
+
+        self.make("AdBlue 10L", 1)
+        header, rows = sheets_sync.TABS["Stock"]()
+        self.assertEqual((rows[0][1], rows[0][2], rows[0][4]), ("AdBlue 10L", 1, "Order now"))
+        self.assertEqual(sheets_sync.MODEL_TABS["StockItem"], ["Stock"])
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

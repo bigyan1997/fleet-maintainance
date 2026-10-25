@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchAlerts } from '../api/alerts'
 import { fetchDashboard } from '../api/dashboard'
 import { fetchDrivers } from '../api/extra'
+import { useStock } from '../api/stock'
 import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
@@ -124,6 +125,7 @@ export function HomeView() {
   const incidents = useQuery({ queryKey: ['incidents', { open: true }], queryFn: () => fetchIncidents({ page_size: 200 }) })
   const vehicles = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
+  const stock = useStock()
   const sub = Object.fromEntries((vehicles.data ?? []).map((v) => [v.id, v.subtitle]))
 
 
@@ -225,6 +227,16 @@ export function HomeView() {
           }]
         : []
     })()),
+    // Spare parts that dropped below their order level (or ran out).
+    ...(stock.data ?? [])
+      .filter((i) => i.status !== 'ok')
+      .map((i) => ({
+        key: `stock-${i.id}`,
+        van: i.name,
+        text: i.status === 'out' ? 'Out of stock. Order now' : `Order now: only ${i.quantity} left (order when below ${i.order_below})`,
+        pill: [i.status === 'out' ? 'red' : 'amber', 'Order now'],
+        action: <a href={href('services', 'stock')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
+      })),
     // A scheduled service finished without its km: the next service can't be worked out until it is typed in.
     ...(vehicles.data ?? [])
       .filter((v) => !v.off_road && v.nextServiceDue?.km_missing && !v.nextServiceDue.booked)

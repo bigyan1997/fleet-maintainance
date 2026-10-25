@@ -57,6 +57,7 @@ Don't have the figures yet? Click **Just change the status**, and fill them in l
 - **Services:** every service, newest first, with columns Van, What, **Mechanic** (who did it), Status and Cost. Pick a van or search; more filters (type, status, mechanic, dates) are under **Filters ▾**. Click a row to see the details and which van it is.
 - **Incidents:** accidents, breakdowns and damage. **Log incident** to add one; add **Photos of the damage** under the description (kept in Google Drive in **Fleet Maintenance Photos › Incidents › van**, named like **INC-VAN6-12102026.jpg**); open one to add follow-up notes, and to say what was done when it's resolved.
 - **Mechanics:** the workshops you use, with their phone number, number of jobs, total spent and last job. **See jobs** lists everything a workshop did.
+- **Stock:** spare parts you keep, for example **Headlight bulb H4 12V**. Type the part's name, how many you have and the number to **order when below** (2 unless you change it), then **+ Add part**. Each time one is used press **Used 1** and the count goes down (it never goes below 0). **+ Add stock** puts more on when you buy them. When a part drops below its order level it turns amber with **Order now** (red at 0), a yellow bar at the top of the list names it, and Home's **Needs doing** shows "Order now" until you add stock. **history** lists every change with the date, **edit** corrects the count after you've counted the shelf, **remove** deletes a part. The Google Sheet has a **Stock** tab too.
 
 ## Vans
 

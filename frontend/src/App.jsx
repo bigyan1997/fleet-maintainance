@@ -13,6 +13,7 @@ import { DriverPage } from './components/DriverPage'
 import { DriverForm } from './components/DriverForm'
 import { HistoryView } from './components/HistoryView'
 import { MechanicsView } from './components/MechanicsView'
+import { StockView } from './components/StockView'
 import { WashesView } from './components/WashesView'
 import { IncidentsView } from './components/IncidentsView'
 import { FuelView } from './components/FuelView'
@@ -49,6 +50,7 @@ const SERVICE_TABS = [
   { key: '', label: 'Services' },
   { key: 'incidents', label: 'Incidents' },
   { key: 'mechanics', label: 'Mechanics' },
+  { key: 'stock', label: 'Stock' },
 ]
 
 const FLEET_TABS = [
@@ -170,13 +172,15 @@ function MainApp({ username }) {
     // #/services, #/services/Booked (a status), #/services/mechanic/3,
     // #/services/mechanics, #/services/incidents
     const byMechanic = path[1] === 'mechanic' ? path[2] : ''
-    const subTab = ['mechanics', 'incidents'].includes(path[1]) ? path[1] : ''
+    const subTab = ['mechanics', 'incidents', 'stock'].includes(path[1]) ? path[1] : ''
     const status = path[1] && path[1] !== 'mechanic' && !subTab ? path[1] : ''
     page = (
       <div>
         <SubTabs items={SERVICE_TABS} value={subTab} base="services" />
         {subTab === 'mechanics' ? (
           <MechanicsView />
+        ) : subTab === 'stock' ? (
+          <StockView />
         ) : subTab === 'incidents' ? (
           <IncidentsView onEdit={(i) => openForm('incident', i)} onAdd={() => openForm('incident')} />
         ) : (

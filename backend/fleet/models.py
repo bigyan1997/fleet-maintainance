@@ -485,3 +485,43 @@ class Budget(models.Model):
     category = models.CharField(max_length=20, choices=BUDGET_CATEGORY_CHOICES, unique=True)
     monthly_amount = models.DecimalField(max_digits=10, decimal_places=2)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class StockItem(models.Model):
+    """A spare part kept in stock (e.g. "Headlight bulb H4 12V"): how many are
+    left, and the number below which it is time to order more."""
+
+    name = models.CharField(max_length=100)
+    quantity = models.PositiveIntegerField(default=0)
+    order_below = models.PositiveIntegerField(default=2)
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def status(self):
+        """"out" at zero, "low" below the order level (time to order), else "ok"."""
+        if self.quantity == 0:
+            return "out"
+        return "low" if self.quantity < self.order_below else "ok"
+
+
+class StockMove(models.Model):
+    """One change to a stock item: used some, added some, or a correction."""
+
+    item = models.ForeignKey(StockItem, on_delete=models.CASCADE, related_name="moves")
+    change = models.IntegerField()  # negative = used
+    quantity_after = models.PositiveIntegerField()
+    note = models.CharField(max_length=200, blank=True)
+    who_label = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
