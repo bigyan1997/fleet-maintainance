@@ -99,7 +99,7 @@ export function IncidentsView({ onEdit, onAdd }) {
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDayDate(x.date)}</td>
                   <td className="px-3 py-2.5">{x.severity}</td>
                   <td className="px-3 py-2.5"><span className={'rounded-full px-2 py-0.5 text-[11px] font-medium ' + (STATUS_BADGE[x.status] ?? '')}>{x.status}</span></td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">{x.cost ? `$${x.cost}` : '—'}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{x.fixed_by_service ? <span className="text-xs text-off" title={`Paid for on the service job: ${x.fixedByLabel}`}>on service job</span> : x.cost ? `$${x.cost}` : '—'}</td>
                   <td className="max-w-[360px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap text-off">{x.description || '—'}</td>
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => onEdit(x)} className="mr-1 rounded px-1.5 py-1 text-off hover:bg-[#f0f0f0]" title="Edit">✎</button>

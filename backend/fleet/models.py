@@ -259,6 +259,9 @@ class Incident(models.Model):
     resolved_date = models.DateField(null=True, blank=True)
     # Google Drive folder holding photos of the damage (see drive.py).
     drive_folder_id = models.CharField(max_length=128, blank=True, default="")
+    # The service job that fixed it. Its price is the one that counts, so the
+    # incident's own cost is left out of the spending totals (no double count).
+    fixed_by_service = models.ForeignKey("ServiceRecord", on_delete=models.SET_NULL, null=True, blank=True, related_name="fixes_incidents")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

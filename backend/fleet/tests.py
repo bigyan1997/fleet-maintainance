@@ -659,6 +659,39 @@ class FineTests(TestCase):
         self.assertEqual(sheets_sync.MODEL_TABS["Fine"], ["Fines"])
 
 
+class IncidentLinkedToServiceTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.api.force_authenticate(get_user_model().objects.create_user("office"))
+        self.van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+        self.today = __import__("django").utils.timezone.localdate()
+
+    def test_a_job_entered_as_an_incident_and_a_service_counts_once_when_linked(self):
+        from . import services
+
+        incident = Incident.objects.create(vehicle=self.van, incident_type="Breakdown", date=self.today, severity="Minor", cost=400, status="Resolved", resolution="New tyre")
+        job = ServiceRecord.objects.create(vehicle=self.van, service_type="Tyre replacement", date=self.today, status="Invoiced", cost=400)
+        row = lambda: [r for r in services.analytics()["runningCost"] if r["id"] == self.van.pk][0]
+        self.assertEqual(row()["maintenance"], 800)  # entered twice and not linked: counted twice
+        res = self.api.patch(f"/api/incidents/{incident.pk}/", {"vehicle": self.van.pk, "incident_type": "Breakdown", "date": str(self.today), "severity": "Minor", "status": "Resolved", "resolution": "New tyre", "cost": "400", "fixed_by_service": job.pk}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data["fixedByLabel"], f"Tyre replacement {self.today:%d-%m-%Y}")
+        self.assertEqual(row()["maintenance"], 400)  # linked: the service's price only
+        data = services.analytics()
+        self.assertEqual((data["totalSpend"], data["openIncidentCost"]), (400, 0))
+        full = {"vehicle": self.van.pk, "incident_type": "Breakdown", "date": str(self.today), "severity": "Minor", "status": "Resolved", "resolution": "New tyre", "cost": "400"}
+        res = self.api.patch(f"/api/incidents/{incident.pk}/", {**full, "fixed_by_service": None}, format="json")
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(row()["maintenance"], 800)  # unlinking brings the incident's cost back
+
+    def test_the_service_job_must_be_for_the_same_van(self):
+        other = Vehicle.objects.create(make="Van 5", model="HiAce", rego="YNU05R")
+        job = ServiceRecord.objects.create(vehicle=other, service_type="Tyre replacement", date=self.today, status="Invoiced", cost=400)
+        res = self.api.post("/api/incidents/", {"vehicle": self.van.pk, "incident_type": "Breakdown", "date": str(self.today), "severity": "Minor", "fixed_by_service": job.pk}, format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("fixed_by_service", res.data)
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

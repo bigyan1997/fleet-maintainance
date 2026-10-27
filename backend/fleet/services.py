@@ -609,6 +609,9 @@ def analytics(vehicle=None, date_from=None, date_to=None):
         services_qs = services_qs.filter(date__lte=date_to)
         incidents_qs = incidents_qs.filter(date__lte=date_to)
         fuel_qs = fuel_qs.filter(date__lte=date_to)
+    # An incident fixed by a service job is paid for on that job: count the job's
+    # price, not the incident's too.
+    incidents_qs = incidents_qs.filter(fixed_by_service__isnull=True)
 
     today = timezone.localdate()
     month_start = today.replace(day=1)

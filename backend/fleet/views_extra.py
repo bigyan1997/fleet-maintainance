@@ -470,7 +470,7 @@ class BudgetView(APIView):
         since = months[0]
         fuel = _by_month(FuelLog.objects.all(), "cost", since)
         service = _by_month(ServiceRecord.objects.exclude(service_type=services.WASH_SERVICE_TYPE), "cost", since)
-        incident = _by_month(Incident.objects.all(), "cost", since)
+        incident = _by_month(Incident.objects.filter(fixed_by_service__isnull=True), "cost", since)
         budgets = {b.category: b.monthly_amount for b in Budget.objects.all()}
         rows = []
         for m in months:

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { todayIso } from '../lib/formatDate'
 import { useState } from 'react'
 import { fetchVehicles } from '../api/vehicles'
+import { fetchServices } from '../api/services'
+import { fmtDate } from '../lib/formatDate'
 import { createIncident, updateIncident } from '../api/incidents'
 import { uploadAttachment } from '../api/extra'
 import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
@@ -18,7 +20,7 @@ const today = todayIso
 function blankForm() {
   return {
     vehicle: '', incident_type: TYPES[0], date: today(), severity: SEVERITIES[0], location: '', status: STATUSES[0],
-    cost: '', description: '', new_update: '', resolution: '', resolved_date: '',
+    cost: '', description: '', new_update: '', resolution: '', resolved_date: '', fixed_by_service: '',
   }
 }
 
@@ -26,7 +28,7 @@ function fromIncident(x) {
   return {
     vehicle: x.vehicle, incident_type: x.incident_type, date: x.date, severity: x.severity,
     location: x.location || '', status: x.status, cost: x.cost ?? '', description: x.description || '',
-    new_update: '', resolution: x.resolution || '', resolved_date: x.resolved_date || '',
+    new_update: '', resolution: x.resolution || '', resolved_date: x.resolved_date || '', fixed_by_service: x.fixed_by_service ?? '',
   }
 }
 
@@ -36,12 +38,20 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
   const queryClient = useQueryClient()
   const vehiclesQuery = useQuery({ queryKey: ['vehicles', ''], queryFn: () => fetchVehicles('') })
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }))
+  // The van's service jobs, so a repair done as a service can be linked: its price is the one that counts.
+  const jobsQuery = useQuery({
+    queryKey: ['services', 'for-incident', form.vehicle],
+    queryFn: () => fetchServices({ vehicle: form.vehicle, page_size: 100 }),
+    enabled: Boolean(form.vehicle),
+  })
+  const jobs = (jobsQuery.data?.results ?? []).filter((s) => s.service_type !== 'Van wash' || s.id === form.fixed_by_service)
+  const linked = Boolean(form.fixed_by_service)
   // Damage photos picked on a new incident, uploaded once it's saved.
   const [pendingPhotos, setPendingPhotos] = useState([])
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload = { ...form, cost: form.cost || null, resolved_date: form.resolved_date || null }
+      const payload = { ...form, cost: form.cost || null, resolved_date: form.resolved_date || null, fixed_by_service: form.fixed_by_service || null }
       if (isEdit) return updateIncident(incident.id, payload)
       const saved = await createIncident(payload)
       await Promise.all(pendingPhotos.map((file) => uploadAttachment({ file, kind: ISSUE_PHOTO, vehicle: saved.vehicle, incident: saved.id })))
@@ -56,7 +66,7 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
     },
     onError: (err) => {
       const data = err?.response?.data
-      onError(data?.detail ?? data?.resolution?.[0] ?? 'Could not save incident.')
+      onError(data?.detail ?? data?.resolution?.[0] ?? data?.fixed_by_service?.[0] ?? 'Could not save incident.')
     },
   })
 
@@ -97,10 +107,33 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
       </FormRow>
       <FormRow>
         <Field label="Cost ($)">
-          <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 850" />
+          {linked ? (
+            <div className="rounded-md border border-line bg-[#f5f5f5] px-2.5 py-2 text-sm text-off">Counted on the service job →</div>
+          ) : (
+            <NumberInput value={form.cost} onChange={set('cost')} placeholder="e.g. 850" />
+          )}
         </Field>
-        <div />
+        <Field label="Fixed by a service job? (so the price isn't counted twice)">
+          <select
+            value={form.fixed_by_service}
+            onChange={(e) => set('fixed_by_service')(e.target.value ? Number(e.target.value) : '')}
+            disabled={!form.vehicle}
+            className="w-full rounded-md border border-line bg-white px-2.5 py-2 text-sm"
+          >
+            <option value="">No: the cost here is the cost</option>
+            {jobs.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.service_type} · {fmtDate(s.date)} · {s.cost ? `$${s.cost}` : 'no price yet'}
+              </option>
+            ))}
+          </select>
+        </Field>
       </FormRow>
+      {linked && (
+        <p className="-mt-2 mb-3 text-xs text-off">
+          The price of that service job is the one that counts in the spending figures. This incident's own cost is left out, so the same repair is never added twice.
+        </p>
+      )}
       <div className="mb-3">
         <Field label="Description">
           <TextInput value={form.description} onChange={set('description')} placeholder="What happened" />

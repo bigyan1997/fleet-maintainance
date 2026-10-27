@@ -108,14 +108,19 @@ class IncidentSerializer(serializers.ModelSerializer):
     notes = serializers.SerializerMethodField()
     # Optional: appended to the log as a new dated entry on save.
     new_update = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    fixedByLabel = serializers.SerializerMethodField()
 
     class Meta:
         model = Incident
         fields = [
             "id", "vehicle", "vehicleLabel", "vehicleSub", "incident_type", "date",
             "severity", "location", "description", "cost", "status", "notes",
-            "updates", "new_update", "resolution", "resolved_date",
+            "updates", "new_update", "resolution", "resolved_date", "fixed_by_service", "fixedByLabel",
         ]
+
+    def get_fixedByLabel(self, obj):
+        s = obj.fixed_by_service
+        return f"{s.service_type} {s.date:%d-%m-%Y}" if s else ""
 
     def get_notes(self, obj):
         return "\n".join(str(u) for u in obj.updates.all())
@@ -139,6 +144,11 @@ class IncidentSerializer(serializers.ModelSerializer):
         return incident
 
     def validate(self, attrs):
+        service = attrs.get("fixed_by_service")
+        if service:
+            vehicle = attrs.get("vehicle") or (self.instance.vehicle if self.instance else None)
+            if vehicle and service.vehicle_id != vehicle.pk:
+                raise serializers.ValidationError({"fixed_by_service": "Pick a service job for the same van as the incident."})
         if attrs.get("status") == "Resolved":
             if not (attrs.get("resolution") or "").strip():
                 raise serializers.ValidationError({"resolution": "Say what was done before marking this resolved."})

@@ -150,7 +150,7 @@ export function VanPage({ id }) {
     ...incidentRows.map((i) => ({
       key: `i${i.id}`, kind: 'Incident', date: i.date, record: i,
       title: `${i.incident_type} · ${i.severity}`, sub: [i.status, i.description].filter(Boolean).join(' · '),
-      amount: i.cost ? money(i.cost) : null,
+      amount: i.fixed_by_service ? 'on service job' : i.cost ? money(i.cost) : null,
     })),
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
