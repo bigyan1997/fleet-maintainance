@@ -226,7 +226,7 @@ export function FuelImport({ onClose }) {
                                     {c.rows.map((r, i) => (
                                       <tr key={i} className={r.duplicate ? 'text-off' : ''}>
                                         <td className="py-1 pr-2 whitespace-nowrap">{fmtDayDate(r.date)}</td>
-                                        <td className="py-1 pr-2">{r.station}{r.product !== 'Diesel' && <span className="text-off"> · {r.product}</span>}</td>
+                                        <td className="py-1 pr-2">{r.station}{r.otherStation && <span className="ml-1.5 rounded bg-due-bg px-1.5 py-0.5 text-[11px] font-semibold text-due" title="Not Metro Petroleum Sydenham">Other station</span>}{r.product !== 'Diesel' && <span className="text-off"> · {r.product}</span>}</td>
                                         <td className="py-1 pr-2">{r.litres} L</td>
                                         <td className="py-1 pr-2">{money(r.cost)}</td>
                                         <td className="py-1 pr-2 whitespace-nowrap">

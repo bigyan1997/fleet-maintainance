@@ -62,6 +62,7 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
               </td>
               <td className="py-2 pr-3">
                 {station(f) || '—'}
+                {f.otherStation && <span className="ml-1.5 rounded bg-due-bg px-1.5 py-0.5 text-[11px] font-semibold text-due" title="Not the usual station">Other station</span>}
                 {f.product && f.product !== 'Diesel' && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">{f.product}</span>}
               </td>
               <td className={num}>{Number(f.litres).toFixed(2)} L</td>

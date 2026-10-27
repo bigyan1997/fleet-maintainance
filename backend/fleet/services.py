@@ -800,6 +800,22 @@ def analytics(vehicle=None, date_from=None, date_to=None):
 FUEL_HIGH_USE_RATIO = 1.15
 # More litres than any of the vans' tanks hold in one go.
 FUEL_MAX_SINGLE_FILL = 80
+# The station the vans are meant to fill up at. A fill-up from a statement at any
+# other station is flagged, so someone can ask why.
+HOME_FUEL_STATION = "Metro Petroleum Sydenham"
+
+
+def is_other_station(name):
+    """True when a statement fill-up was at a station other than the usual one
+    (compared ignoring capitals and spacing; an unknown name is not flagged)."""
+    squash = lambda t: " ".join((t or "").lower().split())
+    name = squash(name)
+    return bool(name) and not name.startswith(squash(HOME_FUEL_STATION))
+
+
+def fuel_log_station(f):
+    """The station on an imported fill-up (the first part of its note), else ''."""
+    return (f.notes or "").split(" · ")[0] if f.statement else ""
 
 
 def _litres_per_100km(fills):
@@ -865,6 +881,8 @@ def fuel_insights(fuel_qs):
                 flag(v, f.date, "Premium diesel", f"{f.litres} L at ${f.price_per_litre}/L — regular diesel is cheaper")
             if f.date.weekday() >= 5:
                 flag(v, f.date, "Weekend fill-up", f"{f.litres} L on a {f.date:%A}")
+            if is_other_station(fuel_log_station(f)):
+                flag(v, f.date, "Other station", f"{f.litres} L at {fuel_log_station(f)}, not {HOME_FUEL_STATION}")
             if "looked wrong" in f.notes:
                 flag(v, f.date, "Odometer typo", "Odometer entered at the pump doesn't fit the van's other readings")
         for day, same in per_day.items():

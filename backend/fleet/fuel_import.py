@@ -100,6 +100,7 @@ def parse_statement(raw):
         (card["rows"] if fuel else card["charges"]).append({
             "date": datetime.strptime(date_s, "%d/%m/%Y").date().isoformat(),
             "station": supplier,
+            "otherStation": services.is_other_station(supplier),
             "docket": docket,
             "custRef": cust_ref,
             "product": name,

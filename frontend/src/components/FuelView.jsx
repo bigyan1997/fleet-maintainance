@@ -76,6 +76,9 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
 
   const clearFilters = () => { setVehicle(''); setDateFrom(''); setDateTo(''); setSearch(''); setPage(1); setPeriod(0) }
   const rows = fuelQuery.data?.results ?? []
+  const otherStation = rows.filter((f) => f.otherStation)
+  const [showOther, setShowOther] = useState(false)
+  const otherByVan = Object.entries(otherStation.reduce((m, f) => ({ ...m, [f.vehicleLabel]: (m[f.vehicleLabel] ?? 0) + 1 }), {}))
   const count = fuelQuery.data?.count ?? 0
   const pageSize = 25
   const totalPages = view === 'van' ? 1 : Math.max(1, Math.ceil(count / pageSize))
@@ -159,6 +162,24 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
           </div>
         )}
       </div>
+      {otherStation.length > 0 && (
+        <div className="mb-3 rounded-lg border border-[#f5b5b5] bg-due-bg px-4 py-2.5 text-[13px] text-due">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+            <span>
+              <b>{otherStation.length} fill-up{otherStation.length === 1 ? '' : 's'} at a station other than Metro Petroleum Sydenham</b>
+              {' · '}{otherByVan.map(([van, n]) => `${van} (${n})`).join(', ')}
+            </span>
+            <button onClick={() => setShowOther(!showOther)} className="font-semibold underline">{showOther ? 'Hide the list' : 'Show the list'}</button>
+          </div>
+          {showOther && (
+            <ul className="mt-1.5 grid gap-0.5">
+              {otherStation.map((f) => (
+                <li key={f.id}>{f.vehicleLabel} · {fmtDayDate(f.date)} · {(f.notes || '').split(' · ')[0]} · {Number(f.litres).toFixed(2)} L · ${Number(f.cost).toFixed(2)}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {view === 'van' ? (
         <FuelByVan
           rows={rows}

@@ -692,6 +692,27 @@ class IncidentLinkedToServiceTests(TestCase):
         self.assertIn("fixed_by_service", res.data)
 
 
+class OtherStationTests(TestCase):
+    def test_a_fill_up_at_another_station_is_flagged_but_the_usual_one_and_hand_logged_are_not(self):
+        from datetime import date
+
+        from . import services
+        from .models import FuelLog
+
+        van = Vehicle.objects.create(make="Van 4", model="HiAce", rego="YKG89N")
+        base = dict(vehicle=van, litres=40, cost=80, odometer=1000)
+        FuelLog.objects.create(date=date(2026, 10, 12), notes="Metro Petroleum Sydenham · imported from fuel statement 14-10-2026", statement=date(2026, 10, 14), **base)
+        FuelLog.objects.create(date=date(2026, 10, 13), notes="METRO PETROLEUM  SYDENHAM · imported from fuel statement 14-10-2026", statement=date(2026, 10, 14), **{**base, "odometer": 1400})
+        FuelLog.objects.create(date=date(2026, 10, 9), notes="Shell Mascot · imported from fuel statement 14-10-2026", statement=date(2026, 10, 14), **{**base, "odometer": 900})
+        FuelLog.objects.create(date=date(2026, 10, 8), notes="topped up at the depot", **{**base, "odometer": 800})  # logged by hand: no station known
+        flags = [f for f in services.fuel_insights(FuelLog.objects.all())["fuelFlags"] if f["kind"] == "Other station"]
+        self.assertEqual([(f["date"], f["text"]) for f in flags], [("2026-10-09", "40.00 L at Shell Mascot, not Metro Petroleum Sydenham")])
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        rows = {r["date"]: r["otherStation"] for r in api.get("/api/fuel-logs/", {"page_size": 50}).data["results"]}
+        self.assertEqual(rows, {"2026-10-12": False, "2026-10-13": False, "2026-10-09": True, "2026-10-08": False})
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

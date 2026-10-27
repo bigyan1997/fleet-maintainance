@@ -164,14 +164,20 @@ class FuelLogSerializer(serializers.ModelSerializer):
     vehicleSub = serializers.CharField(source="vehicle.subtitle", read_only=True)
     pricePerLitre = serializers.SerializerMethodField()
     isFuel = serializers.BooleanField(source="is_fuel", read_only=True)
+    otherStation = serializers.SerializerMethodField()
 
     class Meta:
         model = FuelLog
         fields = [
             "id", "vehicle", "vehicleLabel", "vehicleSub", "date", "product", "isFuel", "litres", "cost",
-            "pricePerLitre", "odometer", "invoice_number", "notes", "statement",
+            "pricePerLitre", "odometer", "invoice_number", "notes", "statement", "otherStation",
         ]
         read_only_fields = ["statement"]
+
+    def get_otherStation(self, obj):
+        from . import services
+
+        return obj.is_fuel and services.is_other_station(services.fuel_log_station(obj))
 
     def get_pricePerLitre(self, obj):
         return obj.price_per_litre

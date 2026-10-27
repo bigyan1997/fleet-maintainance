@@ -106,6 +106,7 @@ After you click **Import**, each van's km becomes the km on its **newest believa
 Fill-ups, card fees and AdBlue are all imported, so each van's total matches the statement to the cent. Litres, $/L and L/100km count diesel only.
 
 ### Reading the Fuel tab
+- **Other stations:** a fill-up at any station other than **Metro Petroleum Sydenham** is marked with a red **Other station** badge. A red bar at the top of the Fuel page counts them for the statement you're looking at and names the vans (**Show the list** gives each date, station, litres and cost). The same fill-ups are listed under **Reports → Fuel → Fuel — worth checking**, and the import preview marks them before you click Import. Only fill-ups imported from a statement are checked (a fill-up you log by hand has no station).
 - It opens on the **latest statement**, showing exactly the lines on that statement, so its total matches the statement to the cent (the fuel company's statements overlap by a day: a few late-posted fill-ups are dated the day the last one ended, and they belong to the newer one). Use **‹ ›** for earlier statements, or **All time**.
 - One row per van: fill-ups, litres, average $/L, L/100km, **Fuel | Card fees | Total (as on statement)**. Click a van to see its fill-ups. Every date on the Fuel pages has the day of the week in front of it (for example **Tue 06-10-2026**).
 - **Filters ▾** has van, dates, search, and "Every line" for the full list.
