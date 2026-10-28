@@ -195,6 +195,7 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
             <tr className="border-b border-line bg-[#fafafa] text-xs text-off">
               <th className="px-3 py-2.5 text-left font-medium">Vehicle</th>
               <th className="px-3 py-2.5 text-left font-medium">Date</th>
+              <th className="px-3 py-2.5 text-left font-medium">Station</th>
               <th className="px-3 py-2.5 text-left font-medium">Litres</th>
               <th className="px-3 py-2.5 text-left font-medium">Cost</th>
               <th className="px-3 py-2.5 text-left font-medium">$/L</th>
@@ -205,12 +206,13 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-3 py-10 text-center text-off">{hasFilters ? 'No fuel records match the current filters.' : 'No fuel records yet.'}</td></tr>
+              <tr><td colSpan={9} className="px-3 py-10 text-center text-off">{hasFilters ? 'No fuel records match the current filters.' : 'No fuel records yet.'}</td></tr>
             ) : (
               rows.map((f) => (
-                <tr key={f.id} className="cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa]" onClick={() => setDetail(f)}>
+                <tr key={f.id} className={'cursor-pointer border-b border-[#f0f0f0] ' + (f.otherStation ? 'bg-[#fde4e4] hover:bg-[#fbd5d5] shadow-[inset_4px_0_0_#d23b3b]' : 'hover:bg-[#fafafa]')} onClick={() => setDetail(f)}>
                   <td className="max-w-[260px] overflow-hidden px-3 py-2.5 text-ellipsis whitespace-nowrap">{f.vehicleLabel}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">{fmtDayDate(f.date)}{f.isFuel && isWeekend(f.date) && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">Weekend</span>}</td>
+                  <td className="px-3 py-2.5">{f.isFuel ? (f.notes || '').split(' · ')[0] || <span className="text-off">—</span> : <span className="text-off">—</span>}</td>
                   <td className="px-3 py-2.5">{f.isFuel ? `${f.litres} L` : <span className="text-off">{f.product}</span>}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">${f.cost}</td>
                   <td className="px-3 py-2.5">{f.pricePerLitre ? `$${f.pricePerLitre}` : '—'}</td>

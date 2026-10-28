@@ -33,7 +33,7 @@ function RowActions({ f, onEdit, onDelete }) {
 
 // One van's fill-ups, then its card charges, with a total that matches the
 // fuel card statement.
-export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered = false }) {
+export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered = false, subset = false }) {
   const fuelCost = sum(fills, 'cost')
   const chargeCost = sum(charges, 'cost')
   const th = 'py-2 pr-3 font-medium'
@@ -55,7 +55,7 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
         </thead>
         <tbody>
           {fills.map((f, i) => (
-            <tr key={f.id} className={`cursor-pointer border-b border-[#f0f0f0] hover:bg-[#f0f5fb] ${i % 2 ? 'bg-[#fafafa]' : ''}`} onClick={() => onPick(f)}>
+            <tr key={f.id} className={`cursor-pointer border-b border-[#f0f0f0] ${f.otherStation ? 'bg-[#fde4e4] hover:bg-[#fbd5d5] shadow-[inset_4px_0_0_#d23b3b]' : `hover:bg-[#f0f5fb] ${i % 2 ? 'bg-[#fafafa]' : ''}`}`} onClick={() => onPick(f)}>
               <td className="py-2 pr-3 pl-3 whitespace-nowrap">
                 {fmtDayDate(f.date)}
                 {isWeekend(f.date) && <span className="ml-1.5 rounded bg-warn-bg px-1.5 py-0.5 text-[11px] font-medium text-warn">Weekend</span>}
@@ -74,13 +74,13 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
             </tr>
           ))}
           <tr className="border-b border-line bg-[#f5f8fc] font-semibold">
-            <td className="py-2 pr-3 pl-3" colSpan={2}>Fuel — {fills.length} fill-up{fills.length === 1 ? '' : 's'}</td>
+            <td className="py-2 pr-3 pl-3" colSpan={2}>{subset ? 'At other stations' : 'Fuel'} — {fills.length} fill-up{fills.length === 1 ? '' : 's'}</td>
             <td className={num}>{sum(fills, 'litres').toFixed(2)} L</td>
             <td />
             <td className={num}>{money(fuelCost)}</td>
             <td colSpan={3} />
           </tr>
-          {charges.length > 0 && (
+          {!subset && charges.length > 0 && (
             <>
               <tr>
                 <td colSpan={8} className="pt-3 pb-1 pl-3 text-xs font-medium tracking-wide text-off uppercase">Card fees &amp; other charges</td>
@@ -101,11 +101,13 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
               </tr>
             </>
           )}
-          <tr className="bg-[#eaf1f9] text-[14px] font-bold">
-            <td className="py-2.5 pr-3 pl-3" colSpan={4}>Total{charges.length > 0 && ' (as on the fuel card statement)'}</td>
-            <td className={num}>{money(fuelCost + chargeCost)}</td>
-            <td colSpan={3} />
-          </tr>
+          {!subset && (
+            <tr className="bg-[#eaf1f9] text-[14px] font-bold">
+              <td className="py-2.5 pr-3 pl-3" colSpan={4}>Total{charges.length > 0 && ' (as on the fuel card statement)'}</td>
+              <td className={num}>{money(fuelCost + chargeCost)}</td>
+              <td colSpan={3} />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -115,6 +117,7 @@ export function VanDetail({ fills, charges, onPick, onEdit, onDelete, centered =
 // One row per van with its totals; click a van to see its fill-ups.
 export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
   const [open, setOpen] = useState(null)
+  const [onlyOther, setOnlyOther] = useState(false) // the open van shows just its other-station fill-ups
 
   const groups = Object.values(
     rows.reduce((acc, f) => {
@@ -129,11 +132,12 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-[13px]">
+      <table className="w-full min-w-[800px] border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-line bg-[#fafafa] text-xs text-off">
             <th className="px-3 py-2.5 text-left font-medium">Van</th>
             <th className="px-3 py-2.5 text-right font-medium">Fill-ups</th>
+            <th className="px-3 py-2.5 text-right font-medium" title="Fill-ups at a station other than Metro Petroleum Sydenham">Other station</th>
             <th className="px-3 py-2.5 text-right font-medium">Litres</th>
             <th className="px-3 py-2.5 text-right font-medium">Avg $/L</th>
             <th className="px-3 py-2.5 text-right font-medium">L/100km</th>
@@ -153,9 +157,11 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
             const per100 = consumption(fills)
             const weekend = fills.filter((f) => isWeekend(f.date)).length
             const isOpen = open === g.id
+            const other = fills.filter((f) => f.otherStation)
+            const showOther = isOpen && onlyOther
             const num = 'px-3 py-2.5 text-right tabular-nums whitespace-nowrap'
             return [
-              <tr key={g.id} className={`cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa] ${isOpen ? 'bg-[#f5f8fc]' : ''}`} onClick={() => setOpen(isOpen ? null : g.id)}>
+              <tr key={g.id} className={`cursor-pointer border-b border-[#f0f0f0] hover:bg-[#fafafa] ${isOpen ? 'bg-[#f5f8fc]' : ''}`} onClick={() => { setOnlyOther(false); setOpen(isOpen ? null : g.id) }}>
                 <td className="px-3 py-2.5 font-medium">
                   <span className="mr-1.5 inline-block w-3 text-off">{isOpen ? '▾' : '▸'}</span>
                   {g.label}
@@ -163,6 +169,17 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
                 <td className={num}>
                   {fills.length}
                   {weekend > 0 && <div className="text-[11px] font-medium text-warn">{weekend} on a weekend</div>}
+                </td>
+                <td className={num} onClick={(e) => e.stopPropagation()}>
+                  {other.length > 0 ? (
+                    <button
+                      onClick={() => { if (showOther) { setOpen(null); setOnlyOther(false) } else { setOpen(g.id); setOnlyOther(true) } }}
+                      className={'rounded-full px-2.5 py-0.5 text-xs font-semibold ' + (showOther ? 'bg-due text-white' : 'bg-due-bg text-due hover:brightness-95')}
+                      title="Open the fill-ups at other stations"
+                    >
+                      {other.length} elsewhere
+                    </button>
+                  ) : <span className="text-off">—</span>}
                 </td>
                 <td className={num}>{litres.toFixed(2)} L</td>
                 <td className={num}>{litres ? `$${(fuelCost / litres).toFixed(3)}` : '—'}</td>
@@ -175,8 +192,14 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
               </tr>,
               isOpen && (
                 <tr key={`${g.id}-fills`} className="border-b border-line bg-[#f5f8fc]">
-                  <td colSpan={10} className="px-3 pt-2 pb-5">
-                    <VanDetail fills={fills} charges={charges} onPick={onPick} onEdit={onEdit} onDelete={onDelete} centered />
+                  <td colSpan={11} className="px-3 pt-2 pb-5">
+                    {showOther && (
+                      <div className="mx-auto mb-2 flex max-w-[960px] flex-wrap items-center justify-between gap-2 rounded-md bg-due-bg px-3 py-2 text-[13px] text-due">
+                        <span><b>{g.label}: {other.length} fill-up{other.length === 1 ? '' : 's'} at a station other than Metro Petroleum Sydenham</b> (of {fills.length})</span>
+                        <button onClick={() => setOnlyOther(false)} className="font-semibold underline">Show all {fills.length} fill-ups</button>
+                      </div>
+                    )}
+                    <VanDetail fills={showOther ? other : fills} charges={showOther ? [] : charges} subset={showOther} onPick={onPick} onEdit={onEdit} onDelete={onDelete} centered />
                   </td>
                 </tr>
               ),
@@ -190,6 +213,7 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
               {allFuel.length}
               {allFuel.some((f) => isWeekend(f.date)) && <div className="text-[11px] font-medium text-warn">{allFuel.filter((f) => isWeekend(f.date)).length} on a weekend</div>}
             </td>
+            <td className="px-3 py-2.5 text-right tabular-nums text-due">{allFuel.filter((f) => f.otherStation).length || '—'}</td>
             <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{sum(allFuel, 'litres').toFixed(2)} L</td>
             <td colSpan={2} />
             <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{money(sum(allFuel, 'cost'))}</td>
@@ -201,7 +225,7 @@ export function FuelByVan({ rows, emptyText, onPick, onEdit, onDelete }) {
       </table>
       <p className="border-t border-line px-3 py-2.5 text-xs text-off">
         <b>Fuel</b> = diesel fill-ups. <b>Card fees</b> = roadside assist, card &amp; management fees, AdBlue and other non-fuel charges on the fuel card.
-        <b> Total</b> = both, the same as each card's total on the fuel card statement. Fill-ups, litres, $/L and L/100km count diesel only. <b>Weekend</b> marks a fill-up made on a Saturday or Sunday.
+        <b> Total</b> = both, the same as each card's total on the fuel card statement. Fill-ups, litres, $/L and L/100km count diesel only. <b>Weekend</b> marks a fill-up made on a Saturday or Sunday. <b>Other station</b> counts fill-ups at a station other than Metro Petroleum Sydenham; click the red number to see just those.
       </p>
     </div>
   )
