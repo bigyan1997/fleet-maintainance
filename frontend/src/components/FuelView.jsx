@@ -172,11 +172,43 @@ export function FuelView({ onEdit, onAdd, hideHeaderActions }) {
             <button onClick={() => setShowOther(!showOther)} className="font-semibold underline">{showOther ? 'Hide the list' : 'Show the list'}</button>
           </div>
           {showOther && (
-            <ul className="mt-1.5 grid gap-0.5">
-              {otherStation.map((f) => (
-                <li key={f.id}>{f.vehicleLabel} · {fmtDayDate(f.date)} · {(f.notes || '').split(' · ')[0]} · {Number(f.litres).toFixed(2)} L · ${Number(f.cost).toFixed(2)}</li>
-              ))}
-            </ul>
+            <div className="mt-2 overflow-x-auto rounded-md border border-[#f5b5b5] bg-white text-ink">
+              <table className="w-full min-w-[640px] border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-[#f5b5b5] bg-[#fde4e4] text-left text-xs text-due">
+                    <th className="px-3 py-2 font-semibold">Van</th>
+                    <th className="px-3 py-2 font-semibold">Date</th>
+                    <th className="px-3 py-2 font-semibold">Station</th>
+                    <th className="px-3 py-2 text-right font-semibold">Litres</th>
+                    <th className="px-3 py-2 text-right font-semibold">$/L</th>
+                    <th className="px-3 py-2 text-right font-semibold">Cost</th>
+                    <th className="px-3 py-2 text-right font-semibold">Odometer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {otherStation.map((f, i) => (
+                    <tr key={f.id} className={'border-b border-[#f0f0f0] last:border-0 ' + (i % 2 ? 'bg-[#fafafa]' : '')}>
+                      <td className="px-3 py-2 font-medium whitespace-nowrap">{f.vehicleLabel}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{fmtDayDate(f.date)}</td>
+                      <td className="px-3 py-2">{(f.notes || '').split(' · ')[0]}</td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{Number(f.litres).toFixed(2)} L</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-off">{f.pricePerLitre ? `$${f.pricePerLitre}` : '—'}</td>
+                      <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">${Number(f.cost).toFixed(2)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{f.odometer ? `${f.odometer.toLocaleString()} km` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-[#f5b5b5] bg-[#fde4e4] font-semibold">
+                    <td className="px-3 py-2" colSpan={3}>{otherStation.length} fill-up{otherStation.length === 1 ? '' : 's'}</td>
+                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{otherStation.reduce((t, f) => t + Number(f.litres), 0).toFixed(2)} L</td>
+                    <td />
+                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">${otherStation.reduce((t, f) => t + Number(f.cost), 0).toFixed(2)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
         </div>
       )}
