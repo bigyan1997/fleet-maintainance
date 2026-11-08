@@ -12,7 +12,7 @@ import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
 
 const SERVICE_TYPES = [
   'Refrigeration unit', 'Scheduled service', 'Tyre rotation', 'Tyre replacement',
-  'Brake service', 'Repair / parts', 'Registration', 'Fuel log',
+  'Battery replacement', 'Brake service', 'Repair / parts', 'Registration', 'Fuel log',
 ]
 
 // Sydney's date, not UTC (UTC is still yesterday before ~10-11 am here).

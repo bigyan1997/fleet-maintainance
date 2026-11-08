@@ -22,6 +22,7 @@ SERVICE_TYPE_CHOICES = [
     ("Scheduled service", "Scheduled service"),
     ("Tyre rotation", "Tyre rotation"),
     ("Tyre replacement", "Tyre replacement"),
+    ("Battery replacement", "Battery replacement"),
     ("Brake service", "Brake service"),
     ("Repair / parts", "Repair / parts"),
     ("Registration", "Registration"),

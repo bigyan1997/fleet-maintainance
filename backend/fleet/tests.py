@@ -713,6 +713,16 @@ class OtherStationTests(TestCase):
         self.assertEqual(rows, {"2026-10-12": False, "2026-10-13": False, "2026-10-09": True, "2026-10-08": False})
 
 
+class BatteryReplacementTests(TestCase):
+    def test_battery_replacement_can_be_logged_as_a_service(self):
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+        res = api.post("/api/services/", {"vehicle": van.pk, "service_type": "Battery replacement", "date": "2026-11-09", "status": "Invoiced", "cost": "220"}, format="json")
+        self.assertEqual(res.status_code, 201, res.data)
+        self.assertEqual(api.get("/api/services/", {"service_type": "Battery replacement"}).data["results"][0]["service_type"], "Battery replacement")
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
