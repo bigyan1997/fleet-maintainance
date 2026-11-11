@@ -10,7 +10,7 @@ the same way NPD Tracker keeps its product photos:
             <Van>/
                 SER-VAN6-07102026.jpg                              (service, van, date)
 
-The Drive is the achievecafeprovisions@gmail.com account's. A personal
+The Drive is the office Google account's. A personal
 account can't take files from a service account (no storage quota), so the
 app acts as that account through an OAuth refresh token, written once by
 `manage.py drive_authorize` (FLEET_DRIVE_TOKEN_FILE).
