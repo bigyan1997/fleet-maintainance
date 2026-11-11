@@ -723,6 +723,28 @@ class BatteryReplacementTests(TestCase):
         self.assertEqual(api.get("/api/services/", {"service_type": "Battery replacement"}).data["results"][0]["service_type"], "Battery replacement")
 
 
+class PhonePhotoNameTests(TestCase):
+    """Phones give pictures odd or missing extensions; any picture is accepted."""
+
+    def test_pictures_with_unusual_names_upload_and_non_pictures_are_still_refused(self):
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+        incident = Incident.objects.create(vehicle=van, incident_type="Damage", date=date(2026, 11, 11), severity="Minor")
+
+        def up(name, ctype, content=JPEG):
+            return api.post("/api/attachments/", {"file": SimpleUploadedFile(name, content, content_type=ctype), "kind": "Issue photo", "incident": incident.pk}, format="multipart")
+
+        with mock.patch.object(drive, "enabled", return_value=False):
+            for name, ctype in (("IMG_1.JPG", "image/jpeg"), ("photo.heif", "image/heif"), ("pic.jfif", "image/jpeg"), ("image", "image/jpeg"), ("blob", "image/png"), ("x.avif", "image/avif")):
+                self.assertEqual(up(name, ctype).status_code, 201, name)
+            names = sorted(a.original_name for a in Attachment.objects.all())
+            self.assertIn("image.jpg", names)  # a missing extension is filled in from the picture type
+            self.assertIn("blob.png", names)
+            self.assertEqual(up("virus.exe", "application/octet-stream", b"MZ").status_code, 400)  # a program is still refused
+            self.assertEqual(up("notes.txt", "text/plain", b"hi").status_code, 201)  # text is a document type
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

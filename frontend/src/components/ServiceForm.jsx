@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { todayIso } from '../lib/formatDate'
 import { useEffect, useState } from 'react'
-import { createMechanic, fetchMechanics, uploadAttachment } from '../api/extra'
+import { createMechanic, fetchMechanics } from '../api/extra'
 import { fetchVehicles } from '../api/vehicles'
 import { createService, fetchService, updateService } from '../api/services'
 import { fetchAttachments } from '../api/extra'
 import { Documents } from './Documents'
-import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
+import { ISSUE_PHOTO, IssuePhotos, uploadPending } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { SERVICE_STATUSES, statusWord } from '../lib/serviceStatus'
 
@@ -89,16 +89,18 @@ function ServiceFormInner({ service, onDone, onSaved, onError }) {
       const payload = { ...form, mechanic, odometer: form.odometer || null, cost: form.cost || null }
       if (isEdit) return updateService(service.id, payload)
       const saved = await createService(payload)
-      await Promise.all(pendingPhotos.map((file) => uploadAttachment({ file, kind: ISSUE_PHOTO, vehicle: saved.vehicle, service: saved.id })))
-      return saved
+      const photos = await uploadPending(pendingPhotos, { kind: ISSUE_PHOTO, vehicle: saved.vehicle, service: saved.id })
+      return { ...saved, photoProblem: photos }
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['mechanics'] })
       queryClient.invalidateQueries({ queryKey: ['services'] })
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['attachments'] })
-      onSaved(isEdit ? 'Record updated.' : 'Record saved.')
+      const p = saved?.photoProblem
+      if (p?.failed) onError(`Record saved, but ${p.failed} photo${p.failed === 1 ? '' : 's'} didn't upload${p.why ? `: ${p.why}` : ''}. Open the job to add ${p.failed === 1 ? 'it' : 'them'} again.`)
+      else onSaved(isEdit ? 'Record updated.' : 'Record saved.')
       onDone(isEdit)
     },
     onError: (err) => onError(err?.response?.data?.detail ?? 'Could not save record.'),

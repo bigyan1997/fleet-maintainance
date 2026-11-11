@@ -7,6 +7,15 @@ import { ConfirmDialog } from './ConfirmDialog'
 
 export const ISSUE_PHOTO = 'Issue photo'
 
+// Uploads the photos picked on a new record. The record is already saved, so a
+// photo that fails is reported, never thrown (which would show "could not save").
+export async function uploadPending(files, fields) {
+  const results = await Promise.allSettled(files.map((file) => uploadAttachment({ file, ...fields })))
+  const failed = results.filter((r) => r.status === 'rejected')
+  const why = failed[0]?.reason?.response?.data?.detail ?? failed[0]?.reason?.message ?? ''
+  return { failed: failed.length, why }
+}
+
 // A thumbnail that falls back to a plain tile when the browser can't show
 // the picture (e.g. an iPhone HEIC opened on Windows).
 function Thumb({ src, name }) {
@@ -64,7 +73,7 @@ export function IssuePhotos({ service, incident, vehicle, label = 'Photos of the
   })
 
   const add = (fileList) => {
-    const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/') || /\.heic$/i.test(f.name))
+    const files = [...(fileList || [])].filter((f) => f.type.startsWith('image/') || /\.(heic|heif|jfif|avif|tiff?|bmp)$/i.test(f.name) || !f.type)
     if (!files.length) return
     if (job) upload.mutate(files)
     else onPendingChange?.([...pending, ...files])
@@ -104,7 +113,7 @@ export function IssuePhotos({ service, incident, vehicle, label = 'Photos of the
           {upload.isPending ? 'Uploading…' : <><span className="text-lg leading-none">+</span>Add photo</>}
           <input
             type="file"
-            accept="image/*,.heic"
+            accept="image/*,.heic,.heif"
             multiple
             className="hidden"
             disabled={upload.isPending}

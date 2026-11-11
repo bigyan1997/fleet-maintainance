@@ -22,6 +22,7 @@ from .serializers import FineSerializer, StockItemSerializer, StockMoveSerialize
 logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".gif", ".jfif", ".avif", ".tif", ".tiff", ".bmp"}
 ALLOWED_UPLOAD_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
 LICENCE_FILE_EXTS = {".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".doc", ".docx"}
 
@@ -93,23 +94,22 @@ class DriverFileViewSet(viewsets.ViewSet):
         driver = Driver.objects.filter(pk=request.data.get("driver") or 0).first()
         if not upload or not driver:
             return Response({"detail": "Choose a photo or scan of the licence."}, status=status.HTTP_400_BAD_REQUEST)
-        ext = ("." + upload.name.rsplit(".", 1)[-1].lower()) if "." in upload.name else ""
-        if ext not in LICENCE_FILE_EXTS:
+        filename, content_type = _photo_name(upload, LICENCE_FILE_EXTS)
+        if not filename:
             return Response({"detail": "Use a photo or a PDF of the licence."}, status=status.HTTP_400_BAD_REQUEST)
         if upload.size > MAX_UPLOAD_BYTES:
             return Response({"detail": "That file is over 20 MB. Try a smaller scan or photo."}, status=status.HTTP_400_BAD_REQUEST)
-        content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
-        fields = dict(driver=driver, original_name=upload.name[:255], content_type=content_type, size=upload.size, uploaded_by=request.user)
+        fields = dict(driver=driver, original_name=filename[:255], content_type=content_type, size=upload.size, uploaded_by=request.user)
         saved = None
         if drive.enabled():
             try:
-                meta, name = drive.upload_driver_file(drive.DriveClient(), driver, upload.name, upload.read(), content_type)
+                meta, name = drive.upload_driver_file(drive.DriveClient(), driver, filename, upload.read(), content_type)
                 saved = DriverFile.objects.create(
                     **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
                 )
             except Exception:
                 # Never lose the photo: keep it on this PC instead.
-                logger.exception("Drive upload failed; keeping %s on disk", upload.name)
+                logger.exception("Drive upload failed; keeping %s on disk", filename)
                 upload.seek(0)
         if saved is None:
             saved = DriverFile.objects.create(file=upload, **fields)
@@ -236,6 +236,21 @@ class MechanicViewSet(viewsets.ViewSet):
 # ── Documents ──────────────────────────────────────────────────────────────
 
 
+def _photo_name(upload, allowed):
+    """(file name to keep, content type), or (None, content type) when the file is
+    not allowed. Any picture is accepted: phones give pictures odd or missing
+    extensions (image, blob, .heif, .jfif, .avif), so the picture type counts, not the name."""
+    name = upload.name or "photo"
+    ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
+    content_type = upload.content_type or mimetypes.guess_type(name)[0] or ""
+    if content_type.startswith("image/"):
+        if ext not in allowed and ext not in IMAGE_EXTS:
+            guessed = {"image/jpeg": ".jpg", "image/jpg": ".jpg", "image/pjpeg": ".jpg", "image/heic": ".heic", "image/heif": ".heif"}.get(content_type)
+            name = f"{name.rsplit('.', 1)[0] if '.' in name else name}{guessed or mimetypes.guess_extension(content_type) or '.jpg'}"
+        return name, content_type
+    return (name if ext in allowed else None), content_type
+
+
 class AttachmentViewSet(viewsets.ViewSet):
     def list(self, request):
         drive.move_local_files()  # anything saved on this server's disk earlier goes to Drive now
@@ -254,8 +269,8 @@ class AttachmentViewSet(viewsets.ViewSet):
         upload = request.FILES.get("file")
         if not upload:
             return Response({"detail": "Choose a file to upload."}, status=status.HTTP_400_BAD_REQUEST)
-        ext = ("." + upload.name.rsplit(".", 1)[-1].lower()) if "." in upload.name else ""
-        if ext not in ALLOWED_UPLOAD_EXTS:
+        filename, content_type = _photo_name(upload, ALLOWED_UPLOAD_EXTS)
+        if not filename:
             return Response({"detail": "That type of file can't be attached. Use a PDF, photo, Word or Excel file."}, status=status.HTTP_400_BAD_REQUEST)
         if upload.size > MAX_UPLOAD_BYTES:
             return Response({"detail": "That file is over 20 MB. Try a smaller scan or photo."}, status=status.HTTP_400_BAD_REQUEST)
@@ -273,9 +288,8 @@ class AttachmentViewSet(viewsets.ViewSet):
             return Response({"detail": "Say which van this file belongs to."}, status=status.HTTP_400_BAD_REQUEST)
 
         kind = request.data.get("kind") or "Other"
-        content_type = upload.content_type or mimetypes.guess_type(upload.name)[0] or ""
         fields = dict(
-            original_name=upload.name[:255], content_type=content_type, size=upload.size, kind=kind,
+            original_name=filename[:255], content_type=content_type, size=upload.size, kind=kind,
             vehicle=vehicle, service=service, incident=incident, fine=fine, uploaded_by=request.user,
         )
         att = None
@@ -283,14 +297,14 @@ class AttachmentViewSet(viewsets.ViewSet):
             try:
                 meta, name = drive.upload_for(
                     drive.DriveClient(), vehicle=vehicle, job=service or incident, kind=kind,
-                    filename=upload.name, content=upload.read(), content_type=content_type, fine=fine,
+                    filename=filename, content=upload.read(), content_type=content_type, fine=fine,
                 )
                 att = Attachment.objects.create(
                     **{**fields, "original_name": name}, drive_file_id=meta["id"], drive_modified_at=drive.parse_time(meta.get("modifiedTime")),
                 )
             except Exception:
                 # Never lose the photo: keep it on this PC instead.
-                logger.exception("Drive upload failed; keeping %s on disk", upload.name)
+                logger.exception("Drive upload failed; keeping %s on disk", filename)
                 upload.seek(0)
         if att is None:
             att = Attachment.objects.create(file=upload, **fields)

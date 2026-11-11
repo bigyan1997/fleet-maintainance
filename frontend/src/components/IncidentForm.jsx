@@ -5,8 +5,7 @@ import { fetchVehicles } from '../api/vehicles'
 import { fetchServices } from '../api/services'
 import { fmtDate } from '../lib/formatDate'
 import { createIncident, updateIncident } from '../api/incidents'
-import { uploadAttachment } from '../api/extra'
-import { ISSUE_PHOTO, IssuePhotos } from './IssuePhotos'
+import { ISSUE_PHOTO, IssuePhotos, uploadPending } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { IncidentLog } from './IncidentLog'
 
@@ -54,14 +53,16 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
       const payload = { ...form, cost: form.cost || null, resolved_date: form.resolved_date || null, fixed_by_service: form.fixed_by_service || null }
       if (isEdit) return updateIncident(incident.id, payload)
       const saved = await createIncident(payload)
-      await Promise.all(pendingPhotos.map((file) => uploadAttachment({ file, kind: ISSUE_PHOTO, vehicle: saved.vehicle, incident: saved.id })))
-      return saved
+      const photos = await uploadPending(pendingPhotos, { kind: ISSUE_PHOTO, vehicle: saved.vehicle, incident: saved.id })
+      return { ...saved, photoProblem: photos }
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['attachments'] })
       queryClient.invalidateQueries({ queryKey: ['incidents'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      onSaved(isEdit ? 'Incident updated.' : 'Incident logged.')
+      const p = saved?.photoProblem
+      if (p?.failed) onError(`Incident logged, but ${p.failed} photo${p.failed === 1 ? '' : 's'} didn't upload${p.why ? `: ${p.why}` : ''}. Open the incident to add ${p.failed === 1 ? 'it' : 'them'} again.`)
+      else onSaved(isEdit ? 'Incident updated.' : 'Incident logged.')
       onDone(true)
     },
     onError: (err) => {
