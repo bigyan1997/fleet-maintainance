@@ -741,7 +741,12 @@ class PhonePhotoNameTests(TestCase):
             names = sorted(a.original_name for a in Attachment.objects.all())
             self.assertIn("image.jpg", names)  # a missing extension is filled in from the picture type
             self.assertIn("blob.png", names)
-            self.assertEqual(up("virus.exe", "application/octet-stream", b"MZ").status_code, 400)  # a program is still refused
+            # A HEIC picked on Windows has no known type (the browser sends "application/octet-stream").
+            self.assertEqual(up("IMG_0123.HEIC", "application/octet-stream").status_code, 201)
+            self.assertEqual(up("IMG_0124.heic", "").status_code, 201)
+            refused = up("virus.exe", "application/octet-stream", b"MZ")
+            self.assertEqual(refused.status_code, 400)  # a program is still refused
+            self.assertIn("virus.exe", refused.data["detail"])  # and the message names the file and its type
             self.assertEqual(up("notes.txt", "text/plain", b"hi").status_code, 201)  # text is a document type
 
 

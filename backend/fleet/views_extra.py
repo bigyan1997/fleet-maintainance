@@ -270,10 +270,14 @@ class AttachmentViewSet(viewsets.ViewSet):
         if not upload:
             return Response({"detail": "Choose a file to upload."}, status=status.HTTP_400_BAD_REQUEST)
         filename, content_type = _photo_name(upload, ALLOWED_UPLOAD_EXTS)
+        # The reason always says which file it was, so a refusal can be traced from the screen or the log.
+        about = f"{upload.name or 'the file'} ({content_type or 'unknown type'}, {upload.size / 1024 / 1024:.1f} MB)"
         if not filename:
-            return Response({"detail": "That type of file can't be attached. Use a PDF, photo, Word or Excel file."}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning("Upload refused (type): %s", about)
+            return Response({"detail": f"That type of file can't be attached: {about}. Use a PDF, photo, Word or Excel file."}, status=status.HTTP_400_BAD_REQUEST)
         if upload.size > MAX_UPLOAD_BYTES:
-            return Response({"detail": "That file is over 20 MB. Try a smaller scan or photo."}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning("Upload refused (size): %s", about)
+            return Response({"detail": f"That file is over 20 MB: {about}. Try a smaller scan or photo."}, status=status.HTTP_400_BAD_REQUEST)
 
         service = ServiceRecord.objects.filter(pk=request.data.get("service") or 0).first()
         incident = Incident.objects.filter(pk=request.data.get("incident") or 0).first()
@@ -285,7 +289,8 @@ class AttachmentViewSet(viewsets.ViewSet):
             or Vehicle.objects.filter(pk=request.data.get("vehicle") or 0).first()
         )
         if not vehicle:
-            return Response({"detail": "Say which van this file belongs to."}, status=status.HTTP_400_BAD_REQUEST)
+            logger.warning("Upload refused (no van): %s, form fields %s", about, sorted(request.data.keys()))
+            return Response({"detail": f"Say which van this file belongs to ({about})."}, status=status.HTTP_400_BAD_REQUEST)
 
         kind = request.data.get("kind") or "Other"
         fields = dict(
