@@ -750,6 +750,28 @@ class PhonePhotoNameTests(TestCase):
             self.assertEqual(up("notes.txt", "text/plain", b"hi").status_code, 201)  # text is a document type
 
 
+class IncidentInvoiceFilesTests(TestCase):
+    def test_an_invoice_attached_to_an_incident_is_kept_in_drive_documents_and_counted(self):
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+        incident = Incident.objects.create(vehicle=van, incident_type="Breakdown", date=date(2026, 11, 15), severity="Minor", status="Resolved", resolution="New tyre")
+        fake = FakeDrive()
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "DriveClient", return_value=fake):
+            for name, ctype, body in (("invoice.pdf", "application/pdf", b"%PDF-1.4 inv"), ("IMG_9.HEIC", "image/heic", JPEG)):
+                res = api.post("/api/attachments/", {"file": SimpleUploadedFile(name, body, content_type=ctype), "kind": "Invoice", "incident": incident.pk}, format="multipart")
+                self.assertEqual(res.status_code, 201, res.data)
+            metas = [m for m, _ in fake.files.values()]
+            self.assertTrue(all(fake.path(m["parents"][0]) == f"Documents/{van}" for m in metas))
+            self.assertTrue(all(m["name"].startswith(f"DOC-{drive.van_code(van)}-") for m in metas))
+        # the damage photo strip is separate: only invoices and other files are counted
+        Attachment.objects.create(vehicle=van, incident=incident, kind=ISSUE_PHOTO, original_name="damage.jpg")
+        row = api.get("/api/incidents/").data["results"][0]
+        self.assertEqual(row["fileCount"], 2)
+        listed = api.get("/api/attachments/", {"incident": incident.pk}).data
+        self.assertEqual(sorted(d["kind"] for d in listed), ["Invoice", "Invoice", "Issue photo"])
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",
@@ -1103,11 +1125,14 @@ class DatabaseBackupTests(TestCase):
     def drive_with_old_copies(self):
         from datetime import timedelta
 
+        from . import backup as backup_module
+
         fake = FakeDrive()
         folder_id = fake.get_or_create_folder("Backups", "root-folder")
         fake.list_files = lambda fid: [
-            {"id": "old", "name": "BACKUP-01092026.dump", "createdTime": (timezone.now() - timedelta(days=40)).isoformat()},
-            {"id": "recent", "name": "BACKUP-10102026.dump", "createdTime": (timezone.now() - timedelta(days=4)).isoformat()},
+            # Names are built from today's date, so the test never goes stale as the calendar moves on.
+            {"id": "old", "name": backup_module.backup_name(timezone.localdate() - timedelta(days=40)), "createdTime": (timezone.now() - timedelta(days=40)).isoformat()},
+            {"id": "recent", "name": backup_module.backup_name(timezone.localdate() - timedelta(days=4)), "createdTime": (timezone.now() - timedelta(days=4)).isoformat()},
             {"id": "notours", "name": "holiday.jpg", "createdTime": (timezone.now() - timedelta(days=400)).isoformat()},
         ] if fid == folder_id else []
         fake.trash = fake.trashed.append

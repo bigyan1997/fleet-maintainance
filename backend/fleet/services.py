@@ -386,7 +386,7 @@ def delete_service(pk):
 
 
 def list_incidents(vehicle=None, incident_type="", status="", date_from=None, date_to=None, search=""):
-    qs = Incident.objects.select_related("vehicle").prefetch_related("updates__author")
+    qs = Incident.objects.select_related("vehicle").prefetch_related("updates__author", "attachments")
     if vehicle:
         qs = qs.filter(vehicle_id=vehicle)
     if date_from:

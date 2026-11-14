@@ -109,14 +109,19 @@ class IncidentSerializer(serializers.ModelSerializer):
     # Optional: appended to the log as a new dated entry on save.
     new_update = serializers.CharField(write_only=True, required=False, allow_blank=True)
     fixedByLabel = serializers.SerializerMethodField()
+    fileCount = serializers.SerializerMethodField()
 
     class Meta:
         model = Incident
         fields = [
             "id", "vehicle", "vehicleLabel", "vehicleSub", "incident_type", "date",
             "severity", "location", "description", "cost", "status", "notes",
-            "updates", "new_update", "resolution", "resolved_date", "fixed_by_service", "fixedByLabel",
+            "updates", "new_update", "resolution", "resolved_date", "fixed_by_service", "fixedByLabel", "fileCount",
         ]
+
+    def get_fileCount(self, obj):
+        # Invoices and other files; the damage photos have their own strip.
+        return sum(1 for a in obj.attachments.all() if a.kind != "Issue photo")
 
     def get_fixedByLabel(self, obj):
         s = obj.fixed_by_service

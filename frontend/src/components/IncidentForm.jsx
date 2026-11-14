@@ -8,6 +8,7 @@ import { createIncident, updateIncident } from '../api/incidents'
 import { ISSUE_PHOTO, IssuePhotos, uploadPending } from './IssuePhotos'
 import { Field, FormRow, NumberInput, SelectInput, DateInput, TextInput } from './FormFields'
 import { IncidentLog } from './IncidentLog'
+import { Documents } from './Documents'
 
 const TYPES = ['Accident', 'Breakdown', 'Damage', 'Other']
 const SEVERITIES = ['Minor', 'Moderate', 'Major']
@@ -180,6 +181,12 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
               <DateInput value={form.resolved_date} onChange={set('resolved_date')} />
             </Field>
           </FormRow>
+          <p className="mt-2 text-xs text-off">
+            {isEdit
+              ? "Attach the mechanic's invoice (photo, PDF or HEIC) in the Files box at the bottom."
+              : "Save first, then open the incident to attach the mechanic's invoice."}
+            {linked && ' The price is on the service job, so the invoice can go there too.'}
+          </p>
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -194,6 +201,13 @@ export function IncidentForm({ incident, onDone, onSaved, onError }) {
           Cancel
         </button>
       </div>
+      {isEdit && (
+        <div className="mt-6 border-t border-line pt-5">
+          <h3 className="mb-1 text-[14px] font-semibold text-ink">Files: invoice or quote</h3>
+          <p className="mb-3 text-xs text-off">The mechanic's invoice or quote, as a photo, PDF or HEIC. Kept in Google Drive under Documents for this van.</p>
+          <Documents incident={incident.id} vehicle={incident.vehicle} compact />
+        </div>
+      )}
     </div>
   )
 }
