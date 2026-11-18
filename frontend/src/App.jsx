@@ -75,10 +75,25 @@ function useToast() {
 }
 
 function App() {
+  const queryClient = useQueryClient()
   const meQuery = useQuery({ queryKey: ['me'], queryFn: me })
+  const [expired, setExpired] = useState(false)
+
+  useEffect(() => {
+    const onExpired = () => {
+      setExpired(true)
+      queryClient.setQueryData(['me'], null)
+    }
+    window.addEventListener('session-expired', onExpired)
+    return () => window.removeEventListener('session-expired', onExpired)
+  }, [queryClient])
+
+  useEffect(() => {
+    if (meQuery.data) setExpired(false)
+  }, [meQuery.data])
 
   if (meQuery.isLoading) return null
-  if (meQuery.isError || !meQuery.data) return <LoginPage />
+  if (meQuery.isError || !meQuery.data) return <LoginPage expired={expired} />
   return <MainApp username={meQuery.data.username} />
 }
 

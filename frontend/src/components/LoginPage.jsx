@@ -47,7 +47,7 @@ function GoogleSignInButton({ onCredential }) {
   return <div ref={buttonRef} className="mb-4 flex justify-center" />
 }
 
-export function LoginPage() {
+export function LoginPage({ expired = false }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -80,6 +80,12 @@ export function LoginPage() {
         <div className="mb-6 text-[11px] tracking-wide text-off uppercase">
           Achieve Cafe Provisions
         </div>
+
+        {expired && (
+          <div className="mb-4 rounded-md bg-[#fff4e0] px-3 py-2 text-[13px] font-semibold text-[#8a5a00]">
+            You've been signed out. Please log in again.
+          </div>
+        )}
 
         <GoogleSignInButton onCredential={(credential) => googleMutation.mutate(credential)} />
         {googleMutation.isError && (
