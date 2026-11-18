@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 import json
 
-from . import activity, drive, fuel_import, services
+from . import activity, drive, fuel_import, health, services
 from .models import FuelLog, FuelStatementFile, Incident, ServiceRecord, Vehicle
 from .pagination import FleetPagination
 from .serializers import (
@@ -372,6 +372,13 @@ class AnalyticsView(APIView):
             date_to=parse_date(request.query_params.get("date_to") or ""),
         )
         return Response(result)
+
+
+class HealthView(APIView):
+    """What is quietly wrong (Drive not connected, backups stopped), for Home's amber line. Empty when all is well."""
+
+    def get(self, request):
+        return Response({"problems": health.problems()})
 
 
 class QuickLinksView(APIView):

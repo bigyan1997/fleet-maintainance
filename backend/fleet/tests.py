@@ -772,6 +772,65 @@ class IncidentInvoiceFilesTests(TestCase):
         self.assertEqual(sorted(d["kind"] for d in listed), ["Invoice", "Invoice", "Issue photo"])
 
 
+class HealthLineTests(TestCase):
+    """The amber line on Home: only when Drive is disconnected or backups stopped."""
+
+    def setUp(self):
+        from . import health
+
+        self.health = health
+        health._drive_cache.update(at=0.0, reason=None)  # forget any earlier check
+        self.van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE")
+
+    def log(self, lines):
+        import pathlib
+
+        path = pathlib.Path(tempfile.mkdtemp()) / "backup.log"
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    def test_drive_down_with_files_waiting_names_the_count_and_the_last_drive_copy(self):
+        from datetime import date
+
+        Attachment.objects.create(vehicle=self.van, kind="Invoice", original_name="a.pdf", size=1, file="attachments/x/a.pdf")
+        Attachment.objects.create(vehicle=self.van, kind="Invoice", original_name="b.pdf", size=1, file="attachments/x/b.pdf")
+        log = self.log(["2026-11-12 20:00:03  BACKUP-2026-11-12.dump: 24 tables, 310 KB. Copied to Google Drive (Backups)."])
+        with mock.patch.object(drive, "enabled", return_value=False):
+            lines = self.health.problems(today=date(2026, 11, 13), log_path=log)
+        self.assertEqual([p["kind"] for p in lines], ["drive"])
+        self.assertEqual(lines[0]["text"], "Google Drive isn't connected: 2 files are waiting on this PC. Last backup copied to Drive: 12-11-2026.")
+
+    def test_all_well_is_silent_and_a_stopped_backup_is_called_out(self):
+        from datetime import date
+
+        fresh = self.log(["2026-11-18 20:00:03  BACKUP-2026-11-18.dump: 24 tables, 310 KB. Copied to Google Drive (Backups)."])
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "_get_credentials", return_value=object()):
+            self.assertEqual(self.health.problems(today=date(2026, 11, 19), log_path=fresh), [])
+            stale = self.log(["2026-11-12 20:00:03  BACKUP-2026-11-12.dump: 24 tables, 310 KB. Copied to Google Drive (Backups)."])
+            lines = self.health.problems(today=date(2026, 11, 19), log_path=stale)
+            self.assertEqual([p["text"] for p in lines], ["Backup problem. Last good backup: 12-11-2026 (7 days ago)."])
+            failed = self.log(["2026-11-18 20:00:03  FAILED: pg_dump failed: connection refused"])
+            self.assertIn("the last run failed", self.health.problems(today=date(2026, 11, 19), log_path=failed)[0]["text"])
+            # saved here but never reaching Drive
+            local_only = self.log(["2026-11-18 20:00:03  BACKUP-2026-11-18.dump: 24 tables, 310 KB. Saved on this computer only: Google Drive isn't connected."])
+            self.assertIn("not copied to Google Drive", self.health.problems(today=date(2026, 11, 19), log_path=local_only)[0]["text"])
+
+    def test_an_expired_sign_in_is_reported_and_the_pc_without_backups_set_up_is_not_nagged(self):
+        from datetime import date
+        import pathlib
+
+        with mock.patch.object(drive, "enabled", return_value=True), mock.patch.object(drive, "_get_credentials", side_effect=RuntimeError("invalid_grant")):
+            lines = self.health.problems(today=date(2026, 11, 19), log_path=pathlib.Path(tempfile.mkdtemp()) / "nothing.log")
+        self.assertEqual([p["text"] for p in lines], ["Google Drive sign-in has expired."])  # no backup log here: no backup nag
+
+    def test_the_health_endpoint_returns_the_lines(self):
+        api = APIClient()
+        api.force_authenticate(get_user_model().objects.create_user("office"))
+        with mock.patch.object(drive, "enabled", return_value=False):
+            data = api.get("/api/health/").data
+        self.assertTrue(any(p["kind"] == "drive" for p in data["problems"]))
+
+
 FUEL_TEXT = "\n".join([
     "METRO PETROLEUM CARD",
     "VEHICLE REPORT AND STATEMENT TO 08 SEP 26",

@@ -4,6 +4,7 @@ import { fetchDashboard } from '../api/dashboard'
 import { fetchDrivers } from '../api/extra'
 import { useStock } from '../api/stock'
 import { useFines } from '../api/fines'
+import { useHealth } from '../api/health'
 import { fetchIncidents } from '../api/incidents'
 import { fetchVehicles } from '../api/vehicles'
 import { fetchWashes } from '../api/washes'
@@ -128,6 +129,7 @@ export function HomeView() {
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: fetchDrivers })
   const stock = useStock()
   const fines = useFines()
+  const health = useHealth()
   const sub = Object.fromEntries((vehicles.data ?? []).map((v) => [v.id, v.subtitle]))
 
 
@@ -305,6 +307,18 @@ export function HomeView() {
 
   return (
     <div className="grid gap-4">
+      {(health.data?.problems ?? []).length > 0 && (
+        <div className="rounded-lg border border-[#e8c872] bg-warn-bg px-4 py-2.5 text-[13px] font-medium text-warn" role="alert">
+          {health.data.problems.map((p) => (
+            <div key={p.kind}>⚠ {p.text}</div>
+          ))}
+          {health.data.problems.some((p) => p.kind === 'drive') && (
+            <div className="mt-1 text-xs font-normal">
+              To fix: on the orders PC, open the fleet-maintenance folder, double-click <b>drive_sign_in.bat</b> and sign in with the office Google account. Waiting files then move to Drive by themselves.
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Tile label="Needs doing" value={items.length} note="see the list below" tone={items.length ? 'text-due' : 'text-ok'} />
         <Tile label="Booked & at the mechanic" value={jobs.length} note={jobsNote} />

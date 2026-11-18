@@ -11,6 +11,7 @@ from .views import (
     FuelStatementsView,
     FuelLogViewSet,
     IncidentViewSet,
+    HealthView,
     QuickLinksView,
     ServiceRecordViewSet,
     VehicleViewSet,
@@ -67,6 +68,7 @@ urlpatterns = [
     path("washes/", WashesView.as_view(), name="washes"),
     path("analytics/", AnalyticsView.as_view(), name="analytics"),
     path("links/", QuickLinksView.as_view(), name="links"),
+    path("health/", HealthView.as_view(), name="health"),
     path("version/", AppVersionView.as_view(), name="version"),
     *router.urls,
 ]
