@@ -221,6 +221,14 @@ export function VanPage({ id }) {
         </div>
       )}
 
+      {tyre?.snoozed_until && <SnoozedNote vehicleId={v.id} label={v.label} until={tyre.snoozed_until} kind="tyre" />}
+      {tyre && !tyre.snoozed_until && !tyre.booked && tyre.km_left < 2000 && !v.off_road && (
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-[13px] text-off">
+          <span>Tyre replacement is {tyre.km_left < 0 ? 'overdue' : 'coming up'}. Not a worry right now?</span>
+          <SnoozeButton vehicleId={v.id} label={v.label} kind="tyre" />
+        </div>
+      )}
+
       {(v.openJob || openIncidents.length > 0) && (
         <div className="mb-5 flex flex-wrap gap-2.5">
           {v.openJob && (

@@ -17,23 +17,25 @@ function isoPlusDays(days) {
 
 // Saves (or clears) the "not urgent" date for a van's service warning, then
 // refreshes everything that shows it.
-function useSnooze(vehicleId, label) {
+function useSnooze(vehicleId, label, kind = 'service') {
+  const field = kind === 'tyre' ? 'tyre_snoozed_until' : 'service_snoozed_until'
+  const what = kind === 'tyre' ? 'tyre warning' : 'service warning'
   const queryClient = useQueryClient()
   const { toast } = useActions()
   return useMutation({
-    mutationFn: (until) => patchVehicle(vehicleId, { service_snoozed_until: until }),
+    mutationFn: (until) => patchVehicle(vehicleId, { [field]: until }),
     onSuccess: (_data, until) => {
       for (const key of ['vehicles', 'vehicle', 'alerts', 'dashboard']) queryClient.invalidateQueries({ queryKey: [key] })
-      toast?.(until ? `${label}: service warning hidden until ${fmtDate(until)}.` : `${label}: service warning is back on.`)
+      toast?.(until ? `${label}: ${what} hidden until ${fmtDate(until)}.` : `${label}: ${what} is back on.`)
     },
     onError: () => toast?.('Could not save that. Try again.'),
   })
 }
 
 // "Not urgent" on a service-due line: pick how long to hide the warning for.
-export function SnoozeButton({ vehicleId, label }) {
+export function SnoozeButton({ vehicleId, label, kind }) {
   const [open, setOpen] = useState(false)
-  const snooze = useSnooze(vehicleId, label)
+  const snooze = useSnooze(vehicleId, label, kind)
   const pick = (days) => {
     setOpen(false)
     snooze.mutate(isoPlusDays(days))
@@ -63,12 +65,12 @@ export function SnoozeButton({ vehicleId, label }) {
 }
 
 // On the van's page: says the warning is hidden and lets you turn it back on.
-export function SnoozedNote({ vehicleId, label, until }) {
-  const unsnooze = useSnooze(vehicleId, label)
+export function SnoozedNote({ vehicleId, label, until, kind }) {
+  const unsnooze = useSnooze(vehicleId, label, kind)
   return (
     <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-[#f5f6f8] px-3.5 py-2 text-[13px] text-off">
       <span>
-        Service warning hidden as "not urgent" until <b className="text-ink">{fmtDate(until)}</b>. It comes back by itself that day.
+        {kind === 'tyre' ? 'Tyre' : 'Service'} warning hidden as "not urgent" until <b className="text-ink">{fmtDate(until)}</b>. It comes back by itself that day.
       </span>
       <button
         onClick={() => unsnooze.mutate(null)}

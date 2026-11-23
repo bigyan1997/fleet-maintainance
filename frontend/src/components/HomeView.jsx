@@ -180,6 +180,7 @@ export function HomeView() {
             <span className="flex flex-wrap items-center gap-2">
               <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>
               {a.title.startsWith('Scheduled service') && <SnoozeButton vehicleId={a.vehicleId} label={a.vehicle} />}
+              {a.title.startsWith('Tyre replacement') && <SnoozeButton vehicleId={a.vehicleId} label={a.vehicle} kind="tyre" />}
             </span>
           ),
       })),

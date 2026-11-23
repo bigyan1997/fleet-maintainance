@@ -105,7 +105,11 @@ def next_tyre_due(vehicle):
     if not last:
         return None
     due_at = last.odometer + vehicle.tyre_interval_km
-    return {"due_at": due_at, "km_left": due_at - vehicle.odometer, "booked": open_job(vehicle, "Tyre replacement")}
+    until = vehicle.tyre_snoozed_until
+    return {
+        "due_at": due_at, "km_left": due_at - vehicle.odometer, "booked": open_job(vehicle, "Tyre replacement"),
+        "snoozed_until": until if until and until > timezone.localdate() else None,
+    }
 
 
 def last_washed_by_vehicle():
@@ -570,7 +574,7 @@ def alerts():
         if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD and not svc["snoozed_until"]:
             add("Scheduled service due", f"{svc['due_at']:,} km{booked_note(svc)}", svc["km_left"], svc["booked"])
         tyre = next_tyre_due(v)
-        if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD:
+        if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD and not tyre["snoozed_until"]:
             add("Tyre replacement due", f"{tyre['due_at']:,} km{booked_note(tyre)}", tyre["km_left"], tyre["booked"])
     return rows
 

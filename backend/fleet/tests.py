@@ -1366,3 +1366,31 @@ class ServiceSnoozeTests(TestCase):
         van.save()
         self.assertEqual([a["title"] for a in services.alerts()], ["Scheduled service due"])
         self.assertEqual(services.vehicle_status_badge(van), "attention")
+
+    def test_not_urgent_hides_the_tyre_warning_separately_from_the_service_one(self):
+        from datetime import timedelta
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(
+            make="Van 3", model="iLoad", rego="CT07HE", odometer=100000, rego_expiry=today + timedelta(days=400),
+            tyre_interval_km=40000,
+        )
+        ServiceRecord.objects.create(vehicle=van, service_type="Tyre replacement", date=today - timedelta(days=300), status="Invoiced", odometer=61000)
+        self.assertEqual([a["title"] for a in services.alerts()], ["Tyre replacement due"])
+
+        user = get_user_model().objects.create_user("office", password="x")
+        client = APIClient()
+        client.force_authenticate(user)
+        until = today + timedelta(days=14)
+        res = client.patch(f"/api/vehicles/{van.pk}/", {"tyre_snoozed_until": until.isoformat()}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["nextTyreDue"]["snoozed_until"], until)
+        self.assertEqual(services.alerts(), [])
+        van.refresh_from_db()
+        self.assertEqual(services.vehicle_status_badge(van), "ok")
+
+        van.tyre_snoozed_until = today  # back on that day
+        van.save()
+        self.assertEqual([a["title"] for a in services.alerts()], ["Tyre replacement due"])

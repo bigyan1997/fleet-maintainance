@@ -24,7 +24,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "id", "make", "model", "year", "rego", "vin", "vehicle_number",
             "fuel_card_number", "toll_tag_number", "fuel_type", "odometer", "rego_expiry",
             "insurance_expiry", "service_interval_km", "tyre_interval_km",
-            "wash_needed", "off_road", "service_snoozed_until", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastFillUp", "lastWashed", "openJob",
+            "wash_needed", "off_road", "service_snoozed_until", "tyre_snoozed_until", "driver", "driverName", "report_token", "label", "subtitle", "statusBadge", "nextServiceDue", "nextTyreDue", "odometerAsOf", "lastFillUp", "lastWashed", "openJob",
         ]
 
         read_only_fields = ["report_token"]
@@ -42,6 +42,9 @@ class VehicleSerializer(serializers.ModelSerializer):
         return self._real_date(value, "insurance expiry")
 
     def validate_service_snoozed_until(self, value):
+        return self._real_date(value, "snooze date")
+
+    def validate_tyre_snoozed_until(self, value):
         return self._real_date(value, "snooze date")
 
     def get_label(self, obj):
