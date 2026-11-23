@@ -1406,5 +1406,8 @@ class HomeNoteTests(TestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["text"], "Van 4 at the tyre shop Monday")
         self.assertEqual([n["text"] for n in client.get("/api/home-notes/").data], ["Van 4 at the tyre shop Monday"])
+        edited = client.patch(f"/api/home-notes/{res.data['id']}/", {"text": "Van 4 back Tuesday"}, format="json")
+        self.assertEqual((edited.status_code, edited.data["text"]), (200, "Van 4 back Tuesday"))
+        self.assertEqual(client.patch(f"/api/home-notes/{res.data['id']}/", {"text": " "}, format="json").status_code, 400)
         self.assertEqual(client.delete(f"/api/home-notes/{res.data['id']}/").status_code, 204)
         self.assertEqual(client.get("/api/home-notes/").data, [])

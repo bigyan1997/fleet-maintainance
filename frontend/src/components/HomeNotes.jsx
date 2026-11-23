@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { addHomeNote, deleteHomeNote, useHomeNotes } from '../api/homeNotes'
+import { addHomeNote, deleteHomeNote, editHomeNote, useHomeNotes } from '../api/homeNotes'
 import { useActions } from '../lib/actions'
 
 // Sydney date, dd-mm-yyyy.
@@ -24,6 +24,12 @@ export function HomeNotes() {
     onSuccess: refresh,
     onError: () => toast?.('Could not remove the note. Try again.', true),
   })
+  const [editing, setEditing] = useState(null) // { id, text }
+  const save = useMutation({
+    mutationFn: editHomeNote,
+    onSuccess: () => { setEditing(null); refresh() },
+    onError: () => toast?.('Could not save the note. Try again.', true),
+  })
   const rows = notes.data ?? []
   const submit = (e) => {
     e.preventDefault()
@@ -39,18 +45,40 @@ export function HomeNotes() {
         <ul className="divide-y divide-[#f0f0f0] border-b border-[#f0f0f0]">
           {rows.map((n) => (
             <li key={n.id} className="flex items-start gap-3 px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] break-words whitespace-pre-wrap text-ink">{n.text}</div>
-                <div className="text-[11px] text-off">{noteDate(n.created_at)}</div>
-              </div>
-              <button
-                onClick={() => remove.mutate(n.id)}
-                disabled={remove.isPending}
-                className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-semibold hover:bg-[#f5f5f5]"
-                title="Remove this note"
-              >
-                Done
-              </button>
+              {editing?.id === n.id ? (
+                <form
+                  className="flex min-w-0 flex-1 gap-2"
+                  onSubmit={(e) => { e.preventDefault(); if (editing.text.trim() && !save.isPending) save.mutate({ id: n.id, text: editing.text.trim() }) }}
+                >
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editing.text}
+                    maxLength={500}
+                    onChange={(e) => setEditing({ id: n.id, text: e.target.value })}
+                    aria-label="Edit note"
+                    className="min-w-0 flex-1 rounded-md border border-line bg-white px-2.5 py-1 text-[13px]"
+                  />
+                  <button type="submit" disabled={!editing.text.trim() || save.isPending} className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-semibold hover:bg-[#f5f5f5] disabled:opacity-50">Save</button>
+                  <button type="button" onClick={() => setEditing(null)} className="rounded-md px-2 py-1 text-xs font-semibold text-off hover:bg-[#f5f5f5]">Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] break-words whitespace-pre-wrap text-ink">{n.text}</div>
+                    <div className="text-[11px] text-off">{noteDate(n.created_at)}</div>
+                  </div>
+                  <button onClick={() => setEditing({ id: n.id, text: n.text })} className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-semibold hover:bg-[#f5f5f5]">Edit</button>
+                  <button
+                    onClick={() => remove.mutate(n.id)}
+                    disabled={remove.isPending}
+                    className="rounded-md border border-line bg-white px-2.5 py-1 text-xs font-semibold hover:bg-[#f5f5f5]"
+                    title="Remove this note"
+                  >
+                    Done
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>

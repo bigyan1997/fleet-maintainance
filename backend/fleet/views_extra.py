@@ -754,12 +754,12 @@ class FineViewSet(viewsets.ViewSet):
 
 
 class HomeNoteViewSet(viewsets.ModelViewSet):
-    """The shared notes box on Home: list, add, delete (no editing)."""
+    """The shared notes box on Home: list, add, edit, delete."""
 
     serializer_class = HomeNoteSerializer
     pagination_class = None
     queryset = HomeNote.objects.select_related("author")
-    http_method_names = ["get", "post", "delete", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user if self.request.user.is_authenticated else None)
