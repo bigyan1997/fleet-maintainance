@@ -37,9 +37,8 @@ export function HomeNotes() {
   }
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white">
-      <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
+      <div className="border-b border-line px-4 py-3">
         <h2 className="text-[15px] font-semibold text-ink">Notes</h2>
-        <span className="text-xs text-off">everyone sees these</span>
       </div>
       {rows.length > 0 && (
         <ul className="divide-y divide-[#f0f0f0] border-b border-[#f0f0f0]">
