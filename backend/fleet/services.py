@@ -83,7 +83,14 @@ def next_service_due(vehicle):
     return {
         "due_at": due_at, "km_left": due_at - vehicle.odometer, "booked": open_job(vehicle, "Scheduled service"),
         "km_missing": {"id": unrecorded.pk, "date": unrecorded.date.isoformat()} if unrecorded else None,
+        "snoozed_until": service_snoozed_until(vehicle),
     }
+
+
+def service_snoozed_until(vehicle):
+    """The date the service warning is hidden until, or None once that day has come."""
+    until = vehicle.service_snoozed_until
+    return until if until and until > timezone.localdate() else None
 
 
 def next_tyre_due(vehicle):
@@ -163,7 +170,7 @@ def vehicle_status_badge(vehicle):
     # A service or tyre change that is already booked or at the mechanic is being
     # dealt with, so it doesn't make the van "due soon" (the countdown only resets
     # once the job is finished with its km).
-    km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due and not due["booked"] and not due.get("km_missing") and not vehicle.off_road]
+    km_left = [due["km_left"] for due in (next_service_due(vehicle), next_tyre_due(vehicle)) if due and not due["booked"] and not due.get("km_missing") and not due.get("snoozed_until") and not vehicle.off_road]
     if is_over(vehicle.rego_expiry) or any(k < 0 for k in km_left):
         return "attention"
     if is_soon(vehicle.rego_expiry) or any(k < DUE_SOON_KM_THRESHOLD for k in km_left):
@@ -490,7 +497,7 @@ def dashboard_summary():
     due_count = 0
     for v in vehicles:
         svc = next_service_due(v)
-        overdue_svc = svc is not None and svc["km_left"] < 0
+        overdue_svc = svc is not None and svc["km_left"] < 0 and not svc["snoozed_until"]
         overdue_rego = v.rego_expiry is not None and v.rego_expiry < today
         if overdue_svc or overdue_rego:
             due_count += 1
@@ -560,7 +567,7 @@ def alerts():
         svc = next_service_due(v)
         if svc and svc["km_missing"]:
             svc = None  # Home shows "service done, km missing" for it instead of a countdown that can't be right
-        if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD:
+        if svc and svc["km_left"] < DUE_SOON_KM_THRESHOLD and not svc["snoozed_until"]:
             add("Scheduled service due", f"{svc['due_at']:,} km{booked_note(svc)}", svc["km_left"], svc["booked"])
         tyre = next_tyre_due(v)
         if tyre and tyre["km_left"] < DUE_SOON_KM_THRESHOLD:

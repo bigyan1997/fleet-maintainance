@@ -23,3 +23,9 @@ export async function updateVehicle(id, data) {
 export async function deleteVehicle(id) {
   await api.delete(`/vehicles/${id}/`)
 }
+
+// Change one or two fields only (e.g. the "not urgent" service snooze).
+export async function patchVehicle(id, data) {
+  const res = await api.patch(`/vehicles/${id}/`, data)
+  return res.data
+}

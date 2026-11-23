@@ -13,6 +13,7 @@ import { daysFromToday, fmtAgo, fmtDate, fmtDayDate, sydneyMonthName, todayIso }
 import { kmAgeDays, kmColour, kmIsOld } from '../lib/fleet'
 import { href } from '../lib/router'
 import { StatusBadge } from './FleetView'
+import { SnoozeButton } from './ServiceSnooze'
 import { StatusSelect } from './StatusSelect'
 
 const money = (n) => `$${Number(n || 0).toLocaleString('en-AU', { maximumFractionDigits: 0 })}`
@@ -83,8 +84,8 @@ function VanStrip({ vans }) {
                 <span className="text-[14px] font-semibold text-ink">{v.label}</span>
                 {job ? <span className={'rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ' + job.pill}>{job.label}</span> : <StatusBadge status={v.statusBadge} />}
               </div>
-              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && kmColour(svc.km_left)) || (job ? job.text : svc?.booked ? 'text-primary' : 'text-off'))}>
-                {v.off_road ? 'not being driven' : svc?.km_missing && !svc.booked ? 'service done, km not entered' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
+              <div className={'mt-0.5 text-xs tabular-nums ' + ((!v.off_road && svc && !svc.booked && !svc.snoozed_until && kmColour(svc.km_left)) || (job ? job.text : svc?.booked ? 'text-primary' : 'text-off'))}>
+                {v.off_road ? 'not being driven' : svc?.km_missing && !svc.booked ? 'service done, km not entered' : svc?.booked ? `service ${svc.booked.status === 'Booked' ? `booked ${fmtDate(svc.booked.date).slice(0, 5)}` : 'at the mechanic'}` : svc?.snoozed_until ? `service warning off until ${fmtDate(svc.snoozed_until).slice(0, 5)}` : !svc ? 'no service logged yet' : svc.km_left < 0 ? `service ${n} km overdue` : `service in ${n} km`}
               </div>
             </a>
           )
@@ -175,7 +176,12 @@ export function HomeView() {
         // Rego dates are changed on the Rego dates page, not on the van's history.
         action: a.title.includes('Registration')
           ? <a href={href('vans', 'dates')} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Update rego date</a>
-          : <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>,
+          : (
+            <span className="flex flex-wrap items-center gap-2">
+              <a href={href('vans', a.vehicleId)} className="rounded-md border border-line bg-white px-3 py-1 text-xs font-semibold no-underline hover:bg-[#f5f5f5]">Open</a>
+              {a.title.startsWith('Scheduled service') && <SnoozeButton vehicleId={a.vehicleId} label={a.vehicle} />}
+            </span>
+          ),
       })),
     // Drivers' licences: expired ones first, then those within 30 days (the
     // server decides the status). People who have left aren't chased.

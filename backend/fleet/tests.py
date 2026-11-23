@@ -899,7 +899,7 @@ class FuelStatementOdometerTests(TestCase):
         # Van A: last service at 175,000 + 10,000 = due at 185,000, so 1,639 km to go. With the guessed km it looked 3,000 km overdue.
         self.assertEqual((before, services.next_service_due(self.a)["km_left"]), (-3000, 1639))
         # Van B: its own last service km (61,218) is what the reminder counts from.
-        self.assertEqual(services.next_service_due(self.b), {"due_at": 71218, "km_left": 10000, "booked": None, "km_missing": None})
+        self.assertEqual(services.next_service_due(self.b), {"due_at": 71218, "km_left": 10000, "booked": None, "km_missing": None, "snoozed_until": None})
 
     def test_anything_odd_about_the_km_is_flagged(self):
         flags = {c["label"].split()[0]: [(f[0], f[1]) for f in c["odometer"]["flags"]] for c in self.upload().data["cards"]}
@@ -1335,3 +1335,34 @@ class TypedKmTests(TestCase):
 
         FuelLog.objects.create(vehicle=self.van, date=date(2026, 10, 5), litres=0, cost=5, product="Card fee")  # no km: not a reading
         self.assertEqual(self.api.get(f"/api/vehicles/{self.van.pk}/").data["lastFillUp"], {"date": "2026-10-01", "km": 126156})
+
+
+class ServiceSnoozeTests(TestCase):
+    def test_not_urgent_hides_the_service_warning_until_the_date_then_it_returns(self):
+        from datetime import timedelta
+
+        from . import services
+
+        today = timezone.localdate()
+        van = Vehicle.objects.create(make="Van 2", model="iLoad", rego="CT06HE", odometer=119000, rego_expiry=today + timedelta(days=400))
+        ServiceRecord.objects.create(vehicle=van, service_type="Scheduled service", date=today - timedelta(days=200), status="Invoiced", odometer=108000)
+        self.assertEqual([a["title"] for a in services.alerts()], ["Scheduled service due"])
+        self.assertEqual(services.vehicle_status_badge(van), "attention")  # 1,000 km overdue
+
+        user = get_user_model().objects.create_user("office", password="x")
+        client = APIClient()
+        client.force_authenticate(user)
+        until = today + timedelta(days=7)
+        res = client.patch(f"/api/vehicles/{van.pk}/", {"service_snoozed_until": until.isoformat()}, format="json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["nextServiceDue"]["snoozed_until"], until)
+        self.assertEqual(res.data["nextServiceDue"]["km_left"], -1000)  # the countdown itself is untouched
+        self.assertEqual(services.alerts(), [])
+        van.refresh_from_db()
+        self.assertEqual(services.vehicle_status_badge(van), "ok")
+        self.assertEqual(services.dashboard_summary()["due_count"], 0)
+
+        van.service_snoozed_until = today  # the day it runs out: back on
+        van.save()
+        self.assertEqual([a["title"] for a in services.alerts()], ["Scheduled service due"])
+        self.assertEqual(services.vehicle_status_badge(van), "attention")

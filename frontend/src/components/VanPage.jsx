@@ -10,6 +10,7 @@ import { fmtAgo, fmtDate, fmtDayDate } from '../lib/formatDate'
 import { statusWord } from '../lib/serviceStatus'
 import { href, navigate } from '../lib/router'
 import { ConfirmDialog } from './ConfirmDialog'
+import { SnoozedNote, SnoozeButton } from './ServiceSnooze'
 import { Documents } from './Documents'
 import { ChangeHistory } from './ChangeHistory'
 import { StatusBadge } from './FleetView'
@@ -211,6 +212,14 @@ export function VanPage({ id }) {
           {fuelStats?.per100 ? `${fuelStats.per100} L/100km${fuelStats.highUse ? ' ▲' : ''}` : '—'}
         </Fact>
       </div>
+
+      {svc?.snoozed_until && <SnoozedNote vehicleId={v.id} label={v.label} until={svc.snoozed_until} />}
+      {svc && !svc.snoozed_until && !svc.booked && !svc.km_missing && svc.km_left < 2000 && !v.off_road && (
+        <div className="mb-5 flex flex-wrap items-center gap-3 text-[13px] text-off">
+          <span>Service is {svc.km_left < 0 ? 'overdue' : 'coming up'}. Not a worry right now?</span>
+          <SnoozeButton vehicleId={v.id} label={v.label} />
+        </div>
+      )}
 
       {(v.openJob || openIncidents.length > 0) && (
         <div className="mb-5 flex flex-wrap gap-2.5">

@@ -143,6 +143,9 @@ class Vehicle(models.Model):
     # True while a van is parked and not being driven (e.g. after an accident):
     # no km, service, tyre or wash warnings until it is switched back on.
     off_road = models.BooleanField(default=False)
+    # "Not urgent": the scheduled-service warning is hidden until this date, then
+    # comes back by itself. The km countdown itself is untouched.
+    service_snoozed_until = models.DateField(null=True, blank=True)
     driver = models.ForeignKey(Driver, on_delete=models.SET_NULL, null=True, blank=True, related_name="vehicles")
     # Secret part of the van's QR-sticker link, so drivers can report a
     # problem or a wash without logging in (and without seeing anything else).
