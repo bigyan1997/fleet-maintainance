@@ -583,3 +583,18 @@ class Fine(models.Model):
         if self.status == "to_pay":
             return self.pay_by
         return None
+
+
+class HomeNote(models.Model):
+    """A short note on the Home tab that everyone using the login can see
+    ("what's happening"). Removed with its done button."""
+
+    text = models.CharField(max_length=500)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return self.text

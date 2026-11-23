@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from . import services
 from . import drive
-from .models import Fine, StockItem, StockMove, ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
+from .models import Fine, HomeNote, StockItem, StockMove, ActivityLog, Attachment, Driver, DriverFile, FuelLog, Incident, IncidentUpdate, Mechanic, ServiceRecord, Vehicle
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -370,3 +370,21 @@ class FineSerializer(serializers.ModelSerializer):
             if value and not 2000 <= value.year <= 2099:
                 raise serializers.ValidationError({field: f"That date has the year {value.year}. Check the date."})
         return attrs
+
+
+class HomeNoteSerializer(serializers.ModelSerializer):
+    authorName = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HomeNote
+        fields = ["id", "text", "created_at", "authorName"]
+        read_only_fields = ["created_at"]
+
+    def get_authorName(self, obj):
+        return obj.author.get_username() if obj.author else ""
+
+    def validate_text(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Type the note first.")
+        return value

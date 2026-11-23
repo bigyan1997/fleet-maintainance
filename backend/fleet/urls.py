@@ -32,6 +32,7 @@ from .views_extra import (
     DriverFileViewSet,
     DriverViewSet,
     MechanicViewSet,
+    HomeNoteViewSet,
     StockViewSet,
     FineViewSet,
     FuelTrendsView,
@@ -44,6 +45,7 @@ router.register("incidents", IncidentViewSet, basename="incident")
 router.register("fuel-logs", FuelLogViewSet, basename="fuel-log")
 router.register("drivers", DriverViewSet, basename="driver")
 router.register("driver-files", DriverFileViewSet, basename="driver-file")
+router.register("home-notes", HomeNoteViewSet, basename="home-note")
 router.register("mechanics", MechanicViewSet, basename="mechanic")
 router.register("stock", StockViewSet, basename="stock")
 router.register("fines", FineViewSet, basename="fine")

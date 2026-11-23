@@ -16,8 +16,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import activity, drive, licence_pdf, services, toll_import
-from .models import Fine, FINE_KINDS, StockItem, StockMove, ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
-from .serializers import FineSerializer, StockItemSerializer, StockMoveSerializer, ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
+from .models import Fine, FINE_KINDS, HomeNote, StockItem, StockMove, ISSUE_PHOTO, ActivityLog, Attachment, Budget, Driver, DriverFile, FuelLog, Incident, Mechanic, ServiceRecord, TollStatement, Vehicle, fuel_only_q
+from .serializers import FineSerializer, HomeNoteSerializer, StockItemSerializer, StockMoveSerializer, ActivityLogSerializer, AttachmentSerializer, DriverFileSerializer, DriverSerializer, MechanicSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -751,3 +751,15 @@ class FineViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="kinds")
     def kinds(self, request):
         return Response(FINE_KINDS)
+
+
+class HomeNoteViewSet(viewsets.ModelViewSet):
+    """The shared notes box on Home: list, add, delete (no editing)."""
+
+    serializer_class = HomeNoteSerializer
+    pagination_class = None
+    queryset = HomeNote.objects.select_related("author")
+    http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user if self.request.user.is_authenticated else None)

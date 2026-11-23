@@ -1394,3 +1394,17 @@ class ServiceSnoozeTests(TestCase):
         van.tyre_snoozed_until = today  # back on that day
         van.save()
         self.assertEqual([a["title"] for a in services.alerts()], ["Tyre replacement due"])
+
+
+class HomeNoteTests(TestCase):
+    def test_notes_can_be_added_listed_and_removed_by_anyone_signed_in(self):
+        client = APIClient()
+        self.assertIn(client.get("/api/home-notes/").status_code, (401, 403))
+        client.force_authenticate(get_user_model().objects.create_user("office", password="x"))
+        self.assertEqual(client.post("/api/home-notes/", {"text": "   "}, format="json").status_code, 400)
+        res = client.post("/api/home-notes/", {"text": " Van 4 at the tyre shop Monday "}, format="json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["text"], "Van 4 at the tyre shop Monday")
+        self.assertEqual([n["text"] for n in client.get("/api/home-notes/").data], ["Van 4 at the tyre shop Monday"])
+        self.assertEqual(client.delete(f"/api/home-notes/{res.data['id']}/").status_code, 204)
+        self.assertEqual(client.get("/api/home-notes/").data, [])

@@ -13,6 +13,7 @@ import { daysFromToday, fmtAgo, fmtDate, fmtDayDate, sydneyMonthName, todayIso }
 import { kmAgeDays, kmColour, kmIsOld } from '../lib/fleet'
 import { href } from '../lib/router'
 import { StatusBadge } from './FleetView'
+import { HomeNotes } from './HomeNotes'
 import { SnoozeButton } from './ServiceSnooze'
 import { StatusSelect } from './StatusSelect'
 
@@ -346,8 +347,8 @@ export function HomeView() {
 
       <VanStrip vans={vehicles.data ?? []} />
 
-      {/* Needs doing on the left; work at the mechanic and invoices on the right (stacked on a phone). */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      {/* Three sections: Needs doing, Booked (with invoices), Notes. Stacked on a phone. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-lg border border-line bg-white">
           <div className="flex items-baseline justify-between border-b border-line px-4 py-3">
             <h2 className="text-[15px] font-semibold text-ink">Needs doing</h2>
@@ -441,6 +442,8 @@ export function HomeView() {
             )}
           </div>
         </div>
+
+        <HomeNotes />
       </div>
     </div>
   )
